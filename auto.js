@@ -3,7 +3,7 @@
   if(window.blueflowLoaded) return;
   window.blueflowLoaded = true;
 
-  // ⚠️ ЗАМЕНИ НА СВОЙ РЕАЛЬНЫЙ АДРЕС ПОСЛЕ ДЕПЛОЯ
+  // ✅ ТВОЯ РЕАЛЬНАЯ ССЫЛКА
   const CRM_URL = "https://kristina-ai-crm.onrender.com";
   const currentDomain = window.location.hostname;
   const pageUrl = window.location.href;
