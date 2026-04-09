@@ -81,15 +81,17 @@ async def settings_page(): return open("settings.html", "r", encoding="utf-8").r
 @app.get("/widget/{site_key}", response_class=HTMLResponse)
 async def widget_page(site_key: str): return open("widget.html", "r", encoding="utf-8").read()
 
+# === ИСПРАВЛЕННАЯ ФУНКЦИЯ (Без ошибок синтаксиса) ===
 @app.get("/admin/pending-sites", response_class=HTMLResponse)
 async def pending_sites_page():
     conn = db()
     sites = conn.execute("SELECT id, url, api_key, created_at FROM websites WHERE status='pending' ORDER BY created_at DESC").fetchall()
     conn.close()
     rows = "".join([f"<tr><td>{s['url']}</td><td><code>{s['api_key']}</code></td><td><button onclick=\"approve('{s['api_key']}')\" style=\"background:#22c55e;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer\">✅ Подтвердить</button></td></tr>" for s in sites])
+    
     return HTMLResponse(f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Подтверждение | КРИСТИНА.AI CRM</title>
     <style>body{{font-family:system-ui;padding:40px;background:#0b132b;color:#e2e8f0}}table{{width:100%;border-collapse:collapse;margin-top:20px}}th,td{{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1)}}code{{background:rgba(0,0,0,0.3);padding:4px 8px;border-radius:4px}}</style>
-    <script>function approve(key){{fetch('/api/approve-site',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:key})}}).then(()=>location.reload())}}</script></head><body>
+    <script>function approve(key){{fetch('/api/approve-site',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{api_key:key}})}}).then(()=>location.reload())}}</script></head><body>
     <h1>🔔 Новые сайты в КРИСТИНА.AI CRM</h1><table><thead><tr><th>Сайт</th><th>API-ключ</th><th>Действие</th></tr></thead><tbody>{rows or '<tr><td colspan="3">Нет новых сайтов</td></tr>'}</tbody></table>
     <p style="margin-top:20px"><a href="/dashboard" style="color:#93c5fd">← В панель</a></p></body></html>""")
 
