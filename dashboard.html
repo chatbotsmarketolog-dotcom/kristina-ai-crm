@@ -2,33 +2,44 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Оператор | КРИСТИНА.AI CRM</title>
 <style>
-:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--text:#e2e8f0}
-*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
-body{background:var(--bg);color:var(--text);height:100vh;display:flex}
+:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--soft:#93c5fd;--text:#e2e8f0}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif}
+body{background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden}
 .sidebar{width:320px;background:var(--panel);border-right:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column}
-.sidebar h2{padding:20px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.sidebar h2{padding:20px;font-size:1.3rem;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center}
 #chatList{flex:1;overflow-y:auto;padding:10px}
-.chat-item{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer}
-.chat-item.active{background:rgba(59,130,246,0.15);border-color:rgba(96,165,250,0.4)}
-.main{flex:1;display:flex;flex-direction:column}
-#chatHeader{padding:20px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between}
+.chat-item{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;transition:0.2s}
+.chat-item:hover,.chat-item.active{background:rgba(59,130,246,0.15);border-color:rgba(96,165,250,0.4);transform:translateX(4px)}
+.meta{display:flex;justify-content:space-between;font-size:12px;opacity:0.6;margin-bottom:4px}
+.status{font-size:11px;padding:2px 8px;border-radius:12px;background:rgba(234,179,8,0.2);color:#fbbf24}
+.status.active{background:rgba(34,197,94,0.2);color:#4ade80}
+.preview{font-size:13px;opacity:0.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.main{flex:1;display:flex;flex-direction:column;background:rgba(0,0,0,0.2)}
+#chatHeader{padding:20px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center}
 #chatArea{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
 #footer{padding:16px;background:var(--panel);border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:10px}
-#input{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
-#send{padding:12px 24px;background:var(--acc);border:none;border-radius:10px;color:#fff;cursor:pointer}
-.msg{max-width:75%;padding:10px 14px;border-radius:12px}
-.msg.vis{background:#1e3a8a;color:#dbeafe;align-self:flex-start}
-.msg.op{background:rgba(59,130,246,0.25);align-self:flex-end}
-.nav a{color:#93c5fd;text-decoration:none;margin-left:12px}
+#input{flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text);outline:none}
+#send{padding:12px 24px;border:none;border-radius:10px;background:linear-gradient(145deg,#3b82f6,#1d4ed8);color:#fff;font-weight:600;cursor:pointer}
+.msg{max-width:75%;padding:10px 14px;border-radius:12px;line-height:1.4}
+.msg.vis{background:linear-gradient(145deg,#1e3a8a,#1d4ed8);color:#dbeafe;align-self:flex-start}
+.msg.op{background:rgba(59,130,246,0.25);color:var(--soft);align-self:flex-end}
+.msg.sys{background:rgba(255,255,255,0.05);color:#94a3b8;align-self:center;font-size:12px;padding:4px 12px;border-radius:20px}
+.empty{display:flex;align-items:center;justify-content:center;height:100%;opacity:0.4;font-size:14px}
+.nav a{color:var(--soft);text-decoration:none;font-size:13px;margin-left:12px}
+.nav a:hover{color:#3b82f6}
 </style>
 </head>
 <body>
-<div class="sidebar"><h2>📂 Диалоги</h2><div id="chatList"></div></div>
+<div class="sidebar">
+ <h2>📂 Диалоги <span id="user" style="font-size:12px;opacity:0.5"></span></h2>
+ <div id="chatList"></div>
+</div>
 <div class="main">
- <div id="chatHeader"><span id="title">Выберите диалог</span><span class="nav"><a href="/settings">⚙️</a><a href="#" onclick="logout()">Выйти</a></span></div>
- <div id="chatArea"><div style="display:flex;align-items:center;justify-content:center;height:100%;opacity:0.4">💬 Выберите чат</div></div>
+ <div id="chatHeader"><span id="title">Выберите диалог</span><span class="nav"><a href="/settings" style="color:#93c5fd;text-decoration:none;margin-left:12px">⚙️ Настройки</a><a href="#" onclick="logout()" style="color:#93c5fd;text-decoration:none;margin-left:12px">Выйти</a></span></div>
+ <div id="chatArea"><div class="empty">💬 Выберите чат слева</div></div>
  <div id="footer"><input id="input" placeholder="Введите ответ..." disabled><button id="send" disabled>Отправить</button></div>
 </div>
 <script>
@@ -63,7 +74,7 @@ async function loadChats() {
     cs.forEach(c => {
       const d = document.createElement("div");
       d.className = "chat-item" + (c.id === activeId ? " active" : "");
-      d.innerHTML = `<div style="font-size:12px;opacity:0.6;margin-bottom:4px">${c.site_url || "Сайт"}</div><div>ID: ${c.visitor_id}</div>`;
+      d.innerHTML = `<div class="meta"><span>${c.site_url || "Сайт"}</span><span class="status ${c.status}">${c.status==="active"?"Онлайн":"Ожидание"}</span></div><div class="preview">ID: ${c.visitor_id} | ${new Date(c.created_at).toLocaleTimeString()}</div>`;
       d.onclick = () => openChat(c);
       el.appendChild(d);
     });
@@ -74,7 +85,7 @@ async function loadChats() {
 
 async function openChat(c) {
   activeId = c.id;
-  document.getElementById("title").textContent = c.visitor_id;
+  document.getElementById("title").innerHTML = `${c.visitor_id} <span style="opacity:0.5;font-size:12px;margin-left:8px">${c.site_url || ""}</span>`;
   document.getElementById("input").disabled = false;
   document.getElementById("send").disabled = false;
   
@@ -95,7 +106,7 @@ async function openChat(c) {
 
 function addMsg(t, s) {
   const d = document.createElement("div");
-  d.className = "msg " + (s === "visitor" ? "vis" : "op");
+  d.className = "msg " + (s === "visitor" ? "vis" : s === "operator" ? "op" : "sys");
   d.textContent = t;
   document.getElementById("chatArea").appendChild(d);
   document.getElementById("chatArea").scrollTop = 9999;
@@ -106,7 +117,7 @@ function connect() {
     ws = new WebSocket(`wss://${location.host}/ws/operator?token=${token}`);
     ws.onmessage = e => {
       const d = JSON.parse(e.data);
-      if (d.type === "new") loadChats();
+      if (d.type === "new" || d.type === "system") loadChats();
       if (d.type === "msg" && d.chat_id === activeId) addMsg(d.text, d.sender);
     };
     ws.onclose = () => setTimeout(connect, 3000);
@@ -124,7 +135,12 @@ document.getElementById("send").onclick = () => {
   i.value = "";
 };
 
+document.getElementById("input").onkeypress = e => {
+  if (e.key === "Enter" && !e.shiftKey) document.getElementById("send").click();
+};
+
 function logout() {
+  console.log('🚪 Logging out...');
   localStorage.removeItem('kristina_crm_token');
   window.location.href = '/login';
 }
