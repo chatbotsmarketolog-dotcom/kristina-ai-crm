@@ -9,7 +9,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 SECRET_KEY = secrets.token_urlsafe(32)
 DB = "crm.db"
-APP_URL = os.getenv("APP_URL", "https://kristina-ai-crm.onrender.com")
+
+# Для Koyeb лучше задавать APP_URL в переменных окружения, но здесь запасной вариант
+APP_URL = os.getenv("APP_URL", "https://kristina-ai-crm.koyeb.app")
 
 TELEGRAM_BOT_TOKEN = "8694190622:AAEVveNpF60fGx8wMl5ViJWawsdWAOqk9Yk"
 TELEGRAM_CHAT_ID = "6300678737"
@@ -57,10 +59,17 @@ def get_owner_id(req: Request):
 
 def send_telegram(domain, api_key):
     try:
-        text = f"🔔 *Новый сайт*\n\n🌐 {domain}\n🔑 `{api_key}`\n\n✅ Подтверди: {APP_URL}/admin/pending-sites"
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=5)
-    except: 
-        pass
+        text = f"🔔 *Новый сайт в КРИСТИНА.AI CRM*\n\n🌐 {domain}\n🔑 `{api_key}`\n\n✅ Подтверди: {APP_URL}/admin/pending-sites"
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        data = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": text,
+            "parse_mode": "Markdown"
+        }
+        response = requests.post(url, json=data, timeout=10)
+        print(f"Telegram response: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"Telegram ERROR: {e}")
 
 class ConnManager:
     def __init__(self): 
@@ -97,7 +106,7 @@ class ConnManager:
 
 mgr = ConnManager()
 
-# === STATIC FILES ===
+# === STATIC FILES (Исправление ошибки 404 для фото) ===
 @app.get("/avatar.jpg")
 async def get_avatar():
     return FileResponse("avatar.jpg")
