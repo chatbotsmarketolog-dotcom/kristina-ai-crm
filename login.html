@@ -21,7 +21,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;p
 .orb-2{width:400px;height:400px;background:radial-gradient(circle,var(--cyan),transparent);bottom:-10%;right:-10%;animation-delay:-5s}
 @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-40px) scale(1.1)}}
 .view{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;transition:opacity 0.5s ease}
-.hidden{opacity:0;pointer-events:none;position:absolute;top:0;left:0;width:100%}
+.hidden{display:none!important;opacity:0;pointer-events:none;position:absolute;top:0;left:0;width:100%}
 .hero-card{max-width:900px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:24px;padding:clamp(2rem,5vw,3.5rem);box-shadow:0 20px 50px -10px rgba(0,0,0,0.6);position:relative;overflow:hidden}
 .hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
 .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:rgba(59,130,246,0.15);border:1px solid var(--border);border-radius:100px;font-size:0.85rem;font-weight:600;color:var(--blue-5);margin-bottom:1.5rem}
@@ -102,6 +102,11 @@ h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;margin-bott
 const API = location.origin;
 let isReg = false;
 
+// Автопереход если уже авторизован
+if (localStorage.getItem('kristina_crm_token')) {
+  window.location.href = '/dashboard';
+}
+
 function goToAuth() {
   document.getElementById('landing').classList.add('hidden');
   document.getElementById('auth').classList.remove('hidden');
@@ -128,7 +133,7 @@ function toggleMode() {
 }
 
 async function auth(e, mode) {
-  if(e) e.preventDefault(); // Блокируем перезагрузку страницы
+  if(e) e.preventDefault();
   const u = document.getElementById('u').value.trim();
   const p = document.getElementById('p').value;
   
@@ -151,7 +156,6 @@ async function auth(e, mode) {
     localStorage.setItem('kristina_crm_token', d.token);
     document.getElementById('err').textContent = '✅ Успешно! Переход...';
     
-    // Небольшая задержка для UX и гарантированного перехода
     setTimeout(() => {
       window.location.href = '/dashboard';
     }, 300);
@@ -160,11 +164,6 @@ async function auth(e, mode) {
     console.error('Auth Error:', err);
     document.getElementById('err').textContent = err.message;
   }
-}
-
-// Автопереход, если уже авторизован
-if (localStorage.getItem('kristina_crm_token')) {
-  window.location.href = '/dashboard';
 }
 </script>
 </body>
