@@ -159,30 +159,59 @@ async def pending_sites_page():
 # === AUTH ===
 @app.post("/auth/register")
 async def register(req: Request):
-    d = await req.json()
-    u, p = d.get("username","").strip(), d.get("password","")
-    if len(u)<2 or len(p)<4: 
-        return {"error":"Мин. 2 символа логин, 4 пароль"}, 400
-    conn = db()
     try:
+        d = await req.json()
+        u, p = d.get("username","").strip(), d.get("password","")
+        
+        if len(u) < 2:
+            return {"error": "Логин слишком короткий (мин. 2 символа)"}, 400
+        if len(p) < 4:
+            return {"error": "Пароль слишком короткий (мин. 4 символа)"}, 400
+        
+        conn = db()
+        existing = conn.execute("SELECT id FROM users WHERE username=?", (u,)).fetchone()
+        if existing:
+            conn.close()
+            return {"error": "Пользователь с таким логином уже существует"}, 409
+        
         conn.execute("INSERT INTO users (username, password_hash) VALUES (?,?)", (u, hash_pwd(p)))
         conn.commit()
-        return {"token": create_token(u)}
-    except: 
-        return {"error":"Логин занят"}, 409
-    finally: 
         conn.close()
+        
+        token = create_token(u)
+        return {"token": token, "username": u}
+    except Exception as e:
+        print(f"Register error: {e}")
+        return {"error": "Ошибка регистрации"}, 500
 
 @app.post("/auth/login")
 async def login(req: Request):
-    d = await req.json()
-    u, p = d.get("username","").strip(), d.get("password","")
-    conn = db()
-    row = conn.execute("SELECT id FROM users WHERE username=? AND password_hash=?", (u, hash_pwd(p))).fetchone()
-    conn.close()
-    if not row: 
-        return {"error":"Неверные данные"}, 401
-    return {"token": create_token(u)}
+    try:
+        d = await req.json()
+        u, p = d.get("username","").strip(), d.get("password","")
+        
+        if not u or not p:
+            return {"error": "Введите логин и пароль"}, 400
+        
+        conn = db()
+        row = conn.execute("SELECT id, username FROM users WHERE username=? AND password_hash=?", (u, hash_pwd(p))).fetchone()
+        conn.close()
+        
+        if not row:
+            conn = db()
+            user_exists = conn.execute("SELECT id FROM users WHERE username=?", (u,)).fetchone()
+            conn.close()
+            
+            if not user_exists:
+                return {"error": "Пользователь не найден. Зарегистрируйтесь."}, 404
+            else:
+                return {"error": "Неверный пароль"}, 401
+        
+        token = create_token(u)
+        return {"token": token, "username": u}
+    except Exception as e:
+        print(f"Login error: {e}")
+        return {"error": "Ошибка входа"}, 500
 
 # === SITES ===
 @app.post("/api/websites")
