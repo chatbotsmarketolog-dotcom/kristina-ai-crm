@@ -1,4 +1,8 @@
-<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Оператор | КРИСТИНА.AI CRM</title>
 <style>
 :root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--soft:#93c5fd;--text:#e2e8f0}
@@ -25,7 +29,9 @@ body{background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:h
 .msg.sys{background:rgba(255,255,255,0.05);color:#94a3b8;align-self:center;font-size:12px;padding:4px 12px;border-radius:20px}
 .empty{display:flex;align-items:center;justify-content:center;height:100%;opacity:0.4;font-size:14px}
 .nav a{color:var(--soft);text-decoration:none;font-size:13px;margin-left:12px}
-</style></head><body>
+</style>
+</head>
+<body>
 <div class="sidebar">
  <h2>📂 Диалоги <span id="user" style="font-size:12px;opacity:0.5"></span></h2>
  <div id="chatList"></div>
@@ -36,13 +42,18 @@ body{background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:h
  <div id="footer"><input id="input" placeholder="Введите ответ..." disabled><button id="send" disabled>Отправить</button></div>
 </div>
 <script>
-const API=location.origin, token=localStorage.getItem('token');
-if(!token) window.location.href='/login';
+// ПРОВЕРКА АВТОРИЗАЦИИ
+const token = localStorage.getItem('kristina_crm_token');
+if (!token) {
+  window.location.href = '/login';
+}
+
+const API=location.origin;
 let ws, activeId=null;
-fetch(API+'/api/me',{headers:{Authorization:`Bearer ${token}`}}).then(r=>r.ok?r.json().then(d=>document.getElementById('user').textContent=d.username):logout()).catch(()=>logout());
 
 async function loadChats(){
  const r=await fetch(API+"/api/chats",{headers:{Authorization:`Bearer ${token}`}});
+ if(r.status===401){logout();return}
  const cs=await r.json();
  const el=document.getElementById("chatList"); el.innerHTML="";
  if(!cs.length) el.innerHTML="<div style='text-align:center;opacity:0.5;padding:30px'>Нет диалогов</div>";
@@ -70,13 +81,13 @@ function addMsg(t,s){
 }
 
 function connect(){
- ws=new WebSocket(`ws://${location.host}/ws/operator?token=${token}`);
+ ws=new WebSocket(`wss://${location.host}/ws/operator?token=${token}`);
  ws.onmessage=e=>{const d=JSON.parse(e.data); if(d.type==="new"||d.type==="system")loadChats(); if(d.type==="msg"&&d.chat_id===activeId)addMsg(d.text,d.sender)};
  ws.onclose=()=>setTimeout(connect,3000);
 }
 
 document.getElementById("send").onclick=()=>{const i=document.getElementById("input"); if(!i.value.trim()||!activeId)return; ws.send(JSON.stringify({chat_id:activeId,text:i.value})); addMsg(i.value,"operator"); i.value=""};
 document.getElementById("input").onkeypress=e=>{if(e.key==="Enter"&&!e.shiftKey)document.getElementById("send").click()};
-function logout(){localStorage.removeItem('token');window.location.href='/login'}
+function logout(){localStorage.removeItem('kristina_crm_token');window.location.href='/login'}
 connect(); loadChats(); setInterval(loadChats,8000);
 </script></body></html>
