@@ -1,6 +1,6 @@
 import os, json, sqlite3, uuid, time, requests
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import jwt, hashlib, secrets
 
@@ -11,7 +11,6 @@ SECRET_KEY = secrets.token_urlsafe(32)
 DB = "crm.db"
 APP_URL = os.getenv("APP_URL", "https://kristina-ai-crm.onrender.com")
 
-# 🔔 TELEGRAM УВЕДОМЛЕНИЯ
 TELEGRAM_BOT_TOKEN = "8694190622:AAEVveNpF60fGx8wMl5ViJWawsdWAOqk9Yk"
 TELEGRAM_CHAT_ID = "6300678737"
 
@@ -22,14 +21,19 @@ def db():
     return conn
 
 def init_db():
-    conn = db()
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-        CREATE TABLE IF NOT EXISTS websites (id INTEGER PRIMARY KEY, url TEXT UNIQUE, api_key TEXT UNIQUE, owner_id TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(owner_id) REFERENCES users(username));
-        CREATE TABLE IF NOT EXISTS chats (id INTEGER PRIMARY KEY, website_id INTEGER, visitor_id TEXT, status TEXT DEFAULT 'waiting', operator_id TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(website_id) REFERENCES websites(id));
-        CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, chat_id INTEGER, sender TEXT, text TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(chat_id) REFERENCES chats(id));
-    """)
-    conn.commit(); conn.close()
+    try:
+        conn = db()
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS websites (id INTEGER PRIMARY KEY, url TEXT UNIQUE, api_key TEXT UNIQUE, owner_id TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS chats (id INTEGER PRIMARY KEY, website_id INTEGER, visitor_id TEXT, status TEXT DEFAULT 'waiting', operator_id TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+            CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, chat_id INTEGER, sender TEXT, text TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"DB Init Warning: {e}")
+
 init_db()
 
 def hash_pwd(p): return hashlib.sha256((p + "crm_salt_2026").encode()).hexdigest()
@@ -47,9 +51,9 @@ def get_owner_id(req: Request):
 
 def send_telegram(domain, api_key):
     try:
-        text = f"🔔 *Новый сайт в КРИСТИНА.AI CRM*\n\n🌐 {domain}\n🔑 `{api_key}`\n\n✅ Подтверди: {APP_URL}/admin/pending-sites"
+        text = f"🔔 *Новый сайт*\n\n🌐 {domain}\n🔑 `{api_key}`\n\n✅ Подтверди: {APP_URL}/admin/pending-sites"
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=5)
-    except Exception as e: print(f"Telegram error: {e}")
+    except: pass
 
 class ConnManager:
     def __init__(self): self.visitors, self.operators = {}, {}
@@ -69,6 +73,16 @@ class ConnManager:
 
 mgr = ConnManager()
 
+# === STATIC FILES ===
+@app.get("/avatar.jpg") async def get_avatar(): return FileResponse("avatar.jpg")
+@app.get("/favicon.png") async def get_favicon(): return FileResponse("favicon.png")
+@app.get("/og-image.png") async def get_og(): return FileResponse("og-image.png")
+@app.get("/auto.js") async def get_autojs(): return FileResponse("auto.js", media_type="application/javascript")
+
+# === HEALTH CHECK (для UptimeRobot) ===
+@app.get("/health")
+async def health(): return {"status": "ok", "message": "CRM is alive"}
+
 # === HTML ROUTES ===
 @app.get("/", response_class=HTMLResponse)
 async def root(): return open("login.html", "r", encoding="utf-8").read()
@@ -81,19 +95,20 @@ async def settings_page(): return open("settings.html", "r", encoding="utf-8").r
 @app.get("/widget/{site_key}", response_class=HTMLResponse)
 async def widget_page(site_key: str): return open("widget.html", "r", encoding="utf-8").read()
 
-# === ИСПРАВЛЕННАЯ ФУНКЦИЯ (Без ошибок синтаксиса) ===
 @app.get("/admin/pending-sites", response_class=HTMLResponse)
 async def pending_sites_page():
     conn = db()
-    sites = conn.execute("SELECT id, url, api_key, created_at FROM websites WHERE status='pending' ORDER BY created_at DESC").fetchall()
+    sites = conn.execute("SELECT id, url, api_key FROM websites WHERE status='pending' ORDER BY created_at DESC").fetchall()
     conn.close()
-    rows = "".join([f"<tr><td>{s['url']}</td><td><code>{s['api_key']}</code></td><td><button onclick=\"approve('{s['api_key']}')\" style=\"background:#22c55e;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer\">✅ Подтвердить</button></td></tr>" for s in sites])
+    rows = ""
+    for s in sites:
+        rows += f"<tr><td>{s['url']}</td><td><code>{s['api_key']}</code></td><td><button onclick=\"fetch('/api/approve-site',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{api_key:'{s['api_key']}'}})}}).then(()=>location.reload())\" style=\"background:#22c55e;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer\">✅</button></td></tr>"
     
-    return HTMLResponse(f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Подтверждение | КРИСТИНА.AI CRM</title>
-    <style>body{{font-family:system-ui;padding:40px;background:#0b132b;color:#e2e8f0}}table{{width:100%;border-collapse:collapse;margin-top:20px}}th,td{{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1)}}code{{background:rgba(0,0,0,0.3);padding:4px 8px;border-radius:4px}}</style>
-    <script>function approve(key){{fetch('/api/approve-site',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{api_key:key}})}}).then(()=>location.reload())}}</script></head><body>
-    <h1>🔔 Новые сайты в КРИСТИНА.AI CRM</h1><table><thead><tr><th>Сайт</th><th>API-ключ</th><th>Действие</th></tr></thead><tbody>{rows or '<tr><td colspan="3">Нет новых сайтов</td></tr>'}</tbody></table>
-    <p style="margin-top:20px"><a href="/dashboard" style="color:#93c5fd">← В панель</a></p></body></html>""")
+    html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Админ | КРИСТИНА.AI CRM</title><style>body{font-family:system-ui;padding:40px;background:#0b132b;color:#e2e8f0}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1)}code{background:rgba(0,0,0,0.3);padding:4px 8px;border-radius:4px}</style></head><body>"
+    html += "<h1>🔔 Новые сайты</h1><table><thead><tr><th>Сайт</th><th>API-ключ</th><th>Действие</th></tr></thead><tbody>"
+    html += rows if rows else "<tr><td colspan='3'>Нет новых сайтов</td></tr>"
+    html += "</tbody></table><p style='margin-top:20px'><a href='/dashboard' style='color:#93c5fd'>← В панель</a></p></body></html>"
+    return HTMLResponse(html)
 
 # === AUTH ===
 @app.post("/auth/register")
@@ -118,7 +133,7 @@ async def login(req: Request):
     if not row: return {"error":"Неверные данные"}, 401
     return {"token": create_token(u)}
 
-# === SITES & AUTO-REG ===
+# === SITES ===
 @app.post("/api/websites")
 async def add_site(req: Request, owner: str = Depends(get_owner_id)):
     d = await req.json(); url = d.get("url","").strip()
