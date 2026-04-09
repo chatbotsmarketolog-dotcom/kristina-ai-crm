@@ -4,12 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>КРИСТИНА.AI CRM — Интеллектуальная система управления диалогами</title>
-
-<!-- 🔹 Фавикон -->
 <link rel="icon" type="image/png" href="favicon.png">
-<link rel="apple-touch-icon" href="favicon.png">
-
-<!-- 🔹 Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://kristina-ai-crm.onrender.com/">
 <meta property="og:title" content="КРИСТИНА.AI CRM">
@@ -17,51 +12,27 @@
 <meta property="og:image" content="https://kristina-ai-crm.onrender.com/og-image.png">
 
 <style>
-:root{
-  --bg:#050a14;
-  --blue-1:#0b1526;
-  --blue-2:#112240;
-  --blue-3:#1e3a8a;
-  --blue-4:#3b82f6;
-  --blue-5:#60a5fa;
-  --cyan:#00e5ff;
-  --glass:rgba(15,25,45,0.65);
-  --border:rgba(59,130,246,0.25);
-  --text:#e2e8f0;
-  --text-muted:#94a3b8;
-  --shadow:0 20px 50px -10px rgba(0,0,0,0.6);
-}
+:root{--bg:#050a14;--glass:rgba(15,25,45,0.65);--border:rgba(59,130,246,0.25);--text:#e2e8f0;--text-muted:#94a3b8;--blue-4:#3b82f6;--blue-5:#60a5fa;--cyan:#00e5ff}
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif}
 body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;position:relative}
-
-/* ========== BACKGROUND ========== */
 .bg-grid{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(59,130,246,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,0.05) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse at center,black 20%,transparent 70%)}
 .bg-orb{position:fixed;border-radius:50%;filter:blur(100px);opacity:0.4;pointer-events:none;z-index:0;animation:orbFloat 20s infinite ease-in-out}
 .orb-1{width:500px;height:500px;background:radial-gradient(circle,var(--blue-4),transparent);top:-10%;left:-10%}
 .orb-2{width:400px;height:400px;background:radial-gradient(circle,var(--cyan),transparent);bottom:-10%;right:-10%;animation-delay:-5s}
 @keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,-40px) scale(1.1)}}
-
-/* ========== VIEWS ========== */
-.view{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;transition:opacity 0.6s ease}
+.view{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;transition:opacity 0.5s ease}
 .hidden{opacity:0;pointer-events:none;position:absolute;top:0;left:0;width:100%}
-
-/* ========== HERO CARD ========== */
-.hero-card{max-width:900px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:24px;padding:clamp(2rem,5vw,3.5rem);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.hero-card{max-width:900px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:24px;padding:clamp(2rem,5vw,3.5rem);box-shadow:0 20px 50px -10px rgba(0,0,0,0.6);position:relative;overflow:hidden}
 .hero-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
-
 .badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:rgba(59,130,246,0.15);border:1px solid var(--border);border-radius:100px;font-size:0.85rem;font-weight:600;color:var(--blue-5);margin-bottom:1.5rem}
 h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(--blue-5));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .subtitle{font-size:clamp(1rem,2vw,1.25rem);color:var(--text-muted);max-width:600px;margin:0 auto 2.5rem;line-height:1.6}
-
-/* ========== INFO GRID ========== */
 .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;margin-bottom:2.5rem}
 .glass-card{background:rgba(10,18,32,0.7);border:1px solid var(--border);border-radius:16px;padding:1.5rem;transition:transform 0.3s,box-shadow 0.3s}
 .glass-card:hover{transform:translateY(-4px);box-shadow:0 10px 30px rgba(0,229,255,0.1);border-color:rgba(0,229,255,0.3)}
 .glass-card .icon{font-size:1.8rem;margin-bottom:0.8rem}
 .glass-card h3{font-size:1.1rem;margin-bottom:0.5rem;color:#fff}
 .glass-card p{font-size:0.95rem;color:var(--text-muted);line-height:1.5}
-
-/* ========== CREATOR ========== */
 .creator-card{display:flex;align-items:center;gap:1.5rem;background:rgba(10,18,32,0.6);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:2.5rem;flex-wrap:wrap}
 .photo-ring{position:relative;width:80px;height:80px;flex-shrink:0}
 .photo-ring::before{content:'';position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(from 0deg,var(--blue-4),var(--cyan),var(--blue-4));animation:spin 4s linear infinite}
@@ -71,25 +42,19 @@ h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;margin-bott
 .creator-name{font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:8px}
 .tags{display:flex;flex-wrap:wrap;gap:8px}
 .tags span{padding:4px 10px;background:rgba(59,130,246,0.15);border:1px solid var(--border);border-radius:8px;font-size:0.8rem;color:var(--blue-5)}
-
-/* ========== BUTTON ========== */
-.cta-btn{width:100%;max-width:320px;margin:0 auto;padding:16px 24px;background:linear-gradient(135deg,var(--blue-4),var(--cyan));color:#050a14;font-weight:700;font-size:1.1rem;border:none;border-radius:14px;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;box-shadow:0 8px 25px rgba(0,229,255,0.3)}
-.cta-btn:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 12px 35px rgba(0,229,255,0.4)}
-
-/* ========== AUTH ========== */
-.auth-card{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:2.5rem;width:100%;max-width:380px;box-shadow:var(--shadow);text-align:center;position:relative}
+.cta-btn,.auth-btn{width:100%;max-width:320px;margin:0 auto;padding:16px 24px;background:linear-gradient(135deg,var(--blue-4),var(--cyan));color:#050a14;font-weight:700;font-size:1.1rem;border:none;border-radius:14px;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;box-shadow:0 8px 25px rgba(0,229,255,0.3)}
+.cta-btn:hover,.auth-btn:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 12px 35px rgba(0,229,255,0.4)}
+.auth-card{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:2.5rem;width:100%;max-width:380px;box-shadow:0 20px 50px -10px rgba(0,0,0,0.6);text-align:center;position:relative}
 .back-btn{position:absolute;top:16px;left:16px;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text-muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem}
 .back-btn:hover{background:rgba(59,130,246,0.2);color:#fff}
 .auth-card h1{font-size:1.6rem;margin-bottom:8px;background:linear-gradient(135deg,#fff,var(--blue-5));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .auth-card p{opacity:0.6;margin-bottom:20px;font-size:14px}
 .auth-card input{width:100%;padding:12px 16px;margin-bottom:12px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:14px;outline:none}
 .auth-card input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,229,255,0.2)}
-.auth-btn{width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--blue-4),#1d4ed8);color:#fff;font-weight:600;cursor:pointer;margin-top:6px}
-.auth-btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(59,130,246,0.35)}
+.auth-btn{background:linear-gradient(135deg,var(--blue-4),#1d4ed8);color:#fff;margin-top:6px}
 .toggle{display:block;text-align:center;margin-top:16px;color:var(--blue-5);font-size:13px;cursor:pointer}
 .toggle:hover{text-decoration:underline}
 .error{color:#f87171;font-size:12px;margin-bottom:10px;min-height:18px}
-
 @media(max-width:600px){.creator-card{flex-direction:column;text-align:center}.tags{justify-content:center}}
 </style>
 </head>
@@ -99,93 +64,107 @@ h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.15;margin-bott
 <div class="bg-orb orb-1"></div>
 <div class="bg-orb orb-2"></div>
 
-<!-- LANDING -->
 <main id="landing" class="view landing">
   <div class="hero-card">
     <div class="badge">🚀 КРИСТИНА.AI CRM v1.0</div>
     <h1>Интеллектуальная система<br>управления диалогами</h1>
     <p class="subtitle">Единое пространство для автоматизации общения с клиентами.</p>
-
     <div class="info-grid">
-      <div class="glass-card">
-        <div class="icon">🔍</div>
-        <h3>Что это?</h3>
-        <p>Закрытая CRM-платформа для приёма и ведения диалогов с посетителями сайтов в реальном времени.</p>
-      </div>
-      <div class="glass-card">
-        <div class="icon">⚡</div>
-        <h3>Для чего?</h3>
-        <p>Чтобы не терять заявки, видеть полную историю переписки и отвечать клиентам из одного удобного окна.</p>
-      </div>
+      <div class="glass-card"><div class="icon">🔍</div><h3>Что это?</h3><p>Закрытая CRM-платформа для приёма и ведения диалогов с посетителями сайтов в реальном времени.</p></div>
+      <div class="glass-card"><div class="icon">⚡</div><h3>Для чего?</h3><p>Чтобы не терять заявки, видеть полную историю переписки и отвечать клиентам из одного удобного окна.</p></div>
     </div>
-
     <div class="creator-card">
-      <div class="photo-ring">
-        <img src="avatar.jpg" alt="Кристина" class="creator-photo" onerror="this.src='https://via.placeholder.com/80?text=К'">
-      </div>
+      <div class="photo-ring"><img src="avatar.jpg" alt="Кристина" class="creator-photo" onerror="this.src='https://via.placeholder.com/80?text=К'"></div>
       <div class="creator-text">
         <h4>Создатель продукта</h4>
         <p class="creator-name">Кристина</p>
-        <div class="tags">
-          <span>Маркетолог</span>
-          <span>Разработчик</span>
-          <span>Визионер</span>
-          <span>Эксперт по AI</span>
-          <span>Архитектор брендов</span>
-        </div>
+        <div class="tags"><span>Маркетолог</span><span>Разработчик</span><span>Визионер</span><span>Эксперт по AI</span><span>Архитектор брендов</span></div>
       </div>
     </div>
-
-    <button class="cta-btn" onclick="goToAuth()">Начать работу →</button>
+    <button type="button" class="cta-btn" onclick="goToAuth()">Начать работу →</button>
   </div>
 </main>
 
-<!-- AUTH -->
 <section id="auth" class="view auth hidden">
   <div class="auth-card">
-    <button class="back-btn" onclick="goToLanding()">← Назад</button>
+    <button type="button" class="back-btn" onclick="goToLanding()">← Назад</button>
     <h1>🔐 Вход в систему</h1>
     <p>Введите данные для доступа к панели управления</p>
     <div class="error" id="err"></div>
     <input type="text" id="u" placeholder="Логин" autocomplete="username">
     <input type="password" id="p" placeholder="Пароль" autocomplete="current-password">
-    <button class="auth-btn" onclick="auth('login')">Войти</button>
+    <button type="button" class="auth-btn" onclick="auth(event, 'login')">Войти</button>
     <span class="toggle" onclick="toggleMode()">Нет аккаунта? Зарегистрироваться</span>
   </div>
 </section>
 
 <script>
-// View Switcher
-function goToAuth(){
+const API = location.origin;
+let isReg = false;
+
+function goToAuth() {
   document.getElementById('landing').classList.add('hidden');
   document.getElementById('auth').classList.remove('hidden');
 }
-function goToLanding(){
+function goToLanding() {
   document.getElementById('auth').classList.add('hidden');
   document.getElementById('landing').classList.remove('hidden');
+  document.getElementById('err').textContent = '';
 }
 
-// Auth Logic
-const API=location.origin;
-let isReg=false;
-function toggleMode(){
-  const b=document.querySelector('.auth-btn'), t=document.querySelector('.toggle'), s=document.querySelector('.auth-card p');
-  isReg=!isReg;
-  if(isReg){b.textContent='Зарегистрироваться';t.textContent='Уже есть аккаунт? Войти';s.textContent='Создайте учётную запись'}
-  else{b.textContent='Войти';t.textContent='Нет аккаунта? Зарегистрироваться';s.textContent='Введите данные для доступа'}
-  document.getElementById('err').textContent='';
+function toggleMode() {
+  const b = document.querySelector('.auth-btn'), t = document.querySelector('.toggle'), s = document.querySelector('.auth-card p');
+  isReg = !isReg;
+  if (isReg) {
+    b.textContent = 'Зарегистрироваться';
+    t.textContent = 'Уже есть аккаунт? Войти';
+    s.textContent = 'Создайте учётную запись менеджера';
+  } else {
+    b.textContent = 'Войти';
+    t.textContent = 'Нет аккаунта? Зарегистрироваться';
+    s.textContent = 'Введите данные для доступа к панели управления';
+  }
+  document.getElementById('err').textContent = '';
 }
-async function auth(mode){
-  const u=document.getElementById('u').value.trim(), p=document.getElementById('p').value;
-  if(!u||p.length<4){document.getElementById('err').textContent='Заполните все поля';return}
-  document.getElementById('err').textContent='';
-  try{
-    const r=await fetch(API+`/auth/${mode}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
-    const d=await r.json();
-    if(!r.ok) throw new Error(d.error);
-    localStorage.setItem('token', d.token);
-    window.location.href='/dashboard';
-  }catch(e){document.getElementById('err').textContent=e.message}
+
+async function auth(e, mode) {
+  if(e) e.preventDefault(); // Блокируем перезагрузку страницы
+  const u = document.getElementById('u').value.trim();
+  const p = document.getElementById('p').value;
+  
+  if (!u || p.length < 4) {
+    document.getElementById('err').textContent = 'Логин мин. 2 символа, пароль мин. 4';
+    return;
+  }
+  
+  document.getElementById('err').textContent = '⏳ Обработка...';
+  try {
+    const r = await fetch(`${API}/auth/${mode}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const d = await r.json();
+    
+    if (!r.ok) throw new Error(d.error || 'Ошибка сервера');
+    
+    localStorage.setItem('kristina_crm_token', d.token);
+    document.getElementById('err').textContent = '✅ Успешно! Переход...';
+    
+    // Небольшая задержка для UX и гарантированного перехода
+    setTimeout(() => {
+      window.location.href = '/dashboard';
+    }, 300);
+    
+  } catch (err) {
+    console.error('Auth Error:', err);
+    document.getElementById('err').textContent = err.message;
+  }
+}
+
+// Автопереход, если уже авторизован
+if (localStorage.getItem('kristina_crm_token')) {
+  window.location.href = '/dashboard';
 }
 </script>
 </body>
