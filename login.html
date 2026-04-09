@@ -30,6 +30,7 @@ h1{font-size:2.5rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,va
 .auth-card input{width:100%;padding:12px;margin:10px 0;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text)}
 .toggle{display:block;margin-top:16px;color:var(--blue-4);cursor:pointer}
 .error{color:#f87171;font-size:12px;margin:10px 0;min-height:18px}
+.success{color:#4ade80;font-size:12px;margin:10px 0}
 </style>
 </head>
 <body>
@@ -57,105 +58,89 @@ h1{font-size:2.5rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,va
 <section id="auth" class="view auth hidden">
   <div class="auth-card">
     <button type="button" class="back-btn" onclick="goToLanding()">← Назад</button>
-    <h1 style="font-size:1.6rem;margin-bottom:10px">🔐 Вход</h1>
-    <div class="error" id="err"></div>
+    <h1 style="font-size:1.6rem;margin-bottom:10px" id="authTitle">🔐 Вход</h1>
+    <div id="msg"></div>
     <input type="text" id="u" placeholder="Логин">
     <input type="password" id="p" placeholder="Пароль">
-    <button type="button" class="auth-btn" onclick="handleAuth(event)">Зарегистрироваться</button>
+    <button type="button" class="auth-btn" id="authBtn" onclick="handleAuth()">Зарегистрироваться</button>
     <span class="toggle" onclick="toggleMode()">Уже есть аккаунт? Войти</span>
   </div>
 </section>
 
 <script>
-console.log(' login.html loaded');
 const API = location.origin;
 let isRegister = true;
 
-// ПРОВЕРКА ПРИ ЗАГРУЗКЕ
-window.addEventListener('DOMContentLoaded', () => {
-  const token = localStorage.getItem('kristina_crm_token');
-  console.log('🔑 Token on load:', token);
-  if (token && token !== 'null') {
-    console.log('✅ Token exists, redirecting to /dashboard');
-    window.location.href = '/dashboard';
-  }
-});
-
 function goToAuth() {
-  console.log('➡️ goToAuth called');
   document.getElementById('landing').classList.add('hidden');
   document.getElementById('auth').classList.remove('hidden');
 }
 
 function goToLanding() {
-  console.log('⬅️ goToLanding called');
   document.getElementById('auth').classList.add('hidden');
   document.getElementById('landing').classList.remove('hidden');
-  document.getElementById('err').textContent = '';
+  clearMsg();
 }
 
 function toggleMode() {
   isRegister = !isRegister;
-  const btn = document.querySelector('.auth-btn');
-  const toggle = document.querySelector('.toggle');
-  if (isRegister) {
-    btn.textContent = 'Зарегистрироваться';
-    toggle.textContent = 'Уже есть аккаунт? Войти';
-  } else {
-    btn.textContent = 'Войти';
-    toggle.textContent = 'Нет аккаунта? Зарегистрироваться';
-  }
-  document.getElementById('err').textContent = '';
+  document.getElementById('authTitle').textContent = isRegister ? '🔐 Вход' : '📝 Регистрация';
+  document.getElementById('authBtn').textContent = isRegister ? 'Зарегистрироваться' : 'Войти';
+  document.querySelector('.toggle').textContent = isRegister ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
+  clearMsg();
 }
 
-async function handleAuth(e) {
-  e.preventDefault();
-  console.log('🔘 handleAuth called');
-  
+function showMsg(text, isError=true) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = isError ? 'error' : 'success';
+}
+
+function clearMsg() {
+  document.getElementById('msg').textContent = '';
+}
+
+async function handleAuth() {
   const username = document.getElementById('u').value.trim();
   const password = document.getElementById('p').value;
   
   if (!username || password.length < 4) {
-    document.getElementById('err').textContent = 'Логин мин. 2 символа, пароль мин. 4';
+    showMsg('Логин мин. 2 символа, пароль мин. 4');
     return;
   }
   
-  const endpoint = isRegister ? 'register' : 'login';
-  console.log(`📡 Sending ${endpoint} request for:`, username);
+  const endpoint = isRegister ? '/auth/register' : '/auth/login';
   
   try {
-    const response = await fetch(`${API}/auth/${endpoint}`, {
+    const response = await fetch(API + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
     
-    console.log('📥 Response status:', response.status);
     const data = await response.json();
-    console.log('📦 Response data:', data);
     
     if (!response.ok) {
-      throw new Error(data.error || 'Ошибка');
+      showMsg(data.error || 'Ошибка');
+      return;
     }
     
-    // СОХРАНЯЕМ ТОКЕН
+    // Успех!
     localStorage.setItem('kristina_crm_token', data.token);
-    const savedToken = localStorage.getItem('kristina_crm_token');
-    console.log('✅ Token saved:', savedToken);
+    showMsg('✅ Успешно! Переход...', false);
     
-    document.getElementById('err').textContent = '✅ Успешно! Переход...';
-    
-    // ПЕРЕХОД В CRM
-    setTimeout(() => {
-      console.log('🚀 Redirecting to /dashboard...');
-      window.location.href = '/dashboard';
-    }, 500);
+    // ПРЯМОЙ редирект без setTimeout
+    window.location.replace('/dashboard');
     
   } catch (error) {
-    console.error('❌ Auth error:', error);
-    document.getElementById('err').textContent = error.message;
+    showMsg('Ошибка соединения');
   }
 }
+
+// Enter для отправки
+document.getElementById('p').onkeypress = function(e) {
+  if (e.key === 'Enter') handleAuth();
+};
 </script>
 </body>
 </html>
