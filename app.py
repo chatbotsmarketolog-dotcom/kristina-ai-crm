@@ -2,7 +2,7 @@ import os, json, uuid, hashlib, datetime, secrets, requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-import google.generativeai as genai
+# import google.generativeai as genai  <-- ОТКЛЮЧЕНО ВРЕМЕННО
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True, origins=["*"])
@@ -52,7 +52,7 @@ class AIManager(db.Model):
     name = db.Column(db.String(100))
     behavior = db.Column(db.Text)
     forbidden = db.Column(db.Text)
-    knowledge_base = db.Column(db.Text) # ссылки на файлы или текст
+    knowledge_base = db.Column(db.Text) 
     is_active = db.Column(db.Boolean, default=False)
 
 class TelegramBot(db.Model):
@@ -186,7 +186,6 @@ def toggle_user():
 def admin_message():
     d = request.json
     db.session.add(AdminMessage(user_id=d['user_id'], text=d['text']))
-    # Добавляем как системное сообщение во все активные чаты пользователя
     user_sites = Website.query.filter_by(owner_id=d['user_id']).all()
     for site in user_sites:
         chats = Chat.query.filter_by(website_id=site.id).all()
@@ -195,7 +194,7 @@ def admin_message():
     db.session.commit()
     return jsonify({"ok": True})
 
-# === AI МЕНЕДЖЕР ===
+# === AI МЕНЕДЖЕР (ПОКА ЗАГЛУШКА) ===
 @app.route('/api/ai/setup', methods=['POST'])
 @token_required
 def setup_ai():
@@ -212,14 +211,9 @@ def setup_ai():
 @app.route('/api/ai/respond', methods=['POST'])
 @token_required
 def ai_respond():
-    # Заглушка для Gemini. Подставь свой API ключ в переменную окружения GEMINI_KEY
     d = request.json
-    ai = AIManager.query.filter_by(user_id=request.current_user.id, is_active=True).first()
-    if not ai: return jsonify({"error": "AI не активен"}), 400
-    
-    # Здесь будет реальный вызов Gemini
-    response_text = f"[AI Ответ на: {d['question']}]" 
-    return jsonify({"answer": response_text})
+    # Заглушка: пока просто возвращает текст вопроса
+    return jsonify({"answer": f"AI пока в разработке. Ваш вопрос: {d.get('question', '')}"})
 
 # === TELEGRAM БОТ ===
 @app.route('/api/telegram/setup', methods=['POST'])
@@ -243,13 +237,13 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
-# Раздача статики (веб-версия)
+# Раздача статики
 @app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory(app.static_folder, path)
 
-# === ЗАПУСК ПРИЛОЖЕНИЯ (ВАЖНО ДЛЯ RENDER) ===
+# === ЗАПУСК (ДЛЯ RENDER) ===
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=True)
