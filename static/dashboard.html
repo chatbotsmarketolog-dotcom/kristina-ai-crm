@@ -463,15 +463,46 @@ function changePassword(){
   });
 }
 
+// TELEGRAM НАСТРОЙКИ С ЛОГАМИ
 function saveTelegramSettings(){
   const chatId = document.getElementById('telegramChatId').value.trim();
   const tokenBot = document.getElementById('telegramToken').value.trim();
-  if(!chatId || !tokenBot){alert('❌ Заполните оба поля');return;}
-  fetchAPI('/admin/save_chat_id', 'POST', {chat_id: chatId}).then(()=>{
-    fetchAPI('/telegram/setup', 'POST', {token: tokenBot, active: true}).then(()=>{
-      alert('✅ Настройки Telegram сохранены!');
+  
+  console.log('📱 Сохранение Telegram настроек...');
+  console.log('Chat ID:', chatId);
+  console.log('Token:', tokenBot);
+  
+  if(!chatId || !tokenBot){
+    alert('❌ Заполните оба поля: Chat ID и Токен бота');
+    return;
+  }
+  
+  // Сохраняем Chat ID
+  fetchAPI('/admin/save_chat_id', 'POST', {chat_id: chatId})
+    .then(result => {
+      console.log('✅ Chat ID сохранён:', result);
+      if(!result) {
+        throw new Error('Chat ID не сохранился');
+      }
+      
+      // Сохраняем токен бота
+      return fetchAPI('/telegram/setup', 'POST', {token: tokenBot, active: true});
+    })
+    .then(result => {
+      console.log('✅ Токен бота сохранён:', result);
+      if(!result) {
+        throw new Error('Токен бота не сохранился');
+      }
+      
+      alert('✅ Настройки Telegram сохранены!\n\nТеперь вы будете получать уведомления о:\n• Новых регистрациях\n• Добавленных сайтах\n• Одобренных сайтах');
+      
+      // Очищаем поле токена (для безопасности)
+      document.getElementById('telegramToken').value = '';
+    })
+    .catch(error => {
+      console.error('❌ Ошибка сохранения:', error);
+      alert('❌ Ошибка: ' + error.message + '\n\nПроверьте консоль (F12) для деталей');
     });
-  });
 }
 
 function logout() {
