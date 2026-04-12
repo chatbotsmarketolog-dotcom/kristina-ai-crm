@@ -23,7 +23,7 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     api_token = db.Column(db.String(100), unique=True, default=lambda: secrets.token_urlsafe(32))
-    telegram_chat_id = db.Column(db.String(100))  # Для уведомлений
+    telegram_chat_id = db.Column(db.String(100))
 
 class Website(db.Model):
     __tablename__ = 'website'
@@ -77,7 +77,6 @@ class AdminMessage(db.Model):
 
 # === ФУНКЦИЯ ОТПРАВКИ УВЕДОМЛЕНИЙ TELEGRAM ===
 def send_telegram_notification(bot_token, chat_id, message):
-    """Отправляет уведомление в Telegram"""
     try:
         if not bot_token or not chat_id:
             return False
@@ -121,10 +120,8 @@ def admin_required(f):
 
 # === ДОБАВЛЕНИЕ НОВОЙ КОЛОНКИ (если нет) ===
 def add_missing_columns():
-    """Добавляет недостающие колонки в базу данных"""
     with app.app_context():
         try:
-            # Проверяем и добавляем колонку telegram_chat_id в таблицу user
             db.session.execute(text("""
                 ALTER TABLE "user" 
                 ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)
@@ -154,7 +151,6 @@ def register():
     db.session.add(u)
     db.session.commit()
     
-    # ✅ УВЕДОМЛЕНИЕ ТЕБЕ о новой регистрации
     admin = User.query.filter_by(is_admin=True).first()
     if admin and admin.telegram_chat_id:
         bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
@@ -181,7 +177,6 @@ def add_site():
     db.session.add(site)
     db.session.commit()
     
-    # ✅ УВЕДОМЛЕНИЕ ТЕБЕ о новом сайте
     admin = User.query.filter_by(is_admin=True).first()
     if admin and admin.telegram_chat_id:
         bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
@@ -200,7 +195,6 @@ def approve_site():
         site.status = 'active'
         db.session.commit()
         
-        # ✅ УВЕДОМЛЕНИЕ владельцу сайта об одобрении
         owner = User.query.get(site.owner_id)
         if owner and owner.telegram_chat_id:
             bot_record = TelegramBot.query.filter_by(user_id=owner.id, is_active=True).first()
@@ -208,7 +202,6 @@ def approve_site():
                 msg = f"✅ <b>Ваш сайт одобрен!</b>\n\n🔗 URL: <code>{site.url}</code>\n🎉 Теперь вы можете принимать диалоги!"
                 send_telegram_notification(bot_record.bot_token, owner.telegram_chat_id, msg)
         
-        # ✅ УВЕДОМЛЕНИЕ ТЕБЕ об одобрении
         admin = request.current_user
         if admin.telegram_chat_id:
             bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
@@ -302,9 +295,14 @@ def setup_tg():
     d = request.json
     tb = TelegramBot.query.filter_by(user_id=request.current_user.id).first()
     if tb:
-        tb.bot_token, tb.is_active = d['token'], d.get('active', False)
+        tb.bot_token = d.get('token')
+        tb.is_active = d.get('active', False)
     else:
-        tb = TelegramBot(user_id=request.current_user.id, **d)
+        tb = TelegramBot(
+            user_id=request.current_user.id,
+            bot_token=d.get('token'),
+            is_active=d.get('active', False)
+        )
         db.session.add(tb)
     db.session.commit()
     return jsonify({"ok": True})
@@ -337,7 +335,7 @@ def change_password():
 # === ИНИЦИАЛИЗАЦИЯ БД ===
 with app.app_context():
     db.create_all()
-    add_missing_columns()  # ✅ Добавляем недостающие колонки
+    add_missing_columns()
     if not User.query.filter_by(username='Kristina').first():
         admin = User(username='Kristina', password_hash=hash_pwd('1234'), is_admin=True)
         db.session.add(admin)
