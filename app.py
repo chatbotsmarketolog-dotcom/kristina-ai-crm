@@ -155,7 +155,7 @@ def get_chats():
 @token_required
 def get_messages(chat_id):
     msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
-    return jsonify([{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msg in msgs])
+    return jsonify([{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msgs])
 
 @app.route('/api/send', methods=['POST'])
 @token_required
@@ -202,7 +202,7 @@ def setup_ai():
     d = request.json
     ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
     if ai:
-        ai.name, ai.behavior, ai.forbidden, ai.knowledge_base, ai.is_active = d['name'], d['behavior'], d['forced'], d.get('kb',''), d.get('active', False)
+        ai.name, ai.behavior, ai.forbidden, ai.knowledge_base, ai.is_active = d['name'], d['behavior'], d['forbidden'], d.get('kb',''), d.get('active', False)
     else:
         ai = AIManager(user_id=request.current_user.id, **d)
         db.session.add(ai)
@@ -249,5 +249,7 @@ with app.app_context():
 def serve_static(path):
     return send_from_directory(app.static_folder, path)
 
+# === ЗАПУСК ПРИЛОЖЕНИЯ (ВАЖНО ДЛЯ RENDER) ===
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port, debug=True)
