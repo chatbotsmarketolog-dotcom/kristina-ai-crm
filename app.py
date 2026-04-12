@@ -2,6 +2,7 @@ import os, json, uuid, hashlib, datetime, secrets, requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True, origins=["*"])
@@ -14,6 +15,7 @@ db = SQLAlchemy(app)
 
 # === МОДЕЛИ БАЗЫ ДАННЫХ ===
 class User(db.Model):
+    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
@@ -24,6 +26,7 @@ class User(db.Model):
     telegram_chat_id = db.Column(db.String(100))  # Для уведомлений
 
 class Website(db.Model):
+    __tablename__ = 'website'
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String(200), unique=True, nullable=False)
     api_key = db.Column(db.String(50), unique=True, nullable=False)
@@ -32,6 +35,7 @@ class Website(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 class Chat(db.Model):
+    __tablename__ = 'chat'
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'))
     visitor_id = db.Column(db.String(50))
@@ -40,6 +44,7 @@ class Chat(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 class Message(db.Model):
+    __tablename__ = 'message'
     id = db.Column(db.Integer, primary_key=True)
     chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'))
     sender = db.Column(db.String(20))
@@ -47,6 +52,7 @@ class Message(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 class AIManager(db.Model):
+    __tablename__ = 'aimanager'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     name = db.Column(db.String(100))
@@ -56,12 +62,14 @@ class AIManager(db.Model):
     is_active = db.Column(db.Boolean, default=False)
 
 class TelegramBot(db.Model):
+    __tablename__ = 'telegrambot'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     bot_token = db.Column(db.String(200), unique=True)
     is_active = db.Column(db.Boolean, default=False)
 
 class AdminMessage(db.Model):
+    __tablename__ = 'adminmessage'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     text = db.Column(db.Text)
@@ -111,13 +119,29 @@ def admin_required(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
+# === ДОБАВЛЕНИЕ НОВОЙ КОЛОНКИ (если нет) ===
+def add_missing_columns():
+    """Добавляет недостающие колонки в базу данных"""
+    with app.app_context():
+        try:
+            # Проверяем и добавляем колонку telegram_chat_id в таблицу user
+            db.session.execute(text("""
+                ALTER TABLE "user" 
+                ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)
+            """))
+            db.session.commit()
+            print("✅ Колонка telegram_chat_id добавлена (или уже существует)")
+        except Exception as e:
+            print(f"⚠️ Ошибка при добавлении колонки: {e}")
+            db.session.rollback()
+
 # === АВТОРИЗАЦИЯ ===
 @app.route('/api/login', methods=['POST'])
 def login():
     d = request.json
     user = User.query.filter_by(username=d.get('username'), password_hash=hash_pwd(d.get('password'))).first()
     if user and user.is_active:
-        return jsonify({"ok": True, "token": user.api_token, "is_admin": user.is_admin})
+        return jsonify({"ok": True, "token": user.api_token, "is_admin": user.is_admin, "username": user.username})
     return jsonify({"error": "Неверные данные или аккаунт отключен"}), 401
 
 @app.route('/api/register', methods=['POST'])
@@ -133,13 +157,12 @@ def register():
     # ✅ УВЕДОМЛЕНИЕ ТЕБЕ о новой регистрации
     admin = User.query.filter_by(is_admin=True).first()
     if admin and admin.telegram_chat_id:
-        # Получаем токен бота из базы (если есть)
         bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
         if bot_record:
             msg = f"🆕 <b>Новая регистрация!</b>\n\n👤 Пользователь: <code>{u.username}</code>\n⏰ Время: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M')}"
             send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
     
-    return jsonify({"ok": True, "token": u.api_token})
+    return jsonify({"ok": True, "token": u.api_token, "username": u.username})
 
 # === САЙТЫ И ЧАТЫ ===
 @app.route('/api/sites', methods=['GET'])
@@ -296,9 +319,25 @@ def save_chat_id():
     db.session.commit()
     return jsonify({"ok": True})
 
+# === СМЕНА ПАРОЛЯ ===
+@app.route('/api/change_password', methods=['POST'])
+@token_required
+def change_password():
+    d = request.json
+    user = request.current_user
+    new_password = d.get('password')
+    
+    if not new_password or len(new_password) < 4:
+        return jsonify({"error": "Пароль должен быть минимум 4 символа"}), 400
+    
+    user.password_hash = hash_pwd(new_password)
+    db.session.commit()
+    return jsonify({"ok": True})
+
 # === ИНИЦИАЛИЗАЦИЯ БД ===
 with app.app_context():
     db.create_all()
+    add_missing_columns()  # ✅ Добавляем недостающие колонки
     if not User.query.filter_by(username='Kristina').first():
         admin = User(username='Kristina', password_hash=hash_pwd('1234'), is_admin=True)
         db.session.add(admin)
