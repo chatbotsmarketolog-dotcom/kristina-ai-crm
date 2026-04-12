@@ -2,7 +2,6 @@ import os, json, uuid, hashlib, datetime, secrets, requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-# import google.generativeai as genai  <-- ОТКЛЮЧЕНО ВРЕМЕННО
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True, origins=["*"])
@@ -22,6 +21,7 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     api_token = db.Column(db.String(100), unique=True, default=lambda: secrets.token_urlsafe(32))
+    telegram_chat_id = db.Column(db.String(100))  # Для уведомлений
 
 class Website(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -42,7 +42,7 @@ class Chat(db.Model):
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'))
-    sender = db.Column(db.String(20)) # visitor, operator, admin, ai
+    sender = db.Column(db.String(20))
     text = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -52,7 +52,7 @@ class AIManager(db.Model):
     name = db.Column(db.String(100))
     behavior = db.Column(db.Text)
     forbidden = db.Column(db.Text)
-    knowledge_base = db.Column(db.Text) 
+    knowledge_base = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=False)
 
 class TelegramBot(db.Model):
@@ -66,6 +66,25 @@ class AdminMessage(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     text = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+# === ФУНКЦИЯ ОТПРАВКИ УВЕДОМЛЕНИЙ TELEGRAM ===
+def send_telegram_notification(bot_token, chat_id, message):
+    """Отправляет уведомление в Telegram"""
+    try:
+        if not bot_token or not chat_id:
+            return False
+        
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        data = {
+            "chat_id": chat_id,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        response = requests.post(url, json=data, timeout=5)
+        return response.status_code == 200
+    except Exception as e:
+        print(f"Telegram notification error: {e}")
+        return False
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 def hash_pwd(p): return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
@@ -106,9 +125,20 @@ def register():
     d = request.json
     if User.query.filter_by(username=d.get('username')).first():
         return jsonify({"error": "Пользователь существует"}), 409
+    
     u = User(username=d['username'], password_hash=hash_pwd(d['password']))
     db.session.add(u)
     db.session.commit()
+    
+    # ✅ УВЕДОМЛЕНИЕ ТЕБЕ о новой регистрации
+    admin = User.query.filter_by(is_admin=True).first()
+    if admin and admin.telegram_chat_id:
+        # Получаем токен бота из базы (если есть)
+        bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
+        if bot_record:
+            msg = f"🆕 <b>Новая регистрация!</b>\n\n👤 Пользователь: <code>{u.username}</code>\n⏰ Время: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
+    
     return jsonify({"ok": True, "token": u.api_token})
 
 # === САЙТЫ И ЧАТЫ ===
@@ -124,8 +154,18 @@ def get_sites():
 def add_site():
     url = request.json.get('url')
     key = f"site_{uuid.uuid4().hex[:8]}"
-    db.session.add(Website(url=url, api_key=key, owner_id=request.current_user.id))
+    site = Website(url=url, api_key=key, owner_id=request.current_user.id)
+    db.session.add(site)
     db.session.commit()
+    
+    # ✅ УВЕДОМЛЕНИЕ ТЕБЕ о новом сайте
+    admin = User.query.filter_by(is_admin=True).first()
+    if admin and admin.telegram_chat_id:
+        bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
+        if bot_record:
+            msg = f"🌐 <b>Новый сайт добавлен!</b>\n\n🔗 URL: <code>{url}</code>\n👤 Владелец: <code>{request.current_user.username}</code>\n⏳ Статус: <b>Ожидает одобрения</b>"
+            send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
+    
     return jsonify({"ok": True})
 
 @app.route('/api/sites/<int:site_id>/approve', methods=['POST'])
@@ -133,8 +173,26 @@ def add_site():
 def approve_site():
     site = Website.query.get(site_id)
     if site:
+        old_status = site.status
         site.status = 'active'
         db.session.commit()
+        
+        # ✅ УВЕДОМЛЕНИЕ владельцу сайта об одобрении
+        owner = User.query.get(site.owner_id)
+        if owner and owner.telegram_chat_id:
+            bot_record = TelegramBot.query.filter_by(user_id=owner.id, is_active=True).first()
+            if bot_record:
+                msg = f"✅ <b>Ваш сайт одобрен!</b>\n\n🔗 URL: <code>{site.url}</code>\n🎉 Теперь вы можете принимать диалоги!"
+                send_telegram_notification(bot_record.bot_token, owner.telegram_chat_id, msg)
+        
+        # ✅ УВЕДОМЛЕНИЕ ТЕБЕ об одобрении
+        admin = request.current_user
+        if admin.telegram_chat_id:
+            bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
+            if bot_record:
+                msg = f"✔️ <b>Сайт одобрен!</b>\n\n🔗 URL: <code>{site.url}</code>\n👤 Владелец: <code>{owner.username if owner else 'Unknown'}</code>"
+                send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
+    
     return jsonify({"ok": True})
 
 @app.route('/api/chats', methods=['GET'])
@@ -194,7 +252,7 @@ def admin_message():
     db.session.commit()
     return jsonify({"ok": True})
 
-# === AI МЕНЕДЖЕР (ПОКА ЗАГЛУШКА) ===
+# === AI МЕНЕДЖЕР ===
 @app.route('/api/ai/setup', methods=['POST'])
 @token_required
 def setup_ai():
@@ -212,7 +270,6 @@ def setup_ai():
 @token_required
 def ai_respond():
     d = request.json
-    # Заглушка: пока просто возвращает текст вопроса
     return jsonify({"answer": f"AI пока в разработке. Ваш вопрос: {d.get('question', '')}"})
 
 # === TELEGRAM БОТ ===
@@ -229,6 +286,16 @@ def setup_tg():
     db.session.commit()
     return jsonify({"ok": True})
 
+# === СОХРАНЕНИЕ CHAT ID ===
+@app.route('/api/admin/save_chat_id', methods=['POST'])
+@token_required
+def save_chat_id():
+    d = request.json
+    user = request.current_user
+    user.telegram_chat_id = d.get('chat_id')
+    db.session.commit()
+    return jsonify({"ok": True})
+
 # === ИНИЦИАЛИЗАЦИЯ БД ===
 with app.app_context():
     db.create_all()
@@ -237,13 +304,11 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
-# Раздача статики
 @app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
 def serve_static(path):
     return send_from_directory(app.static_folder, path)
 
-# === ЗАПУСК (ДЛЯ RENDER) ===
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=True)
