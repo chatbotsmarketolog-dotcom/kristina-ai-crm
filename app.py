@@ -7,7 +7,6 @@ from sqlalchemy import text
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True, origins=["*"])
 
-# Настройки БД и секретов
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
@@ -33,6 +32,8 @@ class Website(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
 class Chat(db.Model):
     __tablename__ = 'chat'
@@ -75,25 +76,17 @@ class AdminMessage(db.Model):
     text = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
-# === ФУНКЦИЯ ОТПРАВКИ УВЕДОМЛЕНИЙ TELEGRAM ===
 def send_telegram_notification(bot_token, chat_id, message):
     try:
-        if not bot_token or not chat_id:
-            return False
-        
+        if not bot_token or not chat_id: return False
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        data = {
-            "chat_id": chat_id,
-            "text": message,
-            "parse_mode": "HTML"
-        }
+        data = {"chat_id": chat_id, "text": message, "parse_mode": "HTML"}
         response = requests.post(url, json=data, timeout=5)
         return response.status_code == 200
     except Exception as e:
         print(f"Telegram notification error: {e}")
         return False
 
-# === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 def hash_pwd(p): return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
 def get_token(): return request.headers.get('Authorization', '').replace('Bearer ', '')
 
@@ -101,8 +94,7 @@ def token_required(f):
     def wrapper(*args, **kwargs):
         token = get_token()
         user = User.query.filter_by(api_token=token).first()
-        if not user or not user.is_active:
-            return jsonify({"error": "Unauthorized"}), 401
+        if not user or not user.is_active: return jsonify({"error": "Unauthorized"}), 401
         request.current_user = user
         return f(*args, **kwargs)
     wrapper.__name__ = f.__name__
@@ -118,21 +110,18 @@ def admin_required(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
-# === ДОБАВЛЕНИЕ НОВОЙ КОЛОНКИ (если нет) ===
 def add_missing_columns():
     with app.app_context():
         try:
-            db.session.execute(text("""
-                ALTER TABLE "user" 
-                ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)
-            """))
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)'))
+            db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE'))
+            db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP'))
             db.session.commit()
-            print("✅ Колонка telegram_chat_id добавлена (или уже существует)")
+            print("✅ Миграции применены")
         except Exception as e:
-            print(f"⚠️ Ошибка при добавлении колонки: {e}")
+            print(f"⚠️ Ошибка миграции: {e}")
             db.session.rollback()
 
-# === АВТОРИЗАЦИЯ ===
 @app.route('/api/login', methods=['POST'])
 def login():
     d = request.json
@@ -146,26 +135,21 @@ def register():
     d = request.json
     if User.query.filter_by(username=d.get('username')).first():
         return jsonify({"error": "Пользователь существует"}), 409
-    
     u = User(username=d['username'], password_hash=hash_pwd(d['password']))
-    db.session.add(u)
-    db.session.commit()
-    
+    db.session.add(u); db.session.commit()
     admin = User.query.filter_by(is_admin=True).first()
     if admin and admin.telegram_chat_id:
         bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
         if bot_record:
-            msg = f"🆕 <b>Новая регистрация!</b>\n\n👤 Пользователь: <code>{u.username}</code>\n⏰ Время: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            msg = f"🆕 <b>Новая регистрация!</b>\n\n👤 Пользователь: <code>{u.username}</code>"
             send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
-    
     return jsonify({"ok": True, "token": u.api_token, "username": u.username})
 
-# === САЙТЫ И ЧАТЫ ===
 @app.route('/api/sites', methods=['GET'])
 @token_required
 def get_sites():
     u = request.current_user
-    sites = Website.query.filter_by(owner_id=u.id).all() if not u.is_admin else Website.query.all()
+    sites = Website.query.filter_by(owner_id=u.id, is_deleted=False).all() if not u.is_admin else Website.query.filter_by(is_deleted=False).all()
     return jsonify([{"id":s.id, "url":s.url, "api_key":s.api_key, "status":s.status, "owner":s.owner_id} for s in sites])
 
 @app.route('/api/sites', methods=['POST'])
@@ -174,51 +158,43 @@ def add_site():
     url = request.json.get('url')
     key = f"site_{uuid.uuid4().hex[:8]}"
     site = Website(url=url, api_key=key, owner_id=request.current_user.id)
-    db.session.add(site)
-    db.session.commit()
-    
+    db.session.add(site); db.session.commit()
     admin = User.query.filter_by(is_admin=True).first()
     if admin and admin.telegram_chat_id:
         bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
         if bot_record:
-            msg = f"🌐 <b>Новый сайт добавлен!</b>\n\n🔗 URL: <code>{url}</code>\n👤 Владелец: <code>{request.current_user.username}</code>\n⏳ Статус: <b>Ожидает одобрения</b>"
+            msg = f"🌐 <b>Новый сайт!</b>\n🔗 {url}\n👤 {request.current_user.username}"
             send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
-    
     return jsonify({"ok": True})
 
 @app.route('/api/sites/<int:site_id>/approve', methods=['POST'])
 @admin_required
 def approve_site():
     site = Website.query.get(site_id)
-    if site:
-        old_status = site.status
-        site.status = 'active'
-        db.session.commit()
-        
+    if site and not site.is_deleted:
+        site.status = 'active'; db.session.commit()
         owner = User.query.get(site.owner_id)
         if owner and owner.telegram_chat_id:
             bot_record = TelegramBot.query.filter_by(user_id=owner.id, is_active=True).first()
             if bot_record:
-                msg = f"✅ <b>Ваш сайт одобрен!</b>\n\n🔗 URL: <code>{site.url}</code>\n🎉 Теперь вы можете принимать диалоги!"
-                send_telegram_notification(bot_record.bot_token, owner.telegram_chat_id, msg)
-        
-        admin = request.current_user
-        if admin.telegram_chat_id:
-            bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
-            if bot_record:
-                msg = f"✔️ <b>Сайт одобрен!</b>\n\n🔗 URL: <code>{site.url}</code>\n👤 Владелец: <code>{owner.username if owner else 'Unknown'}</code>"
-                send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
-    
+                send_telegram_notification(bot_record.bot_token, owner.telegram_chat_id, f"✅ Сайт одобрен: {site.url}")
+    return jsonify({"ok": True})
+
+@app.route('/api/sites/<int:site_id>/delete', methods=['POST'])
+@token_required
+def delete_site():
+    site = Website.query.get(site_id)
+    if not site or site.owner_id != request.current_user.id: return jsonify({"error": "Не найдено"}), 404
+    site.is_deleted = True
+    site.deleted_at = datetime.datetime.utcnow()
+    db.session.commit()
     return jsonify({"ok": True})
 
 @app.route('/api/chats', methods=['GET'])
 @token_required
 def get_chats():
     u = request.current_user
-    if u.is_admin:
-        chats = Chat.query.order_by(Chat.created_at.desc()).all()
-    else:
-        chats = Chat.query.join(Website).filter(Website.owner_id==u.id).order_by(Chat.created_at.desc()).all()
+    chats = Chat.query.join(Website).filter(Website.owner_id==u.id, Website.is_deleted==False).order_by(Chat.created_at.desc()).all()
     res = []
     for c in chats:
         w = Website.query.get(c.website_id)
@@ -239,7 +215,6 @@ def send_message():
     db.session.commit()
     return jsonify({"ok": True})
 
-# === АДМИН-ПАНЕЛЬ: ПОЛЬЗОВАТЕЛИ ===
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required
 def admin_users():
@@ -250,9 +225,7 @@ def admin_users():
 @admin_required
 def toggle_user():
     u = User.query.get(request.json.get('user_id'))
-    if u:
-        u.is_active = not u.is_active
-        db.session.commit()
+    if u: u.is_active = not u.is_active; db.session.commit()
     return jsonify({"ok": True})
 
 @app.route('/api/admin/message', methods=['POST'])
@@ -260,15 +233,34 @@ def toggle_user():
 def admin_message():
     d = request.json
     db.session.add(AdminMessage(user_id=d['user_id'], text=d['text']))
-    user_sites = Website.query.filter_by(owner_id=d['user_id']).all()
+    user_sites = Website.query.filter_by(owner_id=d['user_id'], is_deleted=False).all()
     for site in user_sites:
-        chats = Chat.query.filter_by(website_id=site.id).all()
-        for chat in chats:
-            db.session.add(Message(chat_id=chat.id, sender='admin', text=f"📢 Сообщение от админа: {d['text']}"))
+        for chat in Chat.query.filter_by(website_id=site.id).all():
+            db.session.add(Message(chat_id=chat.id, sender='admin', text=f"📢 {d['text']}"))
     db.session.commit()
     return jsonify({"ok": True})
 
-# === AI МЕНЕДЖЕР ===
+@app.route('/api/admin/trash', methods=['GET'])
+@admin_required
+def get_trash():
+    sites = Website.query.filter_by(is_deleted=True).order_by(Website.deleted_at.desc()).all()
+    return jsonify([{"id":s.id, "url":s.url, "deleted_at":s.deleted_at.isoformat(), "owner":s.owner_id} for s in sites])
+
+@app.route('/api/admin/trash/<int:site_id>/restore', methods=['POST'])
+@admin_required
+def restore_site():
+    site = Website.query.get(site_id)
+    if site:
+        site.is_deleted = False; site.deleted_at = None; db.session.commit()
+    return jsonify({"ok": True})
+
+@app.route('/api/admin/trash/<int:site_id>', methods=['DELETE'])
+@admin_required
+def permanent_delete():
+    site = Website.query.get(site_id)
+    if site: db.session.delete(site); db.session.commit()
+    return jsonify({"ok": True})
+
 @app.route('/api/ai/setup', methods=['POST'])
 @token_required
 def setup_ai():
@@ -277,68 +269,50 @@ def setup_ai():
     if ai:
         ai.name, ai.behavior, ai.forbidden, ai.knowledge_base, ai.is_active = d['name'], d['behavior'], d['forbidden'], d.get('kb',''), d.get('active', False)
     else:
-        ai = AIManager(user_id=request.current_user.id, **d)
-        db.session.add(ai)
+        ai = AIManager(user_id=request.current_user.id, **d); db.session.add(ai)
     db.session.commit()
     return jsonify({"ok": True})
 
 @app.route('/api/ai/respond', methods=['POST'])
 @token_required
 def ai_respond():
-    d = request.json
-    return jsonify({"answer": f"AI пока в разработке. Ваш вопрос: {d.get('question', '')}"})
+    return jsonify({"answer": "AI пока в разработке"})
 
-# === TELEGRAM БОТ ===
 @app.route('/api/telegram/setup', methods=['POST'])
 @token_required
 def setup_tg():
     d = request.json
     tb = TelegramBot.query.filter_by(user_id=request.current_user.id).first()
     if tb:
-        tb.bot_token = d.get('token')
-        tb.is_active = d.get('active', False)
+        tb.bot_token = d.get('token'); tb.is_active = d.get('active', False)
     else:
-        tb = TelegramBot(
-            user_id=request.current_user.id,
-            bot_token=d.get('token'),
-            is_active=d.get('active', False)
-        )
+        tb = TelegramBot(user_id=request.current_user.id, bot_token=d.get('token'), is_active=d.get('active', False))
         db.session.add(tb)
     db.session.commit()
     return jsonify({"ok": True})
 
-# === СОХРАНЕНИЕ CHAT ID ===
 @app.route('/api/admin/save_chat_id', methods=['POST'])
 @token_required
 def save_chat_id():
-    d = request.json
     user = request.current_user
-    user.telegram_chat_id = d.get('chat_id')
+    user.telegram_chat_id = request.json.get('chat_id')
     db.session.commit()
     return jsonify({"ok": True})
 
-# === СМЕНА ПАРОЛЯ ===
 @app.route('/api/change_password', methods=['POST'])
 @token_required
 def change_password():
-    d = request.json
     user = request.current_user
-    new_password = d.get('password')
-    
-    if not new_password or len(new_password) < 4:
-        return jsonify({"error": "Пароль должен быть минимум 4 символа"}), 400
-    
-    user.password_hash = hash_pwd(new_password)
-    db.session.commit()
+    p = request.json.get('password')
+    if not p or len(p) < 4: return jsonify({"error": "Минимум 4 символа"}), 400
+    user.password_hash = hash_pwd(p); db.session.commit()
     return jsonify({"ok": True})
 
-# === ИНИЦИАЛИЗАЦИЯ БД ===
 with app.app_context():
     db.create_all()
     add_missing_columns()
     if not User.query.filter_by(username='Kristina').first():
-        admin = User(username='Kristina', password_hash=hash_pwd('1234'), is_admin=True)
-        db.session.add(admin)
+        db.session.add(User(username='Kristina', password_hash=hash_pwd('1234'), is_admin=True))
         db.session.commit()
 
 @app.route('/', defaults={'path': 'index.html'})
