@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
+from openai import OpenAI
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True, origins=["*"])
@@ -11,6 +12,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 db = SQLAlchemy(app)
+
+# OpenAI клиент (ключ берется из переменных окружения Render)
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # === МОДЕЛИ БАЗЫ ДАННЫХ ===
 class User(db.Model):
@@ -56,11 +60,13 @@ class AIManager(db.Model):
     __tablename__ = 'aimanager'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    name = db.Column(db.String(100))
-    behavior = db.Column(db.Text)
-    forbidden = db.Column(db.Text)
-    knowledge_base = db.Column(db.Text)
-    is_active = db.Column(db.Boolean, default=False)
+    name = db.Column(db.String(100), default='AI Assistant')
+    behavior = db.Column(db.Text, default='Ты полезный помощник')
+    forbidden = db.Column(db.Text, default='')
+    knowledge_base = db.Column(db.Text, default='')
+    is_active_web = db.Column(db.Boolean, default=False)
+    is_active_telegram = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 class TelegramBot(db.Model):
     __tablename__ = 'telegrambot'
@@ -84,7 +90,7 @@ def send_telegram_notification(bot_token, chat_id, message):
         response = requests.post(url, json=data, timeout=5)
         return response.status_code == 200
     except Exception as e:
-        print(f"Telegram notification error: {e}")
+        print(f"Telegram error: {e}")
         return False
 
 def hash_pwd(p): return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
@@ -116,19 +122,55 @@ def add_missing_columns():
             db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)'))
             db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP'))
+            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_web BOOLEAN DEFAULT FALSE'))
+            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
             db.session.commit()
             print("✅ Миграции применены")
         except Exception as e:
             print(f"⚠️ Ошибка миграции: {e}")
             db.session.rollback()
 
+# === AI ФУНКЦИЯ ===
+def generate_ai_response(user_message, ai_settings, conversation_history=[]):
+    """Генерирует ответ через OpenAI"""
+    try:
+        system_prompt = f"""Ты {ai_settings.name} - AI помощник.
+
+ХАРАКТЕР И ПОВЕДЕНИЕ:
+{ai_settings.behavior}
+
+БАЗА ЗНАНИЙ:
+{ai_settings.knowledge_base}
+
+ЗАПРЕЩЁННЫЕ ТЕМЫ:
+{ai_settings.forbidden if ai_settings.forbidden else 'Нет запретов'}
+
+Отвечай на русском языке. Будь полезен и дружелюбен."""
+
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(conversation_history[-10:])  # Последние 10 сообщений
+        messages.append({"role": "user", "content": user_message})
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            max_tokens=500,
+            temperature=0.7
+        )
+        
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"OpenAI error: {e}")
+        return "Извините, произошла ошибка (код AI_01). Попробуйте позже."
+
+# === АВТОРИЗАЦИЯ ===
 @app.route('/api/login', methods=['POST'])
 def login():
     d = request.json
     user = User.query.filter_by(username=d.get('username'), password_hash=hash_pwd(d.get('password'))).first()
     if user and user.is_active:
         return jsonify({"ok": True, "token": user.api_token, "is_admin": user.is_admin, "username": user.username})
-    return jsonify({"error": "Неверные данные или аккаунт отключен"}), 401
+    return jsonify({"error": "Неверные данные"}), 401
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -137,14 +179,9 @@ def register():
         return jsonify({"error": "Пользователь существует"}), 409
     u = User(username=d['username'], password_hash=hash_pwd(d['password']))
     db.session.add(u); db.session.commit()
-    admin = User.query.filter_by(is_admin=True).first()
-    if admin and admin.telegram_chat_id:
-        bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
-        if bot_record:
-            msg = f"🆕 <b>Новая регистрация!</b>\n\n👤 Пользователь: <code>{u.username}</code>"
-            send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
     return jsonify({"ok": True, "token": u.api_token, "username": u.username})
 
+# === САЙТЫ ===
 @app.route('/api/sites', methods=['GET'])
 @token_required
 def get_sites():
@@ -159,12 +196,6 @@ def add_site():
     key = f"site_{uuid.uuid4().hex[:8]}"
     site = Website(url=url, api_key=key, owner_id=request.current_user.id)
     db.session.add(site); db.session.commit()
-    admin = User.query.filter_by(is_admin=True).first()
-    if admin and admin.telegram_chat_id:
-        bot_record = TelegramBot.query.filter_by(user_id=admin.id, is_active=True).first()
-        if bot_record:
-            msg = f"🌐 <b>Новый сайт!</b>\n🔗 {url}\n👤 {request.current_user.username}"
-            send_telegram_notification(bot_record.bot_token, admin.telegram_chat_id, msg)
     return jsonify({"ok": True})
 
 @app.route('/api/sites/<int:site_id>/approve', methods=['POST'])
@@ -173,11 +204,6 @@ def approve_site():
     site = Website.query.get(site_id)
     if site and not site.is_deleted:
         site.status = 'active'; db.session.commit()
-        owner = User.query.get(site.owner_id)
-        if owner and owner.telegram_chat_id:
-            bot_record = TelegramBot.query.filter_by(user_id=owner.id, is_active=True).first()
-            if bot_record:
-                send_telegram_notification(bot_record.bot_token, owner.telegram_chat_id, f"✅ Сайт одобрен: {site.url}")
     return jsonify({"ok": True})
 
 @app.route('/api/sites/<int:site_id>/delete', methods=['POST'])
@@ -185,21 +211,16 @@ def approve_site():
 def delete_site():
     site = Website.query.get(site_id)
     if not site or site.owner_id != request.current_user.id: return jsonify({"error": "Не найдено"}), 404
-    site.is_deleted = True
-    site.deleted_at = datetime.datetime.utcnow()
-    db.session.commit()
+    site.is_deleted = True; site.deleted_at = datetime.datetime.utcnow(); db.session.commit()
     return jsonify({"ok": True})
 
+# === ЧАТЫ ===
 @app.route('/api/chats', methods=['GET'])
 @token_required
 def get_chats():
     u = request.current_user
     chats = Chat.query.join(Website).filter(Website.owner_id==u.id, Website.is_deleted==False).order_by(Chat.created_at.desc()).all()
-    res = []
-    for c in chats:
-        w = Website.query.get(c.website_id)
-        res.append({"id":c.id, "site":w.url if w else "Unknown", "status":c.status, "time":c.created_at.isoformat()})
-    return jsonify(res)
+    return jsonify([{"id":c.id, "site":Website.query.get(c.website_id).url if Website.query.get(c.website_id) else "Unknown", "status":c.status, "time":c.created_at.isoformat()} for c in chats])
 
 @app.route('/api/messages/<int:chat_id>', methods=['GET'])
 @token_required
@@ -215,6 +236,69 @@ def send_message():
     db.session.commit()
     return jsonify({"ok": True})
 
+# === AI MANAGER ===
+@app.route('/api/ai/setup', methods=['POST'])
+@token_required
+def setup_ai():
+    d = request.json
+    ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
+    if ai:
+        ai.name = d.get('name', ai.name)
+        ai.behavior = d.get('behavior', ai.behavior)
+        ai.forbidden = d.get('forbidden', ai.forbidden)
+        ai.knowledge_base = d.get('knowledge_base', ai.knowledge_base)
+        ai.is_active_web = d.get('is_active_web', ai.is_active_web)
+        ai.is_active_telegram = d.get('is_active_telegram', ai.is_active_telegram)
+    else:
+        ai = AIManager(
+            user_id=request.current_user.id,
+            name=d.get('name', 'AI Assistant'),
+            behavior=d.get('behavior', ''),
+            forbidden=d.get('forbidden', ''),
+            knowledge_base=d.get('knowledge_base', ''),
+            is_active_web=d.get('is_active_web', False),
+            is_active_telegram=d.get('is_active_telegram', False)
+        )
+        db.session.add(ai)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@app.route('/api/ai/get', methods=['GET'])
+@token_required
+def get_ai():
+    ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
+    if ai:
+        return jsonify({
+            "name": ai.name,
+            "behavior": ai.behavior,
+            "forbidden": ai.forbidden,
+            "knowledge_base": ai.knowledge_base,
+            "is_active_web": ai.is_active_web,
+            "is_active_telegram": ai.is_active_telegram
+        })
+    return jsonify({})
+
+@app.route('/api/ai/respond', methods=['POST'])
+@token_required
+def ai_respond():
+    d = request.json
+    ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
+    if not ai:
+        return jsonify({"error": "AI не настроен"}), 404
+    
+    # Проверяем, включен ли AI для этого канала
+    channel = d.get('channel', 'web')
+    if channel == 'web' and not ai.is_active_web:
+        return jsonify({"answer": "AI сейчас неактивен. Оператор скоро ответит."})
+    if channel == 'telegram' and not ai.is_active_telegram:
+        return jsonify({"answer": "AI сейчас неактивен."})
+    
+    # Генерируем ответ
+    history = d.get('history', [])
+    answer = generate_ai_response(d.get('message', ''), ai, history)
+    return jsonify({"answer": answer})
+
+# === АДМИНКА ===
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required
 def admin_users():
@@ -233,8 +317,7 @@ def toggle_user():
 def admin_message():
     d = request.json
     db.session.add(AdminMessage(user_id=d['user_id'], text=d['text']))
-    user_sites = Website.query.filter_by(owner_id=d['user_id'], is_deleted=False).all()
-    for site in user_sites:
+    for site in Website.query.filter_by(owner_id=d['user_id'], is_deleted=False).all():
         for chat in Chat.query.filter_by(website_id=site.id).all():
             db.session.add(Message(chat_id=chat.id, sender='admin', text=f"📢 {d['text']}"))
     db.session.commit()
@@ -244,14 +327,13 @@ def admin_message():
 @admin_required
 def get_trash():
     sites = Website.query.filter_by(is_deleted=True).order_by(Website.deleted_at.desc()).all()
-    return jsonify([{"id":s.id, "url":s.url, "deleted_at":s.deleted_at.isoformat(), "owner":s.owner_id} for s in sites])
+    return jsonify([{"id":s.id, "url":s.url, "deleted_at":s.deleted_at.isoformat()} for s in sites])
 
 @app.route('/api/admin/trash/<int:site_id>/restore', methods=['POST'])
 @admin_required
 def restore_site():
     site = Website.query.get(site_id)
-    if site:
-        site.is_deleted = False; site.deleted_at = None; db.session.commit()
+    if site: site.is_deleted = False; site.deleted_at = None; db.session.commit()
     return jsonify({"ok": True})
 
 @app.route('/api/admin/trash/<int:site_id>', methods=['DELETE'])
@@ -261,23 +343,7 @@ def permanent_delete():
     if site: db.session.delete(site); db.session.commit()
     return jsonify({"ok": True})
 
-@app.route('/api/ai/setup', methods=['POST'])
-@token_required
-def setup_ai():
-    d = request.json
-    ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
-    if ai:
-        ai.name, ai.behavior, ai.forbidden, ai.knowledge_base, ai.is_active = d['name'], d['behavior'], d['forbidden'], d.get('kb',''), d.get('active', False)
-    else:
-        ai = AIManager(user_id=request.current_user.id, **d); db.session.add(ai)
-    db.session.commit()
-    return jsonify({"ok": True})
-
-@app.route('/api/ai/respond', methods=['POST'])
-@token_required
-def ai_respond():
-    return jsonify({"answer": "AI пока в разработке"})
-
+# === TELEGRAM ===
 @app.route('/api/telegram/setup', methods=['POST'])
 @token_required
 def setup_tg():
@@ -308,6 +374,7 @@ def change_password():
     user.password_hash = hash_pwd(p); db.session.commit()
     return jsonify({"ok": True})
 
+# === ИНИЦИАЛИЗАЦИЯ ===
 with app.app_context():
     db.create_all()
     add_missing_columns()
