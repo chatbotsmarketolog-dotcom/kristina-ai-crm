@@ -4,81 +4,44 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Панель | КРИСТИНА.AI CRM</title>
+<link rel="icon" type="image/png" href="favicon.png">
 <style>
-:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--soft:#93c5fd;--text:#e2e8f0}
-*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif}
-body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
-
-/* Шапка */
-.header{background:var(--panel);padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-.header h2{font-size:1.3rem;display:flex;align-items:center;gap:8px}
-.nav-buttons{display:flex;gap:8px;flex-wrap:wrap}
-.btn{padding:8px 16px;background:var(--acc);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.9rem;transition:0.2s}
-.btn:hover{opacity:0.85;transform:translateY(-1px)}
-.btn-red{background:#ef4444}
-.btn-green{background:#10b981}
-
-/* Контент */
-.container{padding:20px;flex:1}
-.section{display:none}
-.section.active{display:block}
-.card{background:var(--panel);border-radius:12px;padding:20px;margin-bottom:20px;border:1px solid rgba(255,255,255,0.08)}
-.card h3{margin-bottom:16px;color:#fff}
-
-/* Чаты */
-.chat-container{display:grid;grid-template-columns:320px 1fr;gap:20px;height:calc(100vh - 200px)}
-.chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
-.chat-list-header{padding:16px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600}
-.chat-items{flex:1;overflow-y:auto;padding:10px}
-.chat-item{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;transition:0.2s}
-.chat-item:hover,.chat-item.active{background:rgba(59,130,246,0.15);border-color:var(--acc)}
-.chat-meta{display:flex;justify-content:space-between;font-size:12px;opacity:0.6;margin-bottom:4px}
-.chat-preview{font-size:13px;opacity:0.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column}
-.chat-header{padding:16px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600}
-.chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
-.chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:10px}
-.chat-input input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
-.msg{max-width:75%;padding:10px 14px;border-radius:12px;line-height:1.4}
-.msg.visitor{background:linear-gradient(145deg,#1e3a8a,#1d4ed8);color:#dbeafe;align-self:flex-start}
-.msg.operator{background:rgba(59,130,246,0.25);color:var(--soft);align-self:flex-end}
-.msg.admin{background:rgba(239,68,68,0.2);color:#fca5a5;align-self:center;text-align:center}
-
-/* Сайты */
-.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:8px;padding:16px;margin:16px 0;font-family:monospace;font-size:0.85rem;overflow-x:auto}
-.copy-btn{margin-top:8px;padding:6px 12px;background:var(--acc);border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:0.85rem}
-
-/* Профиль */
-.form-group{margin-bottom:16px}
-.form-group label{display:block;margin-bottom:6px;color:#94a3b8;font-size:0.9rem}
-.form-group input{width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
-
-/* Поддержка */
-.support-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.support-link{display:flex;align-items:center;gap:12px;padding:16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;text-decoration:none;color:var(--text);transition:0.2s}
-.support-link:hover{background:rgba(59,130,246,0.15);border-color:var(--acc);transform:translateY(-2px)}
-
-/* Админка */
-table{width:100%;border-collapse:collapse}
-th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08)}
-.status{padding:4px 8px;border-radius:6px;font-size:0.8rem}
-.status-active{background:rgba(16,185,129,0.2);color:#10b981}
-.status-pending{background:rgba(251,191,36,0.2);color:#fbbf24}
-
-/* Адаптация */
-@media (max-width: 768px) {
-  .chat-container{grid-template-columns:1fr;height:auto}
-  .chat-list{max-height:300px}
-  .header{flex-direction:column;align-items:stretch}
-  .nav-buttons{justify-content:center}
-}
+  body{background:#0b132b;color:#e2e8f0;font-family:system-ui;margin:0;padding:20px}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+  .header h2{display:flex;align-items:center;gap:10px}
+  .logo{width:32px;height:32px}
+  .btn{padding:8px 16px;background:#3b82f6;color:#fff;border:none;border-radius:8px;cursor:pointer}
+  .btn-red{background:#ef4444}
+  .btn-green{background:#10b981}
+  .card{background:rgba(15,23,42,0.85);padding:16px;border-radius:12px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.08)}
+  table{width:100%;border-collapse:collapse;margin-top:10px}
+  th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1)}
+  input,textarea,select{width:100%;padding:10px;margin:5px 0;border-radius:6px;border:1px solid #3b82f6;background:#050a14;color:#fff;box-sizing:border-box}
+  .hidden{display:none}
+  .section{display:none}
+  .section.active{display:block}
+  .status{padding:4px 8px;border-radius:6px;font-size:0.8rem}
+  .status-active{background:rgba(16,185,129,0.2);color:#10b981}
+  .status-pending{background:rgba(251,191,36,0.2);color:#fbbf24}
+  .chat-item{padding:10px;border-bottom:1px solid rgba(255,255,255,0.1);cursor:pointer;transition:0.2s}
+  .chat-item:hover{background:rgba(59,130,246,0.1)}
+  .chat-item.active{background:rgba(59,130,246,0.2)}
+  .msg{margin:5px 0;padding:8px;background:rgba(0,0,0,0.3);border-radius:8px}
+  .code-box{background:rgba(0,0,0,0.4);border:1px solid #3b82f6;border-radius:8px;padding:16px;margin:16px 0;font-family:monospace;font-size:0.85rem;overflow-x:auto}
+  .copy-btn{margin-top:8px;padding:6px 12px;background:#3b82f6;border:none;border-radius:6px;color:#fff;cursor:pointer}
+  .support-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+  .support-link{display:flex;align-items:center;gap:12px;padding:16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;text-decoration:none;color:#e2e8f0;transition:0.2s}
+  .support-link:hover{background:rgba(59,130,246,0.15);border-color:#3b82f6;transform:translateY(-2px)}
+  
+  @media (max-width: 768px) {
+    .header{flex-direction:column;align-items:stretch}
+    .nav-buttons{display:flex;flex-wrap:wrap;gap:8px}
+  }
 </style>
 </head>
 <body>
-
-<!-- Шапка -->
 <div class="header">
-  <h2>🤖 КРИСТИНА.AI CRM</h2>
+  <h2><img src="favicon.png" alt="🤖" class="logo" onerror="this.style.display='none'">🤖 КРИСТИНА.AI CRM</h2>
   <div class="nav-buttons">
     <button class="btn" onclick="showSection('chats')">💬 Чаты</button>
     <button class="btn" onclick="showSection('sites')">🌐 Сайты</button>
@@ -89,162 +52,116 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
   </div>
 </div>
 
-<!-- Контейнер -->
-<div class="container">
+<!-- ЧАТЫ -->
+<div id="chats" class="section active">
+  <div class="card"><h3>Активные диалоги</h3><div id="chatList">Загрузка...</div></div>
+  <div class="card hidden" id="chatWindow">
+    <h4 id="chatTitle">Выберите чат</h4>
+    <div id="messages" style="height:300px;overflow-y:auto;margin:10px 0"></div>
+    <div style="display:flex;gap:10px"><input type="text" id="msgInput" placeholder="Сообщение..."><button class="btn" onclick="sendMsg()">Отправить</button></div>
+  </div>
+</div>
 
-  <!-- ЧАТЫ -->
-  <div id="chats" class="section active">
-    <div class="chat-container">
-      <div class="chat-list">
-        <div class="chat-list-header">📂 Активные диалоги</div>
-        <div class="chat-items" id="chatList">Загрузка...</div>
-      </div>
-      <div class="chat-window">
-        <div class="chat-header" id="chatTitle">Выберите чат</div>
-        <div class="chat-messages" id="chatMessages">
-          <div style="opacity:0.4;text-align:center;margin-top:40px">💬 Выберите чат слева</div>
+<!-- САЙТЫ -->
+<div id="sites" class="section">
+  <div class="card">
+    <h3>🌐 Подключить сайт</h3>
+    <div style="display:flex;gap:10px"><input type="text" id="siteUrl" placeholder="https://client-site.com"><button class="btn" onclick="addSite()">➕ Добавить</button></div>
+  </div>
+  
+  <div class="card" id="siteList">
+    <h3>Ваши сайты</h3>
+    <p style="opacity:0.6">Загрузка...</p>
+  </div>
+</div>
+
+<!-- АДМИНКА -->
+<div id="admin" class="section">
+  <div class="card">
+    <h3>👥 Пользователи</h3>
+    <table><thead><tr><th>Логин</th><th>Дата регистрации</th><th>Статус</th><th>Действия</th></tr></thead><tbody id="userTable"></tbody></table>
+  </div>
+  <div class="card">
+    <h3>📢 Сообщение пользователю</h3>
+    <select id="targetUser" style="margin-bottom:10px"></select>
+    <textarea id="adminMsg" rows="3" placeholder="Текст сообщения..."></textarea>
+    <button class="btn" onclick="sendAdminMsg()">Отправить в CRM</button>
+  </div>
+</div>
+
+<!-- ПРОФИЛЬ -->
+<div id="profile" class="section">
+  <div class="card">
+    <h3>👤 Профиль</h3>
+    <div style="margin-bottom:16px">
+      <label style="display:block;margin-bottom:6px;color:#94a3b8">Ваш логин</label>
+      <input type="text" id="profileUsername" readonly style="opacity:0.7">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="display:block;margin-bottom:6px;color:#94a3b8">Сменить пароль</label>
+      <input type="password" id="newPassword" placeholder="Новый пароль (мин. 4 символа)">
+    </div>
+    <button class="btn" onclick="changePassword()">💾 Сохранить пароль</button>
+  </div>
+  
+  <div class="card">
+    <h3>🔔 Telegram уведомления</h3>
+    <div style="margin-bottom:16px">
+      <label style="display:block;margin-bottom:6px;color:#94a3b8">Ваш Chat ID в Telegram</label>
+      <input type="text" id="telegramChatId" placeholder="Напишите @userinfobot чтобы узнать">
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="display:block;margin-bottom:6px;color:#94a3b8">Токен бота (от @BotFather)</label>
+      <input type="text" id="telegramToken" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+    </div>
+    <button class="btn btn-green" onclick="saveTelegramSettings()">💾 Сохранить настройки</button>
+    <p style="margin-top:12px;font-size:0.85rem;opacity:0.7">После сохранения вы будете получать уведомления о новых регистрациях и сайтах</p>
+  </div>
+</div>
+
+<!-- ПОДДЕРЖКА -->
+<div id="support" class="section">
+  <div class="card">
+    <h3>💚 Связаться со мной</h3>
+    <p style="margin-bottom:20px;opacity:0.8">Выберите удобный способ связи:</p>
+    <div class="support-links">
+      <a href="https://t.me/marketologdizayner" target="_blank" class="support-link">
+        <span style="font-size:1.5rem">✈️</span>
+        <div>
+          <div style="font-weight:600">Telegram</div>
+          <div style="font-size:0.85rem;opacity:0.7">@marketologdizayner</div>
         </div>
-        <div class="chat-input">
-          <input type="text" id="msgInput" placeholder="Введите ответ..." disabled>
-          <button class="btn" id="sendBtn" onclick="sendMessage()" disabled>Отправить</button>
+      </a>
+      <a href="https://www.instagram.com/gap____ova_kristina/" target="_blank" class="support-link">
+        <span style="font-size:1.5rem">📸</span>
+        <div>
+          <div style="font-weight:600">Instagram</div>
+          <div style="font-size:0.85rem;opacity:0.7">gap____ova_kristina</div>
         </div>
-      </div>
+      </a>
+      <a href="https://vk.ru/kristinavcifre" target="_blank" class="support-link">
+        <span style="font-size:1.5rem">📱</span>
+        <div>
+          <div style="font-weight:600">ВКонтакте</div>
+          <div style="font-size:0.85rem;opacity:0.7">kristinavcifre</div>
+        </div>
+      </a>
+      <a href="https://tenchat.ru/techno-marketer?tab=feed" target="_blank" class="support-link">
+        <span style="font-size:1.5rem">💼</span>
+        <div>
+          <div style="font-weight:600">TenChat</div>
+          <div style="font-size:0.85rem;opacity:0.7">techno-marketer</div>
+        </div>
+      </a>
+      <a href="mailto:chatbotsmarketolog@gmail.com" target="_blank" class="support-link">
+        <span style="font-size:1.5rem">📧</span>
+        <div>
+          <div style="font-weight:600">Email</div>
+          <div style="font-size:0.85rem;opacity:0.7">chatbotsmarketolog@gmail.com</div>
+        </div>
+      </a>
     </div>
   </div>
-
-  <!-- САЙТЫ -->
-  <div id="sites" class="section">
-    <div class="card">
-      <h3>🌐 Подключить сайт</h3>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <input type="text" id="siteUrl" placeholder="https://client-site.com" style="flex:1;min-width:200px;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)">
-        <button class="btn" onclick="addSite()">➕ Добавить</button>
-      </div>
-    </div>
-    
-    <div class="card">
-      <h3>📋 Инструкция по подключению</h3>
-      <ol style="margin-left:20px;line-height:1.8">
-        <li>Добавьте сайт выше</li>
-        <li>Скопируйте код ниже</li>
-        <li>Вставьте его перед закрывающим тегом <code>&lt;/body&gt;</code> на вашем сайте</li>
-        <li>Готово! Чат появится на сайте</li>
-      </ol>
-      
-      <div class="code-box" id="widgetCode">
-&lt;!-- КРИСТИНА.AI CRM Widget --&gt;
-&lt;script&gt;
-  (function() {
-    var widget = document.createElement('script');
-    widget.src = 'https://kristina-crm-api.onrender.com/widget.js';
-    widget.async = true;
-    document.body.appendChild(widget);
-  })();
-&lt;/script&gt;
-      </div>
-      <button class="copy-btn" onclick="copyCode()">📋 Скопировать код</button>
-    </div>
-    
-    <div class="card" id="siteList">
-      <h3>Ваши сайты</h3>
-      <p style="opacity:0.6">Загрузка...</p>
-    </div>
-  </div>
-
-  <!-- АДМИНКА -->
-  <div id="admin" class="section">
-    <div class="card">
-      <h3>👥 Пользователи</h3>
-      <table>
-        <thead>
-          <tr><th>Логин</th><th>Дата регистрации</th><th>Статус</th><th>Действия</th></tr>
-        </thead>
-        <tbody id="userTable"></tbody>
-      </table>
-    </div>
-    
-    <div class="card">
-      <h3>📢 Сообщение пользователю</h3>
-      <div class="form-group">
-        <select id="targetUser" style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)">
-          <option value="">Выберите пользователя</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <textarea id="adminMsg" rows="3" placeholder="Текст сообщения..." style="width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)"></textarea>
-      </div>
-      <button class="btn" onclick="sendAdminMsg()">📩 Отправить</button>
-    </div>
-  </div>
-
-  <!-- ПРОФИЛЬ -->
-  <div id="profile" class="section">
-    <div class="card">
-      <h3>👤 Профиль</h3>
-      <div class="form-group">
-        <label>Ваш логин</label>
-        <input type="text" id="profileUsername" readonly style="opacity:0.7">
-      </div>
-      <div class="form-group">
-        <label>Сменить пароль</label>
-        <input type="password" id="newPassword" placeholder="Новый пароль (мин. 4 символа)">
-      </div>
-      <button class="btn" onclick="changePassword()">💾 Сохранить пароль</button>
-    </div>
-    
-    <div class="card">
-      <h3>🔔 Telegram уведомления</h3>
-      <div class="form-group">
-        <label>Ваш Chat ID в Telegram</label>
-        <input type="text" id="telegramChatId" placeholder="Напишите @userinfobot чтобы узнать">
-      </div>
-      <div class="form-group">
-        <label>Токен бота (от @BotFather)</label>
-        <input type="text" id="telegramToken" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
-      </div>
-      <button class="btn btn-green" onclick="saveTelegramSettings()">💾 Сохранить настройки</button>
-      <p style="margin-top:12px;font-size:0.85rem;opacity:0.7">После сохранения вы будете получать уведомления о новых регистрациях и сайтах</p>
-    </div>
-  </div>
-
-  <!-- ПОДДЕРЖКА -->
-  <div id="support" class="section">
-    <div class="card">
-      <h3>💚 Связаться со мной</h3>
-      <p style="margin-bottom:20px;opacity:0.8">Выберите удобный способ связи:</p>
-      <div class="support-links">
-        <a href="https://t.me/your_username" target="_blank" class="support-link">
-          <span style="font-size:1.5rem">✈️</span>
-          <div>
-            <div style="font-weight:600">Telegram</div>
-            <div style="font-size:0.85rem;opacity:0.7">@your_username</div>
-          </div>
-        </a>
-        <a href="https://wa.me/79000000000" target="_blank" class="support-link">
-          <span style="font-size:1.5rem">📱</span>
-          <div>
-            <div style="font-weight:600">WhatsApp</div>
-            <div style="font-size:0.85rem;opacity:0.7">+7 (900) 000-00-00</div>
-          </div>
-        </a>
-        <a href="mailto:your@email.com" target="_blank" class="support-link">
-          <span style="font-size:1.5rem">📧</span>
-          <div>
-            <div style="font-weight:600">Email</div>
-            <div style="font-size:0.85rem;opacity:0.7">your@email.com</div>
-          </div>
-        </a>
-        <a href="https://instagram.com/your_username" target="_blank" class="support-link">
-          <span style="font-size:1.5rem">📸</span>
-          <div>
-            <div style="font-weight:600">Instagram</div>
-            <div style="font-size:0.85rem;opacity:0.7">@your_username</div>
-          </div>
-        </a>
-      </div>
-    </div>
-  </div>
-
 </div>
 
 <script>
@@ -253,199 +170,162 @@ const token = localStorage.getItem('token');
 const isAdmin = localStorage.getItem('isAdmin') === 'true';
 let activeChatId = null;
 let pollInterval = null;
+let currentUsername = localStorage.getItem('username');
 
-if (!token) window.location.href = '/index.html';
-if (isAdmin) document.getElementById('adminBtn').style.display = 'inline-block';
+if(!token) window.location.href = 'index.html';
+if(isAdmin) document.getElementById('adminBtn').style.display = 'inline-block';
 
-// Навигация
-function showSection(id) {
-  document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+function showSection(id){
+  document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  
-  if (id === 'chats') loadChats();
-  if (id === 'sites') loadSites();
-  if (id === 'admin') loadUsers();
-  if (id === 'profile') loadProfile();
+  if(id==='chats') loadChats();
+  if(id==='sites') loadSites();
+  if(id==='admin') loadUsers();
+  if(id==='profile') loadProfile();
 }
 
-// API запросы
-async function fetchAPI(url, method='GET', body=null) {
-  const options = {
-    method,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  };
-  if (body) options.body = JSON.stringify(body);
-  
-  const response = await fetch(API + url, options);
-  if (response.status === 401) { logout(); return null; }
-  return response.json();
+function fetchAPI(url, method='GET', body=null){
+  return fetch(API+url, {
+    method, headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
+    body: body ? JSON.stringify(body) : null
+  }).then(r=>{
+    if(r.status===401){logout();return null;}
+    return r.json();
+  });
 }
 
-// ЧАТЫ
-async function loadChats() {
+async function loadChats(){
   const chats = await fetchAPI('/chats');
-  if (!chats) return;
-  
-  const el = document.getElementById('chatList');
-  if (!chats.length) {
-    el.innerHTML = '<div style="opacity:0.5;text-align:center;padding:20px">Нет активных диалогов</div>';
-    return;
-  }
-  
-  el.innerHTML = chats.map(c => `
-    <div class="chat-item ${c.id === activeChatId ? 'active' : ''}" onclick="openChat(${c.id}, '${c.site}')">
-      <div class="chat-meta">
-        <span>${c.site}</span>
-        <span class="status ${c.status === 'active' ? 'status-active' : 'status-pending'}">
-          ${c.status === 'active' ? 'Онлайн' : 'Ожидание'}
-        </span>
-      </div>
-      <div class="chat-preview">ID: ${c.id} | ${new Date(c.time).toLocaleTimeString()}</div>
-    </div>
-  `).join('');
+  if(!chats) return;
+  document.getElementById('chatList').innerHTML = chats.map(c=>`<div class="chat-item" onclick="openChat(${c.id}, '${c.site}')">${c.site} <span style="float:right;color:#94a3b8">${c.status}</span></div>`).join('');
 }
 
-async function openChat(id, site) {
+async function openChat(id, site){
   activeChatId = id;
+  document.getElementById('chatWindow').classList.remove('hidden');
   document.getElementById('chatTitle').textContent = site;
+  document.getElementById('chatTitle').dataset.id = id;
   document.getElementById('msgInput').disabled = false;
-  document.getElementById('sendBtn').disabled = false;
-  loadMessages();
-  
-  if (pollInterval) clearInterval(pollInterval);
+  const msgs = await fetchAPI(`/messages/${id}`);
+  document.getElementById('messages').innerHTML = msgs.map(m=>`<div class="msg"><b>${m.sender}:</b> ${m.text}</div>`).join('');
+  if(pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(loadMessages, 5000);
 }
 
-async function loadMessages() {
-  if (!activeChatId) return;
+async function loadMessages(){
+  if(!activeChatId) return;
   const msgs = await fetchAPI(`/messages/${activeChatId}`);
-  if (!msgs) return;
-  
-  const el = document.getElementById('chatMessages');
-  el.innerHTML = msgs.map(m => `
-    <div class="msg ${m.sender}">${m.text}</div>
-  `).join('');
-  el.scrollTop = el.scrollHeight;
+  if(!msgs) return;
+  document.getElementById('messages').innerHTML = msgs.map(m=>`<div class="msg"><b>${m.sender}:</b> ${m.text}</div>`).join('');
+  document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 }
 
-function sendMessage() {
-  const input = document.getElementById('msgInput');
-  const text = input.value.trim();
-  if (!text || !activeChatId) return;
-  
-  fetchAPI('/send', 'POST', { chat_id: activeChatId, text, sender: 'operator' }).then(() => {
-    input.value = '';
+function sendMsg(){
+  const text = document.getElementById('msgInput').value;
+  if(!text) return;
+  fetchAPI('/send', 'POST', {chat_id: parseInt(document.getElementById('chatTitle').dataset.id), text, sender: 'operator'}).then(()=>{
+    document.getElementById('msgInput').value='';
     loadMessages();
   });
 }
 
-// САЙТЫ
-async function loadSites() {
+async function loadSites(){
   const sites = await fetchAPI('/sites');
-  if (!sites) return;
+  if(!sites) return;
   
-  const el = document.getElementById('siteList');
-  el.innerHTML = '<h3>Ваши сайты</h3>' + sites.map(s => `
-    <div style="padding:12px;border-bottom:1px solid rgba(255,255,255,0.08)">
+  const listEl = document.getElementById('siteList');
+  
+  if(sites.length === 0) {
+    listEl.innerHTML = '<h3>Ваши сайты</h3><p style="opacity:0.6">У вас пока нет подключенных сайтов</p>';
+    return;
+  }
+  
+  let html = '<h3>Ваши сайты</h3>';
+  sites.forEach(s => {
+    html += `<div style="padding:12px;border-bottom:1px solid rgba(255,255,255,0.08)">
       <div style="font-weight:600">${s.url}</div>
       <div style="font-size:0.85rem;opacity:0.6">API Key: <code>${s.api_key}</code></div>
-      <div style="margin-top:8px"><span class="status ${s.status === 'active' ? 'status-active' : 'status-pending'}">${s.status === 'active' ? '✅ Активен' : '⏳ Ожидает одобрения'}</span></div>
-    </div>
-  `).join('');
+      <div style="margin-top:8px"><span class="status ${s.status==='active'?'status-active':'status-pending'}">${s.status==='active'?'✅ Активен':'⏳ Ожидает одобрения'}</span></div>`;
+    
+    // Показываем код виджета ТОЛЬКО если сайт одобрен
+    if(s.status === 'active') {
+      html += `<div style="margin-top:12px">
+        <div style="font-size:0.85rem;margin-bottom:6px;color:#94a3b8">Код для вставки:</div>
+        <div class="code-box" style="margin:0;font-size:0.75rem">&lt;script&gt;window.KRISTINA_API_KEY='${s.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);&lt;/script&gt;</div>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText(this.previousElementSibling.innerText).then(()=>alert('Скопировано!'))">📋 Копировать</button>
+      </div>`;
+    } else {
+      html += `<div style="margin-top:8px;font-size:0.85rem;color:#fbbf24">⏳ Сайт на модерации. После одобрения здесь появится код для вставки.</div>`;
+    }
+    
+    html += `</div>`;
+  });
+  
+  listEl.innerHTML = html;
 }
 
-function addSite() {
-  const url = document.getElementById('siteUrl').value.trim();
-  if (!url) return;
-  fetchAPI('/sites', 'POST', { url }).then(() => {
-    document.getElementById('siteUrl').value = '';
+function addSite(){
+  fetchAPI('/sites', 'POST', {url: document.getElementById('siteUrl').value}).then(()=>{
+    document.getElementById('siteUrl').value='';
     loadSites();
   });
 }
 
-function copyCode() {
-  const code = document.getElementById('widgetCode').innerText;
-  navigator.clipboard.writeText(code).then(() => alert('✅ Код скопирован!'));
-}
-
-// АДМИНКА
-async function loadUsers() {
+async function loadUsers(){
   const users = await fetchAPI('/admin/users');
-  if (!users) return;
-  
-  const select = document.getElementById('targetUser');
-  select.innerHTML = '<option value="">Выберите пользователя</option>' + users.map(u => `
-    <option value="${u.id}">${u.username}</option>
-  `).join('');
-  
-  document.getElementById('userTable').innerHTML = users.map(u => `
-    <tr>
-      <td>${u.username}</td>
-      <td>${new Date(u.created_at).toLocaleDateString()}</td>
-      <td><span class="status ${u.is_active ? 'status-active' : 'status-pending'}">${u.is_active ? '🟢 Активен' : '🔴 Отключен'}</span></td>
-      <td><button class="btn ${u.is_active ? 'btn-red' : 'btn-green'}" onclick="toggleUser(${u.id}, ${!u.is_active})">${u.is_active ? 'Отключить' : 'Включить'}</button></td>
-    </tr>
-  `).join('');
+  if(!users) return;
+  const sel = document.getElementById('targetUser');
+  sel.innerHTML = '<option value="">Выберите пользователя</option>' + users.map(u=>`<option value="${u.id}">${u.username}</option>`).join('');
+  document.getElementById('userTable').innerHTML = users.map(u=>`<tr><td>${u.username}</td><td>${new Date(u.created_at).toLocaleDateString()}</td><td><span class="status ${u.is_active?'status-active':'status-pending'}">${u.is_active?'🟢 Активен':'🔴 Отключен'}</span></td><td><button class="btn ${u.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${u.id})">${u.is_active?'Отключить':'Включить'}</button></td></tr>`).join('');
 }
 
-function toggleUser(id, status) {
-  fetchAPI('/admin/toggle_user', 'POST', { user_id: id }).then(loadUsers);
+function toggleUser(id){ fetchAPI('/admin/toggle_user', 'POST', {user_id: id}).then(loadUsers); }
+function sendAdminMsg(){ fetchAPI('/admin/message', 'POST', {user_id: document.getElementById('targetUser').value, text: document.getElementById('adminMsg').value}).then(()=>alert('✅ Отправлено!')); }
+
+async function loadProfile(){
+  // Если username не сохранён, загружаем из API
+  if(!currentUsername) {
+    try {
+      const response = await fetch(API + '/me', {
+        headers: {'Authorization': `Bearer ${token}`}
+      });
+      if(response.ok) {
+        const data = await response.json();
+        currentUsername = data.username;
+        localStorage.setItem('username', currentUsername);
+      }
+    } catch(e) {
+      currentUsername = 'Неизвестно';
+    }
+  }
+  document.getElementById('profileUsername').value = currentUsername || 'Загрузка...';
 }
 
-function sendAdminMsg() {
-  const userId = document.getElementById('targetUser').value;
-  const text = document.getElementById('adminMsg').value.trim();
-  if (!userId || !text) return;
-  fetchAPI('/admin/message', 'POST', { user_id: userId, text }).then(() => {
-    alert('✅ Сообщение отправлено!');
-    document.getElementById('adminMsg').value = '';
+function changePassword(){
+  const newPassword = document.getElementById('newPassword').value;
+  if(newPassword.length < 4){alert('❌ Пароль должен быть минимум 4 символа');return;}
+  fetchAPI('/api/change_password', 'POST', {password: newPassword}).then(d=>{
+    if(!d || d.ok){alert('✅ Пароль изменён!');document.getElementById('newPassword').value='';}
+    else alert('❌ Ошибка: '+(d.error||'Неизвестная'));
   });
 }
 
-// ПРОФИЛЬ
-function loadProfile() {
-  document.getElementById('profileUsername').value = localStorage.getItem('username') || 'Загрузка...';
-}
-
-function changePassword() {
-  const newPassword = document.getElementById('newPassword').value;
-  if (newPassword.length < 4) {
-    alert('❌ Пароль должен быть минимум 4 символа');
-    return;
-  }
-  // Здесь нужен эндпоинт для смены пароля (добавим позже)
-  alert('ℹ️ Функция смены пароля будет добавлена в следующем обновлении');
-}
-
-function saveTelegramSettings() {
+function saveTelegramSettings(){
   const chatId = document.getElementById('telegramChatId').value.trim();
-  const token = document.getElementById('telegramToken').value.trim();
-  
-  if (!chatId || !token) {
-    alert('❌ Заполните оба поля');
-    return;
-  }
-  
-  // Сохраняем Chat ID
-  fetchAPI('/api/admin/save_chat_id', 'POST', { chat_id: chatId }).then(() => {
-    // Сохраняем токен бота
-    fetchAPI('/api/telegram/setup', 'POST', { token, active: true }).then(() => {
-      alert('✅ Настройки Telegram сохранены! Теперь вы будете получать уведомления.');
+  const tokenBot = document.getElementById('telegramToken').value.trim();
+  if(!chatId || !tokenBot){alert('❌ Заполните оба поля');return;}
+  fetchAPI('/admin/save_chat_id', 'POST', {chat_id: chatId}).then(()=>{
+    fetchAPI('/telegram/setup', 'POST', {token: tokenBot, active: true}).then(()=>{
+      alert('✅ Настройки Telegram сохранены!');
     });
   });
 }
 
-// ВЫХОД
-function logout() {
-  localStorage.clear();
-  window.location.href = '/index.html';
-}
+function logout(){ localStorage.clear(); window.location.href='index.html'; }
+document.getElementById('msgInput').onkeypress = function(e){if(e.key==='Enter') sendMsg();};
 
-// Инициализация
-document.getElementById('msgInput').onkeypress = e => { if (e.key === 'Enter') sendMessage(); };
+// Загружаем профиль при старте
+loadProfile();
 showSection('chats');
 </script>
 </body>
