@@ -312,7 +312,23 @@ def admin_users():
 @admin_required
 def toggle_user():
     u = User.query.get(request.json.get('user_id'))
-    if u: u.is_active = not u.is_active; db.session.commit()
+    if u: 
+        # Запрещаем отключать самого себя (админа), если это не специально сделано
+        if u.username != request.current_user.username:
+            u.is_active = not u.is_active
+            db.session.commit()
+    return jsonify({"ok": True})
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@admin_required
+def delete_user_admin():
+    # Полное удаление пользователя
+    u = User.query.get(user_id)
+    if u:
+        if u.username == request.current_user.username:
+            return jsonify({"error": "Нельзя удалить себя"}), 400
+        db.session.delete(u)
+        db.session.commit()
     return jsonify({"ok": True})
 
 @app.route('/api/admin/message', methods=['POST'])
@@ -374,7 +390,7 @@ def change_password():
     user.password_hash = hash_pwd(p); db.session.commit()
     return jsonify({"ok": True})
 
-# === ИНИЦИАЛИЗАЦИЯ (АКТИВАЦИЯ + ПАРОЛЬ ZAQQAZ) ===
+# === ИНИЦИАЛИЗАЦИЯ (ГАРАНТИЯ РАБОТЫ) ===
 with app.app_context():
     db.create_all()
     add_missing_columns()
@@ -385,7 +401,7 @@ with app.app_context():
         db.session.add(admin)
         print("🔧 Creating admin: Kristina")
     
-    # ВСЕГДА активируем и ставим пароль
+    # ВСЕГДА активируем и ставим пароль. Аккаунт не может быть отключен при перезагрузке.
     admin.is_active = True
     admin.password_hash = hash_pwd('zaqqaz')
     db.session.commit()
