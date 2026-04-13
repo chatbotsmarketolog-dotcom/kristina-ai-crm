@@ -383,12 +383,13 @@ with app.app_context():
     if not admin:
         admin = User(username='Kristina', is_admin=True)
         db.session.add(admin)
-        
-    # Жёстко ставим пароль и активируем аккаунт
-    admin.password_hash = hash_pwd('zaqqaz')
+        print("🔧 Creating admin: Kristina")
+    
+    # ВСЕГДА активируем и ставим пароль
     admin.is_active = True
+    admin.password_hash = hash_pwd('zaqqaz')
     db.session.commit()
-    print("✅ Админ Kristina готов. Пароль: zaqqaz | Статус: Активен")
+    print("✅ Admin Kristina: ACTIVE | Password: zaqqaz")
 
 @app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
