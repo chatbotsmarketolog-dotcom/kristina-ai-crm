@@ -7,10 +7,12 @@ from openai import OpenAI
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app, supports_credentials=True, origins=["*"])
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 db = SQLAlchemy(app)
+
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 class User(db.Model):
@@ -186,17 +188,14 @@ def approve_site():
 def delete_site():
     try:
         site = Website.query.get(site_id)
-        if not site: return jsonify({"error": "Не найдено"}), 404
-        # Админ может удалять любые сайты, пользователь только свои
-        if not request.current_user.is_admin and site.owner_id != request.current_user.id:
-            return jsonify({"error": "Нет прав"}), 403
+        if not site or site.owner_id != request.current_user.id: return jsonify({"error": "Не найдено"}), 404
         site.is_deleted = True
         site.deleted_at = datetime.datetime.utcnow()
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Delete error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/chats', methods=['GET'])
 @token_required
@@ -292,24 +291,30 @@ def toggle_user():
 @app.route('/api/admin/send_to_user', methods=['POST'])
 @admin_required
 def admin_send_to_user():
+    """ОТПРАВКА СООБЩЕНИЯ ПОЛЬЗОВАТЕЛЮ - СОЗДАЁТ ЧАТ"""
     try:
         d = request.json
         user_id = d.get('user_id')
         text = d.get('text')
+        
         if not user_id or not text:
             return jsonify({"error": "user_id и text обязательны"}), 400
         
+        # Находим сайты пользователя
         user_sites = Website.query.filter_by(owner_id=user_id, is_deleted=False).all()
         if not user_sites:
             return jsonify({"error": "У пользователя нет сайтов"}), 404
         
+        # Создаём чат для первого сайта
         site = user_sites[0]
         chat = Chat(website_id=site.id, visitor_id=f"admin_{uuid.uuid4().hex[:8]}", status='waiting', operator_id=None)
         db.session.add(chat)
         db.session.commit()
         
+        # Добавляем сообщение
         db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
         db.session.commit()
+        
         return jsonify({"ok": True, "chat_id": chat.id})
     except Exception as e:
         print(f"Admin send error: {e}")
@@ -335,15 +340,6 @@ def setup_tg():
         print(f"Telegram error: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/telegram/get', methods=['GET'])
-@token_required
-def get_tg():
-    try:
-        tb = TelegramBot.query.filter_by(user_id=request.current_user.id).first()
-        return jsonify({"token": tb.bot_token if tb else "", "active": tb.is_active if tb else False})
-    except Exception as e:
-        return jsonify({"token": "", "active": False}), 500
-
 @app.route('/api/admin/save_chat_id', methods=['POST'])
 @admin_required
 def save_chat_id():
@@ -355,20 +351,6 @@ def save_chat_id():
     except Exception as e:
         print(f"Save chat ID error: {e}")
         return jsonify({"error": str(e)}), 500
-
-@app.route('/api/admin/get_tg_settings', methods=['GET'])
-@admin_required
-def get_tg_settings():
-    try:
-        user = request.current_user
-        tb = TelegramBot.query.filter_by(user_id=user.id).first()
-        return jsonify({
-            "chat_id": user.telegram_chat_id or "",
-            "bot_token": tb.bot_token if tb else "",
-            "is_active": tb.is_active if tb else False
-        })
-    except Exception as e:
-        return jsonify({"chat_id": "", "bot_token": "", "is_active": False}), 500
 
 @app.route('/api/change_password', methods=['POST'])
 @token_required
