@@ -13,10 +13,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 db = SQLAlchemy(app)
 
-# OpenAI клиент
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# === МОДЕЛИ БАЗЫ ДАННЫХ ===
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
@@ -128,12 +126,10 @@ def add_missing_columns():
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_web BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
             db.session.commit()
-            print("✅ Миграции применены")
         except Exception as e:
             print(f"⚠️ Ошибка миграции: {e}")
             db.session.rollback()
 
-# === AI ФУНКЦИЯ ===
 def generate_ai_response(user_message, ai_settings, conversation_history=[]):
     try:
         system_prompt = f"""Ты {ai_settings.name} - AI помощник.
@@ -163,28 +159,22 @@ def generate_ai_response(user_message, ai_settings, conversation_history=[]):
         return response.choices[0].message.content
     except Exception as e:
         print(f"OpenAI error: {e}")
-        return "Извините, произошла ошибка (код AI_01). Попробуйте позже."
+        return "Извините, произошла ошибка. Попробуйте позже."
 
-# === АВТОРИЗАЦИЯ ===
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
         d = request.json
         username = d.get('username', '').strip()
         password = d.get('password', '')
-        
         user = User.query.filter_by(username=username).first()
-        if not user:
-            return jsonify({"error": "Неверные данные"}), 401
-        if not user.is_active:
-            return jsonify({"error": "Аккаунт отключен"}), 401
-        if user.password_hash != hash_pwd(password):
-            return jsonify({"error": "Неверные данные"}), 401
-            
+        if not user: return jsonify({"error": "Неверные данные"}), 401
+        if not user.is_active: return jsonify({"error": "Аккаунт отключен"}), 401
+        if user.password_hash != hash_pwd(password): return jsonify({"error": "Неверные данные"}), 401
         return jsonify({"ok": True, "token": user.api_token, "is_admin": user.is_admin, "username": user.username})
     except Exception as e:
         print(f"Login error: {e}")
-        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+        return jsonify({"error": "Ошибка сервера"}), 500
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -192,19 +182,16 @@ def register():
         d = request.json
         username = d.get('username', '').strip()
         password = d.get('password', '')
-        if not username or len(password) < 4:
-            return jsonify({"error": "Логин мин. 2 символа, пароль мин. 4"}), 400
-        if User.query.filter_by(username=username).first():
-            return jsonify({"error": "Пользователь существует"}), 409
+        if not username or len(password) < 4: return jsonify({"error": "Логин мин. 2 символа, пароль мин. 4"}), 400
+        if User.query.filter_by(username=username).first(): return jsonify({"error": "Пользователь существует"}), 409
         u = User(username=username, password_hash=hash_pwd(password))
         db.session.add(u)
         db.session.commit()
         return jsonify({"ok": True, "token": u.api_token, "username": u.username})
     except Exception as e:
         print(f"Register error: {e}")
-        return jsonify({"error": "Внутренняя ошибка сервера"}), 500
+        return jsonify({"error": "Ошибка сервера"}), 500
 
-# === САЙТЫ ===
 @app.route('/api/sites', methods=['GET'])
 @token_required
 def get_sites():
@@ -214,7 +201,7 @@ def get_sites():
         return jsonify([{"id":s.id, "url":s.url, "api_key":s.api_key, "status":s.status, "owner":s.owner_id} for s in sites])
     except Exception as e:
         print(f"Get sites error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/sites', methods=['POST'])
 @token_required
@@ -228,7 +215,7 @@ def add_site():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Add site error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/sites/<int:site_id>/approve', methods=['POST'])
 @admin_required
@@ -241,24 +228,22 @@ def approve_site():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Approve site error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/sites/<int:site_id>/delete', methods=['POST'])
 @token_required
 def delete_site():
     try:
         site = Website.query.get(site_id)
-        if not site or site.owner_id != request.current_user.id:
-            return jsonify({"error": "Не найдено"}), 404
+        if not site or site.owner_id != request.current_user.id: return jsonify({"error": "Не найдено"}), 404
         site.is_deleted = True
         site.deleted_at = datetime.datetime.utcnow()
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Delete site error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
-# === ЧАТЫ ===
 @app.route('/api/chats', methods=['GET'])
 @token_required
 def get_chats():
@@ -268,7 +253,7 @@ def get_chats():
         return jsonify([{"id":c.id, "site":Website.query.get(c.website_id).url if Website.query.get(c.website_id) else "Unknown", "status":c.status, "time":c.created_at.isoformat()} for c in chats])
     except Exception as e:
         print(f"Get chats error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/messages/<int:chat_id>', methods=['GET'])
 @token_required
@@ -278,7 +263,7 @@ def get_messages(chat_id):
         return jsonify([{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msgs])
     except Exception as e:
         print(f"Get messages error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/send', methods=['POST'])
 @token_required
@@ -290,9 +275,8 @@ def send_message():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Send message error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
-# === AI MANAGER ===
 @app.route('/api/ai/setup', methods=['POST'])
 @token_required
 def setup_ai():
@@ -323,7 +307,7 @@ def setup_ai():
         print(f"AI setup error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/ai/get', methods=['GET'])
 @token_required
@@ -338,7 +322,7 @@ def get_ai():
         return jsonify({})
     except Exception as e:
         print(f"AI get error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/ai/respond', methods=['POST'])
 @token_required
@@ -355,9 +339,8 @@ def ai_respond():
         return jsonify({"answer": answer})
     except Exception as e:
         print(f"AI respond error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
-# === АДМИНКА ===
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required
 def admin_users():
@@ -366,7 +349,7 @@ def admin_users():
         return jsonify([{"id":u.id, "username":u.username, "created_at":u.created_at.isoformat(), "is_active":u.is_active, "is_admin":u.is_admin} for u in users])
     except Exception as e:
         print(f"Admin users error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/admin/toggle_user', methods=['POST'])
 @admin_required
@@ -375,7 +358,6 @@ def toggle_user():
         user_id = request.json.get('user_id')
         u = User.query.get(user_id)
         if u: 
-            # ИСПРАВЛЕНО: безопасная проверка
             current_username = request.current_user.username if request.current_user else None
             if u.username != current_username:
                 u.is_active = not u.is_active
@@ -383,77 +365,29 @@ def toggle_user():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Toggle user error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
-@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@app.route('/api/admin/send_to_user', methods=['POST'])
 @admin_required
-def delete_user_admin():
-    try:
-        u = User.query.get(user_id)
-        if u:
-            current_username = request.current_user.username if request.current_user else None
-            if u.username == current_username:
-                return jsonify({"error": "Нельзя удалить себя"}), 400
-            db.session.delete(u)
-            db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Delete user error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
-
-@app.route('/api/admin/message', methods=['POST'])
-@admin_required
-def admin_message():
+def admin_send_to_user():
     try:
         d = request.json
-        db.session.add(AdminMessage(user_id=d['user_id'], text=d['text']))
-        for site in Website.query.filter_by(owner_id=d['user_id'], is_deleted=False).all():
-            for chat in Chat.query.filter_by(website_id=site.id).all():
-                db.session.add(Message(chat_id=chat.id, sender='admin', text=f"📢 {d['text']}"))
+        user_id = d.get('user_id')
+        text = d.get('text')
+        user_sites = Website.query.filter_by(owner_id=user_id, is_deleted=False).all()
+        if not user_sites:
+            return jsonify({"error": "У пользователя нет сайтов"}), 404
+        site = user_sites[0]
+        chat = Chat(website_id=site.id, visitor_id=f"admin_{uuid.uuid4().hex[:8]}", status='waiting', operator_id=None)
+        db.session.add(chat)
         db.session.commit()
-        return jsonify({"ok": True})
+        db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
+        db.session.commit()
+        return jsonify({"ok": True, "chat_id": chat.id})
     except Exception as e:
-        print(f"Admin message error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        print(f"Admin send error: {e}")
+        return jsonify({"error": "Ошибка"}), 500
 
-@app.route('/api/admin/trash', methods=['GET'])
-@admin_required
-def get_trash():
-    try:
-        sites = Website.query.filter_by(is_deleted=True).order_by(Website.deleted_at.desc()).all()
-        return jsonify([{"id":s.id, "url":s.url, "deleted_at":s.deleted_at.isoformat()} for s in sites])
-    except Exception as e:
-        print(f"Get trash error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
-
-@app.route('/api/admin/trash/<int:site_id>/restore', methods=['POST'])
-@admin_required
-def restore_site():
-    try:
-        site = Website.query.get(site_id)
-        if site: 
-            site.is_deleted = False
-            site.deleted_at = None
-            db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Restore site error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
-
-@app.route('/api/admin/trash/<int:site_id>', methods=['DELETE'])
-@admin_required
-def permanent_delete():
-    try:
-        site = Website.query.get(site_id)
-        if site: 
-            db.session.delete(site)
-            db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Permanent delete error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
-
-# === TELEGRAM ===
 @app.route('/api/telegram/setup', methods=['POST'])
 @token_required
 def setup_tg():
@@ -470,10 +404,10 @@ def setup_tg():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Telegram setup error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/admin/save_chat_id', methods=['POST'])
-@token_required
+@admin_required
 def save_chat_id():
     try:
         user = request.current_user
@@ -482,7 +416,7 @@ def save_chat_id():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Save chat ID error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/change_password', methods=['POST'])
 @token_required
@@ -490,26 +424,21 @@ def change_password():
     try:
         user = request.current_user
         p = request.json.get('password')
-        if not p or len(p) < 4: 
-            return jsonify({"error": "Минимум 4 символа"}), 400
+        if not p or len(p) < 4: return jsonify({"error": "Минимум 4 символа"}), 400
         user.password_hash = hash_pwd(p)
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Change password error: {e}")
-        return jsonify({"error": "Внутренняя ошибка"}), 500
+        return jsonify({"error": "Ошибка"}), 500
 
-# === ИНИЦИАЛИЗАЦИЯ ===
 with app.app_context():
     db.create_all()
     add_missing_columns()
-    
     admin = User.query.filter_by(username='Kristina').first()
     if not admin:
         admin = User(username='Kristina', is_admin=True)
         db.session.add(admin)
-        print("🔧 Creating admin: Kristina")
-    
     admin.is_active = True
     admin.password_hash = hash_pwd('zaqqaz')
     db.session.commit()
