@@ -129,16 +129,18 @@ function goToLanding() {
 
 function toggleMode() {
   isRegister = !isRegister;
+  const privacyBox = document.getElementById('privacyBox');
+  
   if(isRegister) {
     document.getElementById('authTitle').textContent = 'Регистрация';
     document.getElementById('authBtn').textContent = 'Создать аккаунт';
     document.querySelector('.toggle').textContent = 'Уже есть аккаунт? Войти';
-    document.getElementById('privacyBox').style.display = 'flex';
+    privacyBox.style.display = 'flex';
   } else {
     document.getElementById('authTitle').textContent = 'Вход в CRM';
     document.getElementById('authBtn').textContent = 'Войти';
     document.querySelector('.toggle').textContent = 'Нет аккаунта? Зарегистрироваться';
-    document.getElementById('privacyBox').style.display = 'none';
+    privacyBox.style.display = 'none';
   }
   clearMsg();
 }
@@ -157,8 +159,9 @@ async function handleAuth() {
   const username = document.getElementById('u').value.trim();
   const password = document.getElementById('p').value;
   
+  // ПРОВЕРКА ГАЛОЧКИ ПРИ РЕГИСТРАЦИИ
   if(isRegister && !document.getElementById('privacyCheck').checked) {
-    showMsg('❌ Необходимо согласиться с политикой конфиденциальности');
+    showMsg('❌ Вы должны согласиться с Политикой конфиденциальности');
     return;
   }
   
