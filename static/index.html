@@ -47,7 +47,7 @@ h1{font-size:2rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(
 
 <main id="landing" class="view landing">
   <div class="hero-card">
-    <h1><img src="favicon.png" alt="🤖" class="logo" onerror="this.style.display='none'">🤖 КРИСТИНА.AI CRM</h1>
+    <h1><img src="favicon.png" alt="Logo" class="logo" onerror="this.style.display='none'">КРИСТИНА.AI CRM</h1>
     <p class="subtitle">Интеллектуальная система управления диалогами</p>
     
     <div class="info-grid">
@@ -93,18 +93,18 @@ h1{font-size:2rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(
 <section id="auth" class="view auth hidden">
   <div class="auth-card">
     <button type="button" class="back-btn" onclick="goToLanding()">← Назад</button>
-    <h1 style="font-size:1.6rem;margin-bottom:1rem" id="authTitle">🔐 Вход в CRM</h1>
+    <h1 style="font-size:1.6rem;margin-bottom:1rem" id="authTitle">Вход в CRM</h1>
     <div id="msg"></div>
     <input type="text" id="u" placeholder="Логин">
     <input type="password" id="p" placeholder="Пароль">
-    <button type="button" class="auth-btn" id="authBtn" onclick="handleAuth()">Зарегистрироваться</button>
+    <button type="button" class="auth-btn" id="authBtn" onclick="handleAuth()">Войти</button>
     <span class="toggle" onclick="toggleMode()">Нет аккаунта? Зарегистрироваться</span>
   </div>
 </section>
 
 <script>
 const API = location.origin + '/api';
-let isRegister = true;
+let isRegister = false; // По умолчанию ВХОД
 
 function goToAuth() {
   document.getElementById('landing').classList.add('hidden');
@@ -119,9 +119,15 @@ function goToLanding() {
 
 function toggleMode() {
   isRegister = !isRegister;
-  document.getElementById('authTitle').textContent = isRegister ? '📝 Регистрация' : '🔐 Вход в CRM';
-  document.getElementById('authBtn').textContent = isRegister ? 'Создать аккаунт' : 'Войти';
-  document.querySelector('.toggle').textContent = isRegister ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
+  if(isRegister) {
+    document.getElementById('authTitle').textContent = 'Регистрация';
+    document.getElementById('authBtn').textContent = 'Создать аккаунт';
+    document.querySelector('.toggle').textContent = 'Уже есть аккаунт? Войти';
+  } else {
+    document.getElementById('authTitle').textContent = 'Вход в CRM';
+    document.getElementById('authBtn').textContent = 'Войти';
+    document.querySelector('.toggle').textContent = 'Нет аккаунта? Зарегистрироваться';
+  }
   clearMsg();
 }
 
