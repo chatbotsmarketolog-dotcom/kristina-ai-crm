@@ -73,24 +73,6 @@ class TelegramBot(db.Model):
     bot_token = db.Column(db.String(200), unique=True)
     is_active = db.Column(db.Boolean, default=False)
 
-class AdminMessage(db.Model):
-    __tablename__ = 'adminmessage'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    text = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-
-def send_telegram_notification(bot_token, chat_id, message):
-    try:
-        if not bot_token or not chat_id: return False
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        data = {"chat_id": chat_id, "text": message, "parse_mode": "HTML"}
-        response = requests.post(url, json=data, timeout=5)
-        return response.status_code == 200
-    except Exception as e:
-        print(f"Telegram error: {e}")
-        return False
-
 def hash_pwd(p): 
     return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
 
@@ -127,41 +109,9 @@ def add_missing_columns():
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
             db.session.commit()
-            print("✅ Миграции применены")
         except Exception as e:
-            print(f"⚠️ Ошибка миграции: {e}")
+            print(f"Migration error: {e}")
             db.session.rollback()
-
-def generate_ai_response(user_message, ai_settings, conversation_history=[]):
-    try:
-        system_prompt = f"""Ты {ai_settings.name} - AI помощник.
-
-ХАРАКТЕР И ПОВЕДЕНИЕ:
-{ai_settings.behavior}
-
-БАЗА ЗНАНИЙ:
-{ai_settings.knowledge_base}
-
-ЗАПРЕЩЁННЫЕ ТЕМЫ:
-{ai_settings.forbidden if ai_settings.forbidden else 'Нет запретов'}
-
-Отвечай на русском языке. Будь полезен и дружелюбен."""
-
-        messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(conversation_history[-10:])
-        messages.append({"role": "user", "content": user_message})
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            max_tokens=500,
-            temperature=0.7
-        )
-        
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"OpenAI error: {e}")
-        return "Извините, произошла ошибка. Попробуйте позже."
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -203,21 +153,22 @@ def get_sites():
         return jsonify([{"id":s.id, "url":s.url, "api_key":s.api_key, "status":s.status, "owner":s.owner_id} for s in sites])
     except Exception as e:
         print(f"Get sites error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify([]), 500
 
 @app.route('/api/sites', methods=['POST'])
 @token_required
 def add_site():
     try:
         url = request.json.get('url')
+        if not url: return jsonify({"error": "URL обязателен"}), 400
         key = f"site_{uuid.uuid4().hex[:8]}"
-        site = Website(url=url, api_key=key, owner_id=request.current_user.id)
+        site = Website(url=url, api_key=key, owner_id=request.current_user.id, status='pending')
         db.session.add(site)
         db.session.commit()
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "id": site.id})
     except Exception as e:
         print(f"Add site error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/sites/<int:site_id>/approve', methods=['POST'])
 @admin_required
@@ -229,7 +180,7 @@ def approve_site():
             db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"Approve site error: {e}")
+        print(f"Approve error: {e}")
         return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/sites/<int:site_id>/delete', methods=['POST'])
@@ -243,7 +194,7 @@ def delete_site():
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"Delete site error: {e}")
+        print(f"Delete error: {e}")
         return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/chats', methods=['GET'])
@@ -255,7 +206,7 @@ def get_chats():
         return jsonify([{"id":c.id, "site":Website.query.get(c.website_id).url if Website.query.get(c.website_id) else "Unknown", "status":c.status, "time":c.created_at.isoformat()} for c in chats])
     except Exception as e:
         print(f"Get chats error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify([]), 500
 
 @app.route('/api/messages/<int:chat_id>', methods=['GET'])
 @token_required
@@ -265,7 +216,7 @@ def get_messages(chat_id):
         return jsonify([{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msgs])
     except Exception as e:
         print(f"Get messages error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify([]), 500
 
 @app.route('/api/send', methods=['POST'])
 @token_required
@@ -276,7 +227,7 @@ def send_message():
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"Send message error: {e}")
+        print(f"Send error: {e}")
         return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/ai/setup', methods=['POST'])
@@ -293,22 +244,12 @@ def setup_ai():
             ai.is_active_web = d.get('is_active_web', ai.is_active_web)
             ai.is_active_telegram = d.get('is_active_telegram', ai.is_active_telegram)
         else:
-            ai = AIManager(
-                user_id=request.current_user.id,
-                name=d.get('name', 'AI Assistant'),
-                behavior=d.get('behavior', ''),
-                forbidden=d.get('forbidden', ''),
-                knowledge_base=d.get('knowledge_base', ''),
-                is_active_web=d.get('is_active_web', False),
-                is_active_telegram=d.get('is_active_telegram', False)
-            )
+            ai = AIManager(user_id=request.current_user.id, name=d.get('name','AI'), behavior=d.get('behavior',''), forbidden=d.get('forbidden',''), knowledge_base=d.get('knowledge_base',''), is_active_web=d.get('is_active_web',False), is_active_telegram=d.get('is_active_telegram',False))
             db.session.add(ai)
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
         print(f"AI setup error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/ai/get', methods=['GET'])
@@ -317,31 +258,11 @@ def get_ai():
     try:
         ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
         if ai:
-            return jsonify({
-                "name": ai.name, "behavior": ai.behavior, "forbidden": ai.forbidden,
-                "knowledge_base": ai.knowledge_base, "is_active_web": ai.is_active_web, "is_active_telegram": ai.is_active_telegram
-            })
+            return jsonify({"name": ai.name, "behavior": ai.behavior, "forbidden": ai.forbidden, "knowledge_base": ai.knowledge_base, "is_active_web": ai.is_active_web, "is_active_telegram": ai.is_active_telegram})
         return jsonify({})
     except Exception as e:
         print(f"AI get error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
-
-@app.route('/api/ai/respond', methods=['POST'])
-@token_required
-def ai_respond():
-    try:
-        d = request.json
-        ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
-        if not ai: return jsonify({"error": "AI не настроен"}), 404
-        channel = d.get('channel', 'web')
-        if channel == 'web' and not ai.is_active_web: return jsonify({"answer": "AI сейчас неактивен."})
-        if channel == 'telegram' and not ai.is_active_telegram: return jsonify({"answer": "AI сейчас неактивен."})
-        history = d.get('history', [])
-        answer = generate_ai_response(d.get('message', ''), ai, history)
-        return jsonify({"answer": answer})
-    except Exception as e:
-        print(f"AI respond error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify({}), 500
 
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required
@@ -351,7 +272,7 @@ def admin_users():
         return jsonify([{"id":u.id, "username":u.username, "created_at":u.created_at.isoformat(), "is_active":u.is_active, "is_admin":u.is_admin} for u in users])
     except Exception as e:
         print(f"Admin users error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify([]), 500
 
 @app.route('/api/admin/toggle_user', methods=['POST'])
 @admin_required
@@ -359,36 +280,47 @@ def toggle_user():
     try:
         user_id = request.json.get('user_id')
         u = User.query.get(user_id)
-        if u: 
-            current_username = request.current_user.username if request.current_user else None
-            if u.username != current_username:
-                u.is_active = not u.is_active
-                db.session.commit()
+        if u and u.username != request.current_user.username:
+            u.is_active = not u.is_active
+            db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"Toggle user error: {e}")
+        print(f"Toggle error: {e}")
         return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/admin/send_to_user', methods=['POST'])
 @admin_required
 def admin_send_to_user():
+    """ОТПРАВКА СООБЩЕНИЯ ПОЛЬЗОВАТЕЛЮ - СОЗДАЁТ ЧАТ"""
     try:
         d = request.json
         user_id = d.get('user_id')
         text = d.get('text')
+        
+        if not user_id or not text:
+            return jsonify({"error": "user_id и text обязательны"}), 400
+        
+        # Находим сайты пользователя
         user_sites = Website.query.filter_by(owner_id=user_id, is_deleted=False).all()
         if not user_sites:
             return jsonify({"error": "У пользователя нет сайтов"}), 404
+        
+        # Создаём чат для первого сайта
         site = user_sites[0]
         chat = Chat(website_id=site.id, visitor_id=f"admin_{uuid.uuid4().hex[:8]}", status='waiting', operator_id=None)
         db.session.add(chat)
         db.session.commit()
+        
+        # Добавляем сообщение
         db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
         db.session.commit()
+        
         return jsonify({"ok": True, "chat_id": chat.id})
     except Exception as e:
         print(f"Admin send error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/telegram/setup', methods=['POST'])
 @token_required
@@ -405,8 +337,8 @@ def setup_tg():
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"Telegram setup error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        print(f"Telegram error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/save_chat_id', methods=['POST'])
 @admin_required
@@ -418,7 +350,7 @@ def save_chat_id():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Save chat ID error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/change_password', methods=['POST'])
 @token_required
@@ -431,7 +363,7 @@ def change_password():
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"Change password error: {e}")
+        print(f"Password error: {e}")
         return jsonify({"error": "Ошибка"}), 500
 
 with app.app_context():
