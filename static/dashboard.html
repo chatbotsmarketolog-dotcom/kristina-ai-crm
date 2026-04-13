@@ -10,7 +10,7 @@
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 
-/* Мобильное меню - отдельная страница */
+/* Мобильное меню */
 #mobileMenu{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:1000;padding:20px;overflow-y:auto}
 #mobileMenu.active{display:block}
 .menu-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.1)}
@@ -19,7 +19,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .menu-item:hover{background:rgba(59,130,246,0.15)}
 .menu-icon{font-size:1.5rem}
 
-/* Шапка - только кнопка Меню на мобильном */
+/* Шапка */
 .header{background:var(--panel);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center}
 .header h2{font-size:1.1rem;display:flex;align-items:center;gap:8px}
 .logo{width:28px;height:28px}
@@ -36,9 +36,9 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .section{display:none}
 .section.active{display:block}
 
-/* ЧАТЫ - на мобильном чат на весь экран, слева список */
-.chat-container{display:grid;grid-template-columns:1fr;gap:16px;height:calc(100vh - 150px)}
-@media(min-width:768px){.chat-container{grid-template-columns:280px 1fr}}
+/* ЧАТЫ - мобильная адаптация: список слева, диалог справа */
+.chat-container{display:grid;grid-template-columns:1fr;gap:16px;height:calc(100vh - 120px)}
+@media(min-width:768px){.chat-container{grid-template-columns:300px 1fr}}
 .chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
 .chat-list-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:0.95rem}
 .chat-items{flex:1;overflow-y:auto}
@@ -76,11 +76,15 @@ input:checked+.slider:before{transform:translateX(20px)}
 @media(min-width:640px){.site-item{flex-direction:row;align-items:center;justify-content:space-between}}
 .site-info{flex:1}
 .site-actions{display:flex;gap:6px;flex-wrap:wrap}
-.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:6px;padding:10px;font-family:monospace;font-size:0.75rem;overflow-x:auto}
+.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:6px;padding:10px;font-family:monospace;font-size:0.75rem;overflow-x:auto;white-space:pre-wrap}
 .copy-btn{padding:4px 10px;background:var(--acc);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:0.75rem}
 .status{padding:3px 8px;border-radius:4px;font-size:0.75rem}
 .status-active{background:rgba(16,185,129,0.2);color:var(--success)}
 .status-pending{background:rgba(251,191,36,0.2);color:#fbbf24}
+
+/* Инструкция */
+.instruction{background:rgba(59,130,246,0.05);border-left:4px solid var(--acc);padding:16px;border-radius:6px;margin:16px 0}
+.instruction ol{margin-left:20px;line-height:1.8}
 
 /* Табсы для AI */
 .tabs{display:flex;gap:4px;margin-bottom:16px;background:rgba(0,0,0,0.2);padding:4px;border-radius:8px}
@@ -112,7 +116,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 </head>
 <body>
 
-<!-- Мобильное меню (отдельная страница) -->
+<!-- Мобильное меню -->
 <div id="mobileMenu">
   <div class="menu-header">
     <h3>КРИСТИНА.AI CRM</h3>
@@ -169,9 +173,18 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
       <div style="display:flex;gap:8px"><input type="text" id="siteUrl" placeholder="https://site.com"><button class="btn" onclick="addSite()">➕ Добавить</button></div>
     </div>
     <div class="card">
-      <h3>📋 Код виджета</h3>
-      <div class="code-box" id="widgetCode">&lt;!-- Код после одобрения --&gt;</div>
-      <button class="copy-btn" onclick="copyCode()">📋 Копировать</button>
+      <h3>📋 Инструкция по подключению</h3>
+      <div class="instruction">
+        <ol>
+          <li>Добавьте сайт выше</li>
+          <li>Дождитесь одобрения администратора</li>
+          <li>Скопируйте код виджета ниже</li>
+          <li>Вставьте код перед закрывающим тегом <code>&lt;/body&gt;</code> на вашем сайте</li>
+          <li>Готово! Чат появится на сайте</li>
+        </ol>
+      </div>
+      <div class="code-box" id="widgetCode">&lt;!-- Код появится после одобрения --&gt;</div>
+      <button class="copy-btn" onclick="copyCode()">📋 Скопировать код</button>
     </div>
     <div class="card" id="siteList"><h3>Мои сайты</h3><p style="opacity:0.6">Загрузка...</p></div>
   </div>
@@ -229,11 +242,26 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 
   <!-- АДМИНКА -->
   <div id="admin" class="section">
-    <div class="card"><h3>👥 Пользователи</h3><div style="overflow-x:auto"><table><thead><tr><th>Логин</th><th>Дата</th><th>Статус</th><th>Действия</th></tr></thead><tbody id="userTable"></tbody></table></div></div>
-    <div class="card"><h3>📢 Сообщение</h3><select id="targetUser" style="width:100%;padding:10px;margin-bottom:10px"><option>Выберите</option></select><textarea id="adminMsg" rows="3" placeholder="Текст..."></textarea><button class="btn" onclick="sendAdminMsg()">📩 Отправить</button></div>
+    <div class="card">
+      <h3>👥 Пользователи</h3>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Логин</th><th>Сайт</th><th>Дата</th><th>Статус</th><th>Действия</th></tr>
+          </thead>
+          <tbody id="userTable"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>📢 Сообщение</h3>
+      <select id="targetUser" style="width:100%;padding:10px;margin-bottom:10px"><option>Выберите</option></select>
+      <textarea id="adminMsg" rows="3" placeholder="Текст..."></textarea>
+      <button class="btn" onclick="sendAdminMsg()">📩 Отправить</button>
+    </div>
   </div>
 
-  <!-- ПРОФИЛЬ (с Telegram настройками) -->
+  <!-- ПРОФИЛЬ -->
   <div id="profile" class="section">
     <div class="card">
       <h3>👤 Профиль</h3>
@@ -335,11 +363,11 @@ async function loadSites(){
     html+=`<div class="site-item"><div class="site-info"><div style="font-weight:600">${s.url}</div><div style="font-size:0.8rem;opacity:0.6">API: <code>${s.api_key}</code></div><span class="status ${s.status==='active'?'status-active':'status-pending'}">${s.status==='active'?'✅':'⏳'} ${s.status==='active'?'Активен':'Ожидает'}</span></div><div class="site-actions"><button class="btn btn-red" onclick="deleteSite(${s.id})">🗑️ Удалить</button></div></div>`;
   });
   el.innerHTML=html;
-  document.getElementById('widgetCode').textContent=approved?`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`:'<!-- Код после одобрения -->';
+  document.getElementById('widgetCode').textContent=approved?`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`:'<!-- Код появится после одобрения -->';
 }
 function addSite(){ const u=document.getElementById('siteUrl').value.trim(); if(!u) return; fetchAPI('/sites','POST',{url:u}).then(()=>{document.getElementById('siteUrl').value='';loadSites();}); }
 function deleteSite(id){ if(!confirm('Переместить в корзину?')) return; fetchAPI(`/sites/${id}/delete`,'POST').then(()=>{loadSites();alert('✅ В корзине');}); }
-function copyCode(){ const c=document.getElementById('widgetCode').textContent; if(c.includes('появится')) return alert('ℹ️ Код после одобрения'); navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано')); }
+function copyCode(){ const c=document.getElementById('widgetCode').textContent; if(c.includes('появится')) return alert('ℹ️ Код появится после одобрения'); navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано')); }
 
 // AI MANAGER
 function handleFiles(files){
@@ -368,17 +396,44 @@ async function loadAISettings(){
   document.getElementById('aiWebToggle').checked=ai.is_active_web||false;
   document.getElementById('aiTgToggle').checked=ai.is_active_telegram||false;
 }
+
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ saveAISettings
 function saveAISettings(channel){
-  const data={
-    name:document.getElementById('aiName').value,
-    behavior:document.getElementById('aiBehavior').value,
-    knowledge_base:document.getElementById('aiKnowledge').value,
-    forbidden:document.getElementById('aiForbidden').value,
-    is_active_web:document.getElementById('aiWebToggle').checked,
-    is_active_telegram:document.getElementById('aiTgToggle').checked
+  console.log('🔧 Сохранение AI настроек для:', channel);
+  
+  const name = document.getElementById('aiName').value;
+  const behavior = document.getElementById('aiBehavior').value;
+  const knowledge = document.getElementById('aiKnowledge').value;
+  const forbidden = document.getElementById('aiForbidden').value;
+  const webActive = document.getElementById('aiWebToggle').checked;
+  const tgActive = document.getElementById('aiTgToggle').checked;
+  
+  console.log('📦 Данные:', {name, behavior, knowledge, forbidden, webActive, tgActive});
+  
+  const data = {
+    name: name,
+    behavior: behavior,
+    knowledge_base: knowledge,
+    forbidden: forbidden,
+    is_active_web: webActive,
+    is_active_telegram: tgActive
   };
-  fetchAPI('/ai/setup','POST',data).then(()=>alert('✅ AI сохранён!'));
+  
+  fetchAPI('/ai/setup','POST',data)
+    .then(result => {
+      console.log('✅ Результат:', result);
+      if(result && result.ok) {
+        alert('✅ AI настройки успешно сохранены!');
+      } else {
+        alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
+      }
+    })
+    .catch(error => {
+      console.error('❌ Ошибка сети:', error);
+      alert('❌ Ошибка соединения с сервером');
+    });
 }
+
 function saveTelegramConfig(){
   const tok=document.getElementById('tgToken').value.trim();
   const cid=document.getElementById('tgChatId').value.trim();
@@ -387,8 +442,14 @@ function saveTelegramConfig(){
 }
 
 // АДМИНКА
-async function loadUsers(){ const u=await fetchAPI('/admin/users'); if(!u) return; document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join(''); document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':'🔴'}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join(''); }
+async function loadUsers(){ 
+  const u=await fetchAPI('/admin/users'); 
+  if(!u) return; 
+  document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join(''); 
+  document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td><a href="${location.protocol}//${location.hostname}" target="_blank" style="color:var(--acc)">Сайт</a></td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':'🔴'}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button> <button class="btn btn-red" onclick="deleteUser(${x.id})">🗑️</button></td></tr>`).join(''); 
+}
 function toggleUser(id){ fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers); }
+function deleteUser(id){ if(!confirm('Удалить пользователя?')) return; alert('Функция в разработке'); }
 function sendAdminMsg(){ const u=document.getElementById('targetUser').value,t=document.getElementById('adminMsg').value.trim(); if(!u||!t) return; fetchAPI('/admin/message','POST',{user_id:u,text:t}).then(()=>{alert('✅ Отправлено');document.getElementById('adminMsg').value='';}); }
 
 // ПРОФИЛЬ
