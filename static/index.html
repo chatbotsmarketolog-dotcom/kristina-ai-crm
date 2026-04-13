@@ -29,6 +29,10 @@ h1{font-size:2rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(
 .auth-card{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:2rem;width:100%;max-width:400px;text-align:center;position:relative;margin:0 auto}
 .back-btn{position:relative;top:0;left:0;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:#94a3b8;padding:10px 20px;border-radius:8px;cursor:pointer;margin:0 auto 20px;display:block}
 .auth-card input{width:100%;padding:12px;margin:10px 0;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text)}
+.checkbox-group{display:flex;align-items:flex-start;gap:10px;margin:16px 0;text-align:left}
+.checkbox-group input{margin-top:4px;width:auto}
+.checkbox-group label{font-size:0.85rem;color:#94a3b8;line-height:1.4}
+.checkbox-group a{color:var(--blue-4);text-decoration:underline}
 .toggle{display:block;margin-top:16px;color:var(--blue-4);cursor:pointer}
 .error{color:#f87171;font-size:12px;margin:10px 0;min-height:18px}
 .success{color:#4ade80;font-size:12px;margin:10px 0}
@@ -97,6 +101,12 @@ h1{font-size:2rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(
     <div id="msg"></div>
     <input type="text" id="u" placeholder="Логин">
     <input type="password" id="p" placeholder="Пароль">
+    
+    <div class="checkbox-group" id="privacyBox" style="display:none">
+      <input type="checkbox" id="privacyCheck">
+      <label for="privacyCheck">Я согласен с <a href="/privacy.html" target="_blank">Политикой конфиденциальности</a> и <a href="/privacy.html#terms" target="_blank">Условиями использования</a></label>
+    </div>
+    
     <button type="button" class="auth-btn" id="authBtn" onclick="handleAuth()">Войти</button>
     <span class="toggle" onclick="toggleMode()">Нет аккаунта? Зарегистрироваться</span>
   </div>
@@ -104,7 +114,7 @@ h1{font-size:2rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(
 
 <script>
 const API = location.origin + '/api';
-let isRegister = false; // По умолчанию ВХОД
+let isRegister = false;
 
 function goToAuth() {
   document.getElementById('landing').classList.add('hidden');
@@ -123,10 +133,12 @@ function toggleMode() {
     document.getElementById('authTitle').textContent = 'Регистрация';
     document.getElementById('authBtn').textContent = 'Создать аккаунт';
     document.querySelector('.toggle').textContent = 'Уже есть аккаунт? Войти';
+    document.getElementById('privacyBox').style.display = 'flex';
   } else {
     document.getElementById('authTitle').textContent = 'Вход в CRM';
     document.getElementById('authBtn').textContent = 'Войти';
     document.querySelector('.toggle').textContent = 'Нет аккаунта? Зарегистрироваться';
+    document.getElementById('privacyBox').style.display = 'none';
   }
   clearMsg();
 }
@@ -144,6 +156,11 @@ function clearMsg() {
 async function handleAuth() {
   const username = document.getElementById('u').value.trim();
   const password = document.getElementById('p').value;
+  
+  if(isRegister && !document.getElementById('privacyCheck').checked) {
+    showMsg('❌ Необходимо согласиться с политикой конфиденциальности');
+    return;
+  }
   
   if (!username || password.length < 4) {
     showMsg('Логин мин. 2 символа, пароль мин. 4');
