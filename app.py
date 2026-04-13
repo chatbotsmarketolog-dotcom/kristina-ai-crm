@@ -172,50 +172,27 @@ def login():
     username = d.get('username', '').strip()
     password = d.get('password', '')
     
-    print(f"🔐 LOGIN ATTEMPT: username={username}")
-    
     user = User.query.filter_by(username=username).first()
-    
     if not user:
-        print(f"❌ User not found: {username}")
         return jsonify({"error": "Неверные данные"}), 401
-    
     if not user.is_active:
-        print(f"❌ User inactive: {username}")
         return jsonify({"error": "Аккаунт отключен"}), 401
-    
-    password_hash = hash_pwd(password)
-    print(f"🔑 Password hash check: DB={user.password_hash[:20]}... Input={password_hash[:20]}...")
-    
-    if user.password_hash != password_hash:
-        print(f"❌ Wrong password for {username}")
+    if user.password_hash != hash_pwd(password):
         return jsonify({"error": "Неверные данные"}), 401
-    
-    print(f"✅ Login successful: {username}")
-    return jsonify({
-        "ok": True, 
-        "token": user.api_token, 
-        "is_admin": user.is_admin, 
-        "username": user.username
-    })
+        
+    return jsonify({"ok": True, "token": user.api_token, "is_admin": user.is_admin, "username": user.username})
 
 @app.route('/api/register', methods=['POST'])
 def register():
     d = request.json
     username = d.get('username', '').strip()
     password = d.get('password', '')
-    
     if not username or len(password) < 4:
         return jsonify({"error": "Логин мин. 2 символа, пароль мин. 4"}), 400
-    
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Пользователь существует"}), 409
-    
     u = User(username=username, password_hash=hash_pwd(password))
-    db.session.add(u)
-    db.session.commit()
-    
-    print(f"✅ User registered: {username}")
+    db.session.add(u); db.session.commit()
     return jsonify({"ok": True, "token": u.api_token, "username": u.username})
 
 # === САЙТЫ ===
@@ -306,12 +283,8 @@ def get_ai():
     ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
     if ai:
         return jsonify({
-            "name": ai.name,
-            "behavior": ai.behavior,
-            "forbidden": ai.forbidden,
-            "knowledge_base": ai.knowledge_base,
-            "is_active_web": ai.is_active_web,
-            "is_active_telegram": ai.is_active_telegram
+            "name": ai.name, "behavior": ai.behavior, "forbidden": ai.forbidden,
+            "knowledge_base": ai.knowledge_base, "is_active_web": ai.is_active_web, "is_active_telegram": ai.is_active_telegram
         })
     return jsonify({})
 
@@ -320,15 +293,10 @@ def get_ai():
 def ai_respond():
     d = request.json
     ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
-    if not ai:
-        return jsonify({"error": "AI не настроен"}), 404
-    
+    if not ai: return jsonify({"error": "AI не настроен"}), 404
     channel = d.get('channel', 'web')
-    if channel == 'web' and not ai.is_active_web:
-        return jsonify({"answer": "AI сейчас неактивен. Оператор скоро ответит."})
-    if channel == 'telegram' and not ai.is_active_telegram:
-        return jsonify({"answer": "AI сейчас неактивен."})
-    
+    if channel == 'web' and not ai.is_active_web: return jsonify({"answer": "AI сейчас неактивен."})
+    if channel == 'telegram' and not ai.is_active_telegram: return jsonify({"answer": "AI сейчас неактивен."})
     history = d.get('history', [])
     answer = generate_ai_response(d.get('message', ''), ai, history)
     return jsonify({"answer": answer})
@@ -384,11 +352,8 @@ def permanent_delete():
 def setup_tg():
     d = request.json
     tb = TelegramBot.query.filter_by(user_id=request.current_user.id).first()
-    if tb:
-        tb.bot_token = d.get('token'); tb.is_active = d.get('active', False)
-    else:
-        tb = TelegramBot(user_id=request.current_user.id, bot_token=d.get('token'), is_active=d.get('active', False))
-        db.session.add(tb)
+    if tb: tb.bot_token = d.get('token'); tb.is_active = d.get('active', False)
+    else: tb = TelegramBot(user_id=request.current_user.id, bot_token=d.get('token'), is_active=d.get('active', False)); db.session.add(tb)
     db.session.commit()
     return jsonify({"ok": True})
 
@@ -406,25 +371,24 @@ def change_password():
     user = request.current_user
     p = request.json.get('password')
     if not p or len(p) < 4: return jsonify({"error": "Минимум 4 символа"}), 400
-    
-    user.password_hash = hash_pwd(p)
-    db.session.commit()
-    print(f"✅ Password changed for {user.username}")
+    user.password_hash = hash_pwd(p); db.session.commit()
     return jsonify({"ok": True})
 
-# === ИНИЦИАЛИЗАЦИЯ ===
+# === ИНИЦИАЛИЗАЦИЯ (АКТИВАЦИЯ + ПАРОЛЬ ZAQQAZ) ===
 with app.app_context():
     db.create_all()
     add_missing_columns()
     
-    # Создаём админа если нет
     admin = User.query.filter_by(username='Kristina').first()
     if not admin:
-        print("🔧 Creating admin user: Kristina / 1234")
-        db.session.add(User(username='Kristina', password_hash=hash_pwd('1234'), is_admin=True))
-        db.session.commit()
-    else:
-        print(f"✅ Admin exists: {admin.username}, Active: {admin.is_active}")
+        admin = User(username='Kristina', is_admin=True)
+        db.session.add(admin)
+        
+    # Жёстко ставим пароль и активируем аккаунт
+    admin.password_hash = hash_pwd('zaqqaz')
+    admin.is_active = True
+    db.session.commit()
+    print("✅ Админ Kristina готов. Пароль: zaqqaz | Статус: Активен")
 
 @app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
