@@ -9,50 +9,45 @@
 :root{--bg:#050a14;--glass:rgba(15,25,45,0.65);--border:rgba(59,130,246,0.25);--text:#e2e8f0;--blue-4:#3b82f6;--cyan:#00e5ff}
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
 body{background:var(--bg);color:var(--text);min-height:100vh}
-.view{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}
+.view{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .hidden{display:none!important}
-
-/* ПРЕВЬЮ СТРАНИЦА */
-.hero-card{max-width:900px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:24px;padding:3rem}
-h1{font-size:2.5rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(--blue-4));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.subtitle{color:#94a3b8;margin-bottom:2rem}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;margin-bottom:2.5rem}
+.hero-card{max-width:900px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:24px;padding:2rem}
+h1{font-size:2rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(--blue-4));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:flex;align-items:center;justify-content:center;gap:12px}
+.logo{width:40px;height:40px}
+.subtitle{color:#94a3b8;margin-bottom:2rem;text-align:center}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin-bottom:2rem}
 .glass-card{background:rgba(10,18,32,0.7);border:1px solid var(--border);border-radius:16px;padding:1.5rem}
-.glass-card h3{margin:10px 0;color:#fff}
-.glass-card p{color:#94a3b8;font-size:0.95rem}
-.creator-card{display:flex;align-items:center;gap:1.5rem;background:rgba(10,18,32,0.6);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:2.5rem}
+.glass-card h3{margin:10px 0;color:#fff;font-size:1.1rem}
+.glass-card p{color:#94a3b8;font-size:0.9rem}
+.creator-card{display:flex;align-items:center;gap:1.5rem;background:rgba(10,18,32,0.6);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:2rem;flex-wrap:wrap;justify-content:center;text-align:center}
 .photo-ring{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--blue-4),var(--cyan));padding:3px;flex-shrink:0}
 .creator-photo{width:100%;height:100%;border-radius:50%;object-fit:cover;border:3px solid var(--bg);background:#1e3a8a}
 .creator-name{font-size:1.3rem;font-weight:700;color:#fff;margin:5px 0}
-.tags{display:flex;gap:8px;flex-wrap:wrap}
-.tags span{padding:4px 10px;background:rgba(59,130,246,0.15);border:1px solid var(--border);border-radius:8px;font-size:0.8rem;color:var(--blue-4)}
-.cta-btn{width:100%;max-width:320px;padding:16px;background:linear-gradient(135deg,var(--blue-4),var(--cyan));color:#050a14;font-weight:700;font-size:1.1rem;border:none;border-radius:14px;cursor:pointer;margin:0 auto;display:block}
+.tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.tags span{padding:4px 10px;background:rgba(59,130,246,0.15);border:1px solid var(--border);border-radius:8px;font-size:0.75rem;color:var(--blue-4)}
+.cta-btn,.auth-btn{width:100%;max-width:320px;padding:16px;background:linear-gradient(135deg,var(--blue-4),var(--cyan));color:#050a14;font-weight:700;font-size:1.1rem;border:none;border-radius:14px;cursor:pointer;margin:0 auto;display:block}
+.auth-card{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:2rem;width:100%;max-width:400px;text-align:center;position:relative;margin:0 auto}
+.back-btn{position:relative;top:0;left:0;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:#94a3b8;padding:10px 20px;border-radius:8px;cursor:pointer;margin:0 auto 20px;display:block}
+.auth-card input{width:100%;padding:12px;margin:10px 0;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text)}
+.toggle{display:block;margin-top:16px;color:var(--blue-4);cursor:pointer}
+.error{color:#f87171;font-size:12px;margin:10px 0;min-height:18px}
+.success{color:#4ade80;font-size:12px;margin:10px 0}
 
-/* ВХОД/РЕГИСТРАЦИЯ (простой дизайн) */
-.auth-card{background:rgba(15,25,45,0.9);padding:2rem;border-radius:20px;border:1px solid #3b82f6;width:100%;max-width:400px;text-align:center;position:relative}
-.auth-card h1{color:#60a5fa;margin-bottom:1rem;font-size:1.6rem}
-.back-btn{position:absolute;top:16px;left:16px;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:#94a3b8;padding:6px 12px;border-radius:8px;cursor:pointer}
-.auth-card input{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:1px solid #3b82f6;background:#050a14;color:#fff;box-sizing:border-box}
-.auth-btn{width:100%;padding:12px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-weight:bold;cursor:pointer;margin-top:10px}
-.auth-btn:hover{background:#2563eb}
-.toggle{color:#60a5fa;cursor:pointer;margin-top:15px;display:block;font-size:14px}
-.error{color:#f87171;font-size:13px;margin:10px 0}
-.success{color:#4ade80;font-size:13px;margin:10px 0}
-
-@media (max-width: 768px) {
+@media (max-width: 640px) {
   .hero-card{padding:1.5rem}
-  h1{font-size:1.8rem}
-  .creator-card{flex-direction:column;text-align:center}
+  h1{font-size:1.5rem}
+  .logo{width:32px;height:32px}
+  .creator-card{flex-direction:column}
   .info-grid{grid-template-columns:1fr}
+  .auth-card{padding:1.5rem}
 }
 </style>
 </head>
 <body>
 
-<!-- ПРЕВЬЮ СТРАНИЦА -->
 <main id="landing" class="view landing">
   <div class="hero-card">
-    <h1>🔐 КРИСТИНА.AI CRM</h1>
+    <h1><img src="favicon.png" alt="🤖" class="logo" onerror="this.style.display='none'">🤖 КРИСТИНА.AI CRM</h1>
     <p class="subtitle">Интеллектуальная система управления диалогами</p>
     
     <div class="info-grid">
@@ -95,22 +90,21 @@ h1{font-size:2.5rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,va
   </div>
 </main>
 
-<!-- ВХОД/РЕГИСТРАЦИЯ -->
 <section id="auth" class="view auth hidden">
   <div class="auth-card">
     <button type="button" class="back-btn" onclick="goToLanding()">← Назад</button>
-    <h1 id="title">🔐 Вход в CRM</h1>
-    <div class="error" id="err"></div>
+    <h1 style="font-size:1.6rem;margin-bottom:1rem" id="authTitle">🔐 Вход в CRM</h1>
+    <div id="msg"></div>
     <input type="text" id="u" placeholder="Логин">
     <input type="password" id="p" placeholder="Пароль">
-    <button id="btn" class="auth-btn" onclick="auth('login')">Войти</button>
+    <button type="button" class="auth-btn" id="authBtn" onclick="handleAuth()">Зарегистрироваться</button>
     <span class="toggle" onclick="toggleMode()">Нет аккаунта? Зарегистрироваться</span>
   </div>
 </section>
 
 <script>
 const API = location.origin + '/api';
-let isReg = false;
+let isRegister = true;
 
 function goToAuth() {
   document.getElementById('landing').classList.add('hidden');
@@ -120,40 +114,68 @@ function goToAuth() {
 function goToLanding() {
   document.getElementById('auth').classList.add('hidden');
   document.getElementById('landing').classList.remove('hidden');
-  document.getElementById('err').textContent = '';
+  clearMsg();
 }
 
-function toggleMode(){
-  isReg = !isReg;
-  document.getElementById('title').textContent = isReg ? '📝 Регистрация' : '🔐 Вход в CRM';
-  document.getElementById('btn').textContent = isReg ? 'Создать аккаунт' : 'Войти';
-  document.getElementById('btn').onclick = () => auth(isReg?'register':'login');
-  document.querySelector('.toggle').textContent = isReg ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
-  document.getElementById('err').textContent = '';
+function toggleMode() {
+  isRegister = !isRegister;
+  document.getElementById('authTitle').textContent = isRegister ? '📝 Регистрация' : '🔐 Вход в CRM';
+  document.getElementById('authBtn').textContent = isRegister ? 'Создать аккаунт' : 'Войти';
+  document.querySelector('.toggle').textContent = isRegister ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
+  clearMsg();
 }
 
-async function auth(type){
-  const r = await fetch(`${API}/${type}`, {
-    method:'POST', 
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      username: document.getElementById('u').value, 
-      password: document.getElementById('p').value
-    })
-  });
-  const d = await r.json();
-  if(d.ok){
-    localStorage.setItem('token', d.token);
-    localStorage.setItem('isAdmin', d.is_admin || false);
-    localStorage.setItem('username', d.username || document.getElementById('u').value);
-    window.location.href = 'dashboard.html';
-  } else {
-    document.getElementById('err').textContent = d.error;
+function showMsg(text, isError=true) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = isError ? 'error' : 'success';
+}
+
+function clearMsg() {
+  document.getElementById('msg').textContent = '';
+}
+
+async function handleAuth() {
+  const username = document.getElementById('u').value.trim();
+  const password = document.getElementById('p').value;
+  
+  if (!username || password.length < 4) {
+    showMsg('Логин мин. 2 символа, пароль мин. 4');
+    return;
+  }
+  
+  const endpoint = isRegister ? '/register' : '/login';
+  
+  try {
+    const response = await fetch(API + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      showMsg(data.error || 'Ошибка');
+      return;
+    }
+    
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('isAdmin', data.is_admin || false);
+    localStorage.setItem('username', data.username || username);
+    showMsg('✅ Успешно! Переход...', false);
+    
+    setTimeout(() => {
+      window.location.href = '/dashboard.html';
+    }, 800);
+    
+  } catch (error) {
+    showMsg('Ошибка соединения');
   }
 }
 
 document.getElementById('p').onkeypress = function(e) {
-  if (e.key === 'Enter') auth(isReg?'register':'login');
+  if (e.key === 'Enter') handleAuth();
 };
 </script>
 </body>
