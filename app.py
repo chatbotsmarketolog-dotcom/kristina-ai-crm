@@ -13,7 +13,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 db = SQLAlchemy(app)
 
-# OpenAI клиент (ключ берется из переменных окружения Render)
+# OpenAI клиент
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # === МОДЕЛИ БАЗЫ ДАННЫХ ===
@@ -93,8 +93,11 @@ def send_telegram_notification(bot_token, chat_id, message):
         print(f"Telegram error: {e}")
         return False
 
-def hash_pwd(p): return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
-def get_token(): return request.headers.get('Authorization', '').replace('Bearer ', '')
+def hash_pwd(p): 
+    return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
+
+def get_token(): 
+    return request.headers.get('Authorization', '').replace('Bearer ', '')
 
 def token_required(f):
     def wrapper(*args, **kwargs):
@@ -132,7 +135,6 @@ def add_missing_columns():
 
 # === AI ФУНКЦИЯ ===
 def generate_ai_response(user_message, ai_settings, conversation_history=[]):
-    """Генерирует ответ через OpenAI"""
     try:
         system_prompt = f"""Ты {ai_settings.name} - AI помощник.
 
@@ -148,7 +150,7 @@ def generate_ai_response(user_message, ai_settings, conversation_history=[]):
 Отвечай на русском языке. Будь полезен и дружелюбен."""
 
         messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(conversation_history[-10:])  # Последние 10 сообщений
+        messages.extend(conversation_history[-10:])
         messages.append({"role": "user", "content": user_message})
 
         response = client.chat.completions.create(
@@ -167,18 +169,53 @@ def generate_ai_response(user_message, ai_settings, conversation_history=[]):
 @app.route('/api/login', methods=['POST'])
 def login():
     d = request.json
-    user = User.query.filter_by(username=d.get('username'), password_hash=hash_pwd(d.get('password'))).first()
-    if user and user.is_active:
-        return jsonify({"ok": True, "token": user.api_token, "is_admin": user.is_admin, "username": user.username})
-    return jsonify({"error": "Неверные данные"}), 401
+    username = d.get('username', '').strip()
+    password = d.get('password', '')
+    
+    print(f"🔐 LOGIN ATTEMPT: username={username}")
+    
+    user = User.query.filter_by(username=username).first()
+    
+    if not user:
+        print(f"❌ User not found: {username}")
+        return jsonify({"error": "Неверные данные"}), 401
+    
+    if not user.is_active:
+        print(f"❌ User inactive: {username}")
+        return jsonify({"error": "Аккаунт отключен"}), 401
+    
+    password_hash = hash_pwd(password)
+    print(f"🔑 Password hash check: DB={user.password_hash[:20]}... Input={password_hash[:20]}...")
+    
+    if user.password_hash != password_hash:
+        print(f"❌ Wrong password for {username}")
+        return jsonify({"error": "Неверные данные"}), 401
+    
+    print(f"✅ Login successful: {username}")
+    return jsonify({
+        "ok": True, 
+        "token": user.api_token, 
+        "is_admin": user.is_admin, 
+        "username": user.username
+    })
 
 @app.route('/api/register', methods=['POST'])
 def register():
     d = request.json
-    if User.query.filter_by(username=d.get('username')).first():
+    username = d.get('username', '').strip()
+    password = d.get('password', '')
+    
+    if not username or len(password) < 4:
+        return jsonify({"error": "Логин мин. 2 символа, пароль мин. 4"}), 400
+    
+    if User.query.filter_by(username=username).first():
         return jsonify({"error": "Пользователь существует"}), 409
-    u = User(username=d['username'], password_hash=hash_pwd(d['password']))
-    db.session.add(u); db.session.commit()
+    
+    u = User(username=username, password_hash=hash_pwd(password))
+    db.session.add(u)
+    db.session.commit()
+    
+    print(f"✅ User registered: {username}")
     return jsonify({"ok": True, "token": u.api_token, "username": u.username})
 
 # === САЙТЫ ===
@@ -286,14 +323,12 @@ def ai_respond():
     if not ai:
         return jsonify({"error": "AI не настроен"}), 404
     
-    # Проверяем, включен ли AI для этого канала
     channel = d.get('channel', 'web')
     if channel == 'web' and not ai.is_active_web:
         return jsonify({"answer": "AI сейчас неактивен. Оператор скоро ответит."})
     if channel == 'telegram' and not ai.is_active_telegram:
         return jsonify({"answer": "AI сейчас неактивен."})
     
-    # Генерируем ответ
     history = d.get('history', [])
     answer = generate_ai_response(d.get('message', ''), ai, history)
     return jsonify({"answer": answer})
@@ -371,16 +406,25 @@ def change_password():
     user = request.current_user
     p = request.json.get('password')
     if not p or len(p) < 4: return jsonify({"error": "Минимум 4 символа"}), 400
-    user.password_hash = hash_pwd(p); db.session.commit()
+    
+    user.password_hash = hash_pwd(p)
+    db.session.commit()
+    print(f"✅ Password changed for {user.username}")
     return jsonify({"ok": True})
 
 # === ИНИЦИАЛИЗАЦИЯ ===
 with app.app_context():
     db.create_all()
     add_missing_columns()
-    if not User.query.filter_by(username='Kristina').first():
+    
+    # Создаём админа если нет
+    admin = User.query.filter_by(username='Kristina').first()
+    if not admin:
+        print("🔧 Creating admin user: Kristina / 1234")
         db.session.add(User(username='Kristina', password_hash=hash_pwd('1234'), is_admin=True))
         db.session.commit()
+    else:
+        print(f"✅ Admin exists: {admin.username}, Active: {admin.is_active}")
 
 @app.route('/', defaults={'path': 'index.html'})
 @app.route('/<path:path>')
