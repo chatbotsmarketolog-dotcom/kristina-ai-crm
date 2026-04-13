@@ -6,29 +6,36 @@
 <title>КРИСТИНА.AI CRM</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-:root{--bg:#050a14;--glass:rgba(15,25,45,0.65);--border:rgba(59,130,246,0.25);--text:#e2e8f0;--blue:#3b82f6}
+:root{--bg:#050a14;--glass:rgba(15,25,45,0.65);--border:rgba(59,130,246,0.25);--text:#e2e8f0;--blue:#3b82f6;--cyan:#00e5ff}
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{max-width:400px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:2rem;text-align:center}
-h1{color:var(--blue);margin-bottom:1rem}
+.card{max-width:450px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:2.5rem;text-align:center}
+h1{color:var(--blue);margin-bottom:0.5rem;font-size:1.8rem}
+.subtitle{color:#94a3b8;margin-bottom:2rem;font-size:0.95rem}
 input{width:100%;padding:12px;margin:10px 0;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:#fff}
-.btn{width:100%;padding:12px;background:var(--blue);color:#000;font-weight:bold;border:none;border-radius:8px;cursor:pointer;margin-top:10px}
+.btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#000;font-weight:bold;border:none;border-radius:8px;cursor:pointer;margin-top:15px;font-size:1rem}
 .toggle{display:block;margin-top:15px;color:var(--blue);cursor:pointer;font-size:0.9rem}
-.checkbox{display:flex;align-items:flex-start;gap:10px;margin:15px 0;text-align:left;font-size:0.85rem}
-.checkbox a{color:var(--blue)}
+.checkbox{display:flex;align-items:flex-start;gap:10px;margin:15px 0;text-align:left;font-size:0.85rem;color:#94a3b8}
+.checkbox a{color:var(--blue);text-decoration:underline}
 .hidden{display:none}
+#msg{margin-bottom:15px;padding:10px;border-radius:6px;font-size:0.9rem}
+.error{background:rgba(239,68,68,0.2);color:#f87171;border:1px solid #ef4444}
+.success{background:rgba(74,222,128,0.2);color:#4ade80;border:1px solid #4ade80}
+@media(max-width:640px){.card{padding:2rem}}
 </style>
 </head>
 <body>
 <div class="card">
-  <h1>КРИСТИНА.AI CRM</h1>
-  <div id="msg" style="color:red;margin-bottom:10px;font-size:0.9rem"></div>
+  <h1>🤖 КРИСТИНА.AI CRM</h1>
+  <p class="subtitle">Интеллектуальная система управления диалогами</p>
+  
+  <div id="msg"></div>
   <input type="text" id="u" placeholder="Логин">
   <input type="password" id="p" placeholder="Пароль">
   
   <div id="regBox" class="checkbox hidden">
-    <input type="checkbox" id="check" style="width:auto;margin:0">
-    <label for="check">Согласен с <a href="/privacy.html" target="_blank">Политикой</a></label>
+    <input type="checkbox" id="check" style="width:auto;margin:0;margin-top:3px">
+    <label for="check">Я согласен с <a href="/privacy.html" target="_blank">Политикой конфиденциальности</a> и <a href="/privacy.html#terms" target="_blank">Условиями использования</a></label>
   </div>
 
   <button class="btn" id="btn" onclick="go()">Войти</button>
@@ -40,10 +47,17 @@ let isReg = false;
 
 function sw(){
   isReg = !isReg;
-  document.getElementById('btn').innerText = isReg ? 'Регистрация' : 'Войти';
+  document.getElementById('btn').innerText = isReg ? 'Создать аккаунт' : 'Войти';
   document.getElementById('tog').innerText = isReg ? 'Есть аккаунт? Войти' : 'Нет аккаунта? Регистрация';
   document.getElementById('regBox').classList.toggle('hidden');
-  document.getElementById('msg').innerText = '';
+  document.getElementById('msg').innerHTML = '';
+  document.getElementById('msg').className = '';
+}
+
+function showMsg(text, isError=true){
+  const el = document.getElementById('msg');
+  el.innerText = text;
+  el.className = isError ? 'error' : 'success';
 }
 
 async function go(){
@@ -51,22 +65,26 @@ async function go(){
   const p = document.getElementById('p').value;
   
   if(isReg && !document.getElementById('check').checked) {
-    document.getElementById('msg').innerText = 'Нужно согласие!'; return;
+    showMsg('❌ Необходимо согласиться с политикой конфиденциальности'); return;
+  }
+  
+  if(!u || p.length < 4) {
+    showMsg('Логин мин. 2 символа, пароль мин. 4'); return;
   }
   
   const url = isReg ? '/register' : '/login';
   try{
     const r = await fetch(API+url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u,password:p})});
     const d = await r.json();
-    if(!r.ok) { document.getElementById('msg').innerText = d.error; return; }
+    if(!r.ok) { showMsg('❌ ' + d.error); return; }
     localStorage.setItem('token', d.token);
-    localStorage.setItem('isAdmin', d.is_admin);
-    localStorage.setItem('username', d.username);
-    location.href='/dashboard.html';
-  }catch(e){ document.getElementById('msg').innerText = 'Ошибка сети'; }
+    localStorage.setItem('isAdmin', d.is_admin || false);
+    localStorage.setItem('username', d.username || u);
+    showMsg('✅ Успешно! Переход...', false);
+    setTimeout(() => { location.href='/dashboard.html'; }, 800);
+  }catch(e){ showMsg('Ошибка сети'); }
 }
 
-// Проверка ссылки (если пришли с политики)
 if(new URLSearchParams(window.location.search).has('reg')) { sw(); }
 
 document.getElementById('p').onkeypress = e => { if(e.key==='Enter') go(); };
