@@ -203,6 +203,15 @@ async function handleAuth() {
 document.getElementById('p').onkeypress = function(e) {
   if (e.key === 'Enter') handleAuth();
 };
+
+// ПРОВЕРКА ССЫЛКИ НА РЕГИСТРАЦИЮ (для кнопки "Вернуться" из политики)
+window.onload = function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if(urlParams.has('reg') || urlParams.has('register')) {
+      goToAuth();
+      toggleMode();
+  }
+}
 </script>
 </body>
 </html>
