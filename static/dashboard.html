@@ -25,7 +25,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .section{display:none}
 .section.active{display:block}
 
-/* ЧАТЫ - БОЛЬШОЕ ОКНО НА ПК */
+/* ЧАТЫ - БОЛЬШОЕ ОКНО */
 .chat-container{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 100px)}
 @media(max-width:768px){
   .chat-container{grid-template-columns:1fr;gap:0;height:calc(100vh - 70px)}
@@ -76,6 +76,10 @@ input:checked+.slider:before{transform:translateX(20px)}
 .status{padding:4px 10px;border-radius:6px;font-size:0.8rem}
 .status-active{background:rgba(16,185,129,0.2);color:var(--success)}
 .status-pending{background:rgba(251,191,36,0.2);color:#fbbf24}
+.instruction{background:rgba(59,130,246,0.05);border-left:4px solid var(--acc);padding:16px;border-radius:6px;margin:16px 0}
+.instruction ol{margin-left:20px;line-height:1.8}
+.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:6px;padding:10px;font-family:monospace;font-size:0.75rem;overflow-x:auto;white-space:pre-wrap}
+.copy-btn{padding:4px 10px;background:var(--acc);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:0.75rem}
 
 /* Табсы */
 .tabs{display:flex;gap:4px;margin-bottom:20px;background:rgba(0,0,0,0.2);padding:4px;border-radius:8px}
@@ -83,6 +87,10 @@ input:checked+.slider:before{transform:translateX(20px)}
 .tab.active{background:var(--acc);color:#fff}
 .tab-content{display:none}
 .tab-content.active{display:block}
+
+/* Загрузка файлов */
+.file-upload{border:2px dashed rgba(59,130,246,0.5);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:rgba(59,130,246,0.05);margin:10px 0}
+.file-list{margin-top:12px}
 
 /* Таблицы */
 table{width:100%;border-collapse:collapse}
@@ -141,10 +149,23 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         <button class="btn" onclick="addSite()">➕ Добавить</button>
       </div>
     </div>
+    <div class="card">
+      <h3>📋 Инструкция</h3>
+      <div class="instruction">
+        <ol>
+          <li>Добавьте сайт</li>
+          <li>Дождитесь одобрения</li>
+          <li>Скопируйте код</li>
+          <li>Вставьте перед &lt;/body&gt;</li>
+        </ol>
+      </div>
+      <div class="code-box" id="widgetCode">&lt;!-- Код появится после одобрения --&gt;</div>
+      <button class="copy-btn" onclick="copyCode()">📋 Копировать</button>
+    </div>
     <div class="card" id="siteList"><h3>Мои сайты</h3><p style="opacity:0.6">Загрузка...</p></div>
   </div>
 
-  <!-- AI -->
+  <!-- AI - ПОЛНЫЕ НАСТРОЙКИ С PDF -->
   <div id="ai" class="section">
     <div class="card">
       <h3>🤖 Настройка AI</h3>
@@ -153,11 +174,23 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         <div class="tab" onclick="switchTab('tg')">Telegram</div>
       </div>
       <div id="tab-web" class="tab-content active">
-        <div class="form-group"><label>Имя</label><input type="text" id="aiName" placeholder="Ассистент"></div>
-        <div class="form-group"><label>Характер</label><textarea id="aiBehavior" placeholder="Ты вежливый..."></textarea></div>
-        <div class="form-group"><label>База знаний</label><textarea id="aiKnowledge" placeholder="Услуги, цены..."></textarea></div>
+        <div class="form-group"><label>Имя</label><input type="text" id="aiName" placeholder="Кристина-Ассистент"></div>
+        <div class="form-group"><label>Характер</label><textarea id="aiBehavior" placeholder="Ты вежливый помощник..."></textarea></div>
+        <div class="form-group"><label>База знаний</label><textarea id="aiKnowledge" placeholder="Услуги, цены, контакты..."></textarea></div>
+        <div class="form-group"><label>Запреты</label><textarea id="aiForbidden" placeholder="Политика, религия..."></textarea></div>
+        
+        <!-- Загрузка PDF -->
+        <div class="form-group">
+          <label>📎 Файлы (PDF, 10 шт, макс 10 МБ)</label>
+          <div class="file-upload" onclick="document.getElementById('pdfInput').click()">
+            📁 Нажмите для загрузки PDF
+            <input type="file" id="pdfInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)">
+          </div>
+          <div class="file-list" id="fileList"></div>
+        </div>
+        
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0">
-          <span>🌐 Включить AI</span>
+          <div><div style="font-weight:600">🌐 Включить</div><div style="font-size:0.8rem;opacity:0.7">AI отвечает на сайте</div></div>
           <label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label>
         </div>
         <button class="btn btn-green" onclick="saveAI()" style="width:100%">💾 Сохранить</button>
@@ -210,6 +243,8 @@ const token = localStorage.getItem('token');
 const isAdmin = localStorage.getItem('isAdmin') === 'true';
 let activeChatId = null;
 let pollInterval = null;
+let uploadedFiles = [];
+let uploadedFileNames = [];
 
 if(!token) window.location.href = '/index.html';
 if(isAdmin) document.getElementById('adminBtn').style.display = 'inline-block';
@@ -296,10 +331,15 @@ async function loadSites(){
   const el = document.getElementById('siteList');
   if(!sites.length){el.innerHTML = '<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}
   let html = '<h3>Мои сайты</h3>';
+  let approved = null;
   sites.forEach(s => {
+    if(s.status==='active' && !approved) approved = s;
     html += `<div class="site-item"><div><div style="font-weight:600">${s.url}</div><div style="font-size:0.8rem;opacity:0.6">API: ${s.api_key}</div><span class="status ${s.status==='active'?'status-active':'status-pending'}">${s.status==='active'?'✅ Активен':'⏳ Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${s.id})">🗑️</button></div>`;
   });
   el.innerHTML = html;
+  if(approved){
+    document.getElementById('widgetCode').textContent = `<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;
+  }
 }
 
 function addSite(){
@@ -317,13 +357,20 @@ function deleteSite(id){
   fetchAPI(`/sites/${id}/delete`, 'POST').then(()=>loadSites());
 }
 
-// AI
+function copyCode(){
+  const c = document.getElementById('widgetCode').textContent;
+  if(c.includes('появится')) return alert('ℹ️ Код появится после одобрения');
+  navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));
+}
+
+// AI С ЗАГРУЗКОЙ PDF
 async function loadAI(){
   const ai = await fetchAPI('/ai/get');
   if(!ai) return;
   document.getElementById('aiName').value = ai.name || '';
   document.getElementById('aiBehavior').value = ai.behavior || '';
   document.getElementById('aiKnowledge').value = ai.knowledge_base || '';
+  document.getElementById('aiForbidden').value = ai.forbidden || '';
   document.getElementById('aiWebToggle').checked = ai.is_active_web || false;
 }
 
@@ -332,9 +379,10 @@ function saveAI(){
     name: document.getElementById('aiName').value,
     behavior: document.getElementById('aiBehavior').value,
     knowledge_base: document.getElementById('aiKnowledge').value,
+    forbidden: document.getElementById('aiForbidden').value,
     is_active_web: document.getElementById('aiWebToggle').checked
   };
-  fetchAPI('/ai/setup', 'POST', data).then(()=>alert('✅ Сохранено!'));
+  fetchAPI('/ai/setup', 'POST', data).then(()=>alert('✅ AI сохранён!'));
 }
 
 function saveTG(){
@@ -342,6 +390,35 @@ function saveTG(){
   const cid = document.getElementById('tgChatId').value.trim();
   if(!tok || !cid) return alert('❌ Заполните оба поля');
   fetchAPI('/admin/save_chat_id', 'POST', {chat_id:cid}).then(()=>fetchAPI('/telegram/setup', 'POST', {token:tok, active:true}).then(()=>alert('✅ Telegram настроен!')));
+}
+
+// Загрузка PDF
+function handleFiles(files){
+  for(let f of files){
+    if(f.type !== 'application/pdf') return alert('❌ Только PDF');
+    if(f.size > 10*1024*1024) return alert('❌ Макс 10 МБ');
+    if(uploadedFiles.length >= 10) return alert('❌ Макс 10 файлов');
+    uploadedFiles.push(f);
+    uploadedFileNames.push(f.name);
+  }
+  renderFileList();
+}
+
+function renderFileList(){
+  const el = document.getElementById('fileList');
+  if(!el) return;
+  el.innerHTML = uploadedFileNames.map((name,i) => 
+    `<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin-bottom:6px;font-size:0.85rem">
+      <span>${name}</span>
+      <span onclick="removeFile(${i})" style="color:var(--danger);cursor:pointer;font-size:1.2rem">×</span>
+    </div>`
+  ).join('');
+}
+
+function removeFile(i){
+  uploadedFiles.splice(i,1);
+  uploadedFileNames.splice(i,1);
+  renderFileList();
 }
 
 // АДМИН
@@ -361,8 +438,9 @@ function sendAdminMsg(){
   const t = document.getElementById('adminMsg').value.trim();
   if(!u || !t) return alert('❌ Выберите и введите текст');
   fetchAPI('/admin/send_to_user', 'POST', {user_id:parseInt(u), text:t}).then(()=>{
-    alert('✅ Отправлено!');
+    alert('✅ Отправлено! Пользователь получит сообщение в чат.');
     document.getElementById('adminMsg').value = '';
+    loadChats();
   });
 }
 
