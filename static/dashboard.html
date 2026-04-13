@@ -6,56 +6,52 @@
 <title>Панель | КРИСТИНА.AI CRM</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--soft:#93c5fd;--text:#e2e8f0;--success:#10b981;--danger:#ef4444}
-*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif}
+:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--text:#e2e8f0;--success:#10b981;--danger:#ef4444}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 
-/* Шапка */
 .header{background:var(--panel);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-.header h2{font-size:1.1rem;display:flex;align-items:center;gap:8px}
-.logo{width:28px;height:28px}
+.header h2{font-size:1rem;display:flex;align-items:center;gap:8px}
 .nav{display:flex;gap:6px;flex-wrap:wrap}
 .btn{padding:6px 12px;background:var(--acc);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem}
 .btn:hover{opacity:0.85}
 .btn-red{background:var(--danger)}
 .btn-green{background:var(--success)}
 
-/* Контейнер */
 .container{padding:16px;flex:1;overflow-y:auto}
 .section{display:none}
 .section.active{display:block}
 
-/* ЧАТЫ - БОЛЬШОЕ ОКНО */
-.chat-container{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 100px)}
+/* МОБИЛЬНАЯ АДАПТАЦИЯ */
 @media(max-width:768px){
-  .chat-container{grid-template-columns:1fr;gap:0;height:calc(100vh - 70px)}
-  .chat-list{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;z-index:100!important;border-radius:0!important;height:100vh!important;background:var(--bg)!important}
-  .chat-list.hidden{display:none!important}
-  .chat-window{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;z-index:101!important;border-radius:0!important;height:100vh!important;background:var(--bg)!important}
-  .chat-window.hidden{display:none!important}
-  .chat-input{position:fixed!important;bottom:0!important;left:0!important;right:0!important;background:var(--panel)!important;padding:12px!important;z-index:102!important}
-  .chat-messages{padding-bottom:80px!important}
-  .back-btn{display:block!important}
+  .header{padding:10px}
+  .header h2{font-size:0.9rem;width:100%;order:1;margin-bottom:10px}
+  .nav{width:100%;order:2;justify-content:space-between}
+  .nav .btn{flex:1;margin:2px;padding:8px;font-size:0.8rem}
+  .card{padding:12px;margin-bottom:12px}
+  .chat-container{grid-template-columns:1fr!important;height:calc(100vh - 60px)!important}
+  table{font-size:0.75rem}
+  th,td{padding:6px}
 }
+
+.chat-container{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 100px)}
 .chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
 .chat-list-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600}
 .chat-items{flex:1;overflow-y:auto}
 .chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer}
 .chat-item:hover,.chat-item.active{background:rgba(59,130,246,0.15)}
 .chat-meta{display:flex;justify-content:space-between;font-size:0.75rem;opacity:0.7;margin-bottom:4px}
-.back-btn{display:none;background:rgba(59,130,246,0.2);border:none;color:var(--text);padding:6px 12px;border-radius:6px;cursor:pointer}
 
 .chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column;height:100%}
-.chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600}
 .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
 .chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px}
-.chat-input input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text);font-size:0.95rem}
-.msg{max-width:80%;padding:12px 16px;border-radius:12px;line-height:1.5}
-.msg.visitor{background:linear-gradient(145deg,#1e3a8a,#1d4ed8);color:#dbeafe;align-self:flex-start}
-.msg.operator{background:rgba(59,130,246,0.25);color:var(--soft);align-self:flex-end}
+.chat-input input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
+.msg{max-width:80%;padding:12px 16px;border-radius:12px}
+.msg.visitor{background:#1e3a8a;color:#dbeafe;align-self:flex-start}
+.msg.operator{background:rgba(59,130,246,0.25);color:var(--text);align-self:flex-end}
 .empty-state{text-align:center;padding:40px;opacity:0.6}
 
-/* Карточки */
 .card{background:var(--panel);border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.08)}
 .card h3{margin-bottom:16px;color:#fff}
 .form-group{margin-bottom:16px}
@@ -63,7 +59,6 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .form-group input,.form-group textarea{width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
 .form-group textarea{resize:vertical;min-height:100px}
 
-/* Переключатели */
 .switch{position:relative;display:inline-block;width:44px;height:24px}
 .switch input{opacity:0;width:0;height:0}
 .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;transition:.3s;border-radius:24px}
@@ -71,34 +66,29 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 input:checked+.slider{background:var(--success)}
 input:checked+.slider:before{transform:translateX(20px)}
 
-/* Сайты */
 .site-item{padding:16px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .status{padding:4px 10px;border-radius:6px;font-size:0.8rem}
 .status-active{background:rgba(16,185,129,0.2);color:var(--success)}
 .status-pending{background:rgba(251,191,36,0.2);color:#fbbf24}
 .instruction{background:rgba(59,130,246,0.05);border-left:4px solid var(--acc);padding:16px;border-radius:6px;margin:16px 0}
 .instruction ol{margin-left:20px;line-height:1.8}
-.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:6px;padding:10px;font-family:monospace;font-size:0.75rem;overflow-x:auto;white-space:pre-wrap}
-.copy-btn{padding:4px 10px;background:var(--acc);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:0.75rem}
+.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:6px;padding:10px;font-family:monospace;font-size:0.75rem;overflow-x:auto}
+.copy-btn{padding:4px 10px;background:var(--acc);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:0.75rem;margin-top:8px}
 
-/* Табсы */
 .tabs{display:flex;gap:4px;margin-bottom:20px;background:rgba(0,0,0,0.2);padding:4px;border-radius:8px}
 .tab{flex:1;padding:10px;text-align:center;border-radius:6px;cursor:pointer}
 .tab.active{background:var(--acc);color:#fff}
 .tab-content{display:none}
 .tab-content.active{display:block}
 
-/* Загрузка файлов */
 .file-upload{border:2px dashed rgba(59,130,246,0.5);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:rgba(59,130,246,0.05);margin:10px 0}
 .file-list{margin-top:12px}
 
-/* Таблицы */
 table{width:100%;border-collapse:collapse}
 th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08)}
 
-/* Поддержка */
 .support-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
-.support-link{display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;text-decoration:none;color:var(--text);border:1px solid rgba(255,255,255,0.06)}
+.support-link{display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;text-decoration:none;color:var(--text)}
 </style>
 </head>
 <body>
@@ -117,360 +107,82 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 </div>
 
 <div class="container">
-
-  <!-- ЧАТЫ -->
   <div id="chats" class="section active">
     <div class="chat-container">
-      <div class="chat-list" id="chatListPanel">
+      <div class="chat-list">
         <div class="chat-list-header">📂 Активные диалоги</div>
         <div class="chat-items" id="chatList"><div class="empty-state">Нет диалогов</div></div>
       </div>
-      <div class="chat-window hidden" id="chatWindowPanel">
-        <div class="chat-header">
-          <button class="back-btn" onclick="showChatList()">← Назад</button>
-          <span id="chatTitle">Выберите диалог</span>
-          <span style="width:60px"></span>
-        </div>
-        <div class="chat-messages" id="chatMessages"><div class="empty-state">💬 Выберите чат слева</div></div>
-        <div class="chat-input">
-          <input type="text" id="msgInput" placeholder="Введите ответ..." disabled>
-          <button class="btn" id="sendBtn" onclick="sendMessage()" disabled>Отправить</button>
-        </div>
+      <div class="chat-window">
+        <div class="chat-header" id="chatTitle">Выберите диалог</div>
+        <div class="chat-messages" id="chatMessages"><div class="empty-state">💬 Выберите чат</div></div>
+        <div class="chat-input"><input type="text" id="msgInput" placeholder="Ответ..." disabled><button class="btn" id="sendBtn" onclick="sendMessage()" disabled>Отправить</button></div>
       </div>
     </div>
   </div>
 
-  <!-- САЙТЫ -->
   <div id="sites" class="section">
-    <div class="card">
-      <h3>🌐 Добавить сайт</h3>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <input type="text" id="siteUrl" placeholder="https://site.com" style="flex:1;min-width:200px;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)">
-        <button class="btn" onclick="addSite()">➕ Добавить</button>
-      </div>
-    </div>
-    <div class="card">
-      <h3>📋 Инструкция</h3>
-      <div class="instruction">
-        <ol>
-          <li>Добавьте сайт</li>
-          <li>Дождитесь одобрения</li>
-          <li>Скопируйте код</li>
-          <li>Вставьте перед &lt;/body&gt;</li>
-        </ol>
-      </div>
-      <div class="code-box" id="widgetCode">&lt;!-- Код появится после одобрения --&gt;</div>
-      <button class="copy-btn" onclick="copyCode()">📋 Копировать</button>
-    </div>
+    <div class="card"><h3>🌐 Добавить сайт</h3><div style="display:flex;gap:10px"><input type="text" id="siteUrl" placeholder="https://site.com" style="flex:1;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)"><button class="btn" onclick="addSite()">➕ Добавить</button></div></div>
+    <div class="card"><h3>📋 Инструкция</h3><div class="instruction"><ol><li>Добавьте сайт</li><li>Дождитесь одобрения</li><li>Скопируйте код</li><li>Вставьте перед &lt;/body&gt;</li></ol></div><div class="code-box" id="widgetCode">&lt;!-- После одобрения --&gt;</div><button class="copy-btn" onclick="copyCode()">📋 Копировать</button></div>
     <div class="card" id="siteList"><h3>Мои сайты</h3><p style="opacity:0.6">Загрузка...</p></div>
   </div>
 
-  <!-- AI - ПОЛНЫЕ НАСТРОЙКИ С PDF -->
   <div id="ai" class="section">
-    <div class="card">
-      <h3>🤖 Настройка AI</h3>
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('web')">🌐 Веб</div>
-        <div class="tab" onclick="switchTab('tg')">Telegram</div>
-      </div>
-      <div id="tab-web" class="tab-content active">
-        <div class="form-group"><label>Имя</label><input type="text" id="aiName" placeholder="Кристина-Ассистент"></div>
-        <div class="form-group"><label>Характер</label><textarea id="aiBehavior" placeholder="Ты вежливый помощник..."></textarea></div>
-        <div class="form-group"><label>База знаний</label><textarea id="aiKnowledge" placeholder="Услуги, цены, контакты..."></textarea></div>
-        <div class="form-group"><label>Запреты</label><textarea id="aiForbidden" placeholder="Политика, религия..."></textarea></div>
-        
-        <!-- Загрузка PDF -->
-        <div class="form-group">
-          <label>📎 Файлы (PDF, 10 шт, макс 10 МБ)</label>
-          <div class="file-upload" onclick="document.getElementById('pdfInput').click()">
-            📁 Нажмите для загрузки PDF
-            <input type="file" id="pdfInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)">
-          </div>
-          <div class="file-list" id="fileList"></div>
-        </div>
-        
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0">
-          <div><div style="font-weight:600">🌐 Включить</div><div style="font-size:0.8rem;opacity:0.7">AI отвечает на сайте</div></div>
-          <label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label>
-        </div>
-        <button class="btn btn-green" onclick="saveAI()" style="width:100%">💾 Сохранить</button>
-      </div>
-      <div id="tab-tg" class="tab-content">
-        <div class="form-group"><label>Токен бота</label><input type="text" id="tgToken" placeholder="123456:ABC..."></div>
-        <div class="form-group"><label>Chat ID</label><input type="text" id="tgChatId" placeholder="@userinfobot"></div>
-        <button class="btn" onclick="saveTG()">💾 Сохранить</button>
-      </div>
-    </div>
+    <div class="card"><h3>🤖 AI Настройки</h3><div class="tabs"><div class="tab active" onclick="switchTab('web')">🌐 Веб</div><div class="tab" onclick="switchTab('tg')">Telegram</div></div><div id="tab-web" class="tab-content active"><div class="form-group"><label>Имя</label><input type="text" id="aiName"></div><div class="form-group"><label>Характер</label><textarea id="aiBehavior"></textarea></div><div class="form-group"><label>База знаний</label><textarea id="aiKnowledge"></textarea></div><div class="form-group"><label>📎 PDF файлы</label><div class="file-upload" onclick="document.getElementById('pdfInput').click()">📁 Загрузить PDF<input type="file" id="pdfInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)"></div><div class="file-list" id="fileList"></div></div><div style="display:flex;justify-content:space-between;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0"><span>🌐 Включить AI</span><label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label></div><button class="btn btn-green" onclick="saveAI()" style="width:100%">💾 Сохранить</button></div><div id="tab-tg" class="tab-content"><div class="form-group"><label>Токен</label><input type="text" id="tgToken"></div><div class="form-group"><label>Chat ID</label><input type="text" id="tgChatId"></div><button class="btn" onclick="saveTG()">💾 Сохранить</button></div></div>
   </div>
 
-  <!-- АДМИН -->
   <div id="admin" class="section">
     <div class="card"><h3>👥 Пользователи</h3><div style="overflow-x:auto"><table><thead><tr><th>Логин</th><th>Дата</th><th>Статус</th><th>Действия</th></tr></thead><tbody id="userTable"></tbody></table></div></div>
-    <div class="card"><h3>📢 Сообщение</h3><select id="targetUser" style="width:100%;padding:10px;margin-bottom:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)"><option>Выберите</option></select><textarea id="adminMsg" rows="3" placeholder="Текст..."></textarea><button class="btn" onclick="sendAdminMsg()">📩 Отправить</button></div>
+    <div class="card"><h3>📢 Сообщение</h3><select id="targetUser" style="width:100%;padding:10px;margin-bottom:10px;border-radius:6px;background:rgba(0,0,0,0.3);color:var(--text);border:1px solid rgba(255,255,255,0.1)"><option>Выберите</option></select><textarea id="adminMsg" rows="3" placeholder="Текст..."></textarea><button class="btn" onclick="sendAdminMsg()">📩 Отправить</button></div>
   </div>
 
-  <!-- ПРОФИЛЬ -->
   <div id="profile" class="section">
-    <div class="card">
-      <h3>👤 Профиль</h3>
-      <div class="form-group"><label>Логин</label><input type="text" id="profileUsername" readonly></div>
-      <div class="form-group"><label>Новый пароль</label><input type="password" id="newPassword" placeholder="Мин. 4 символа"></div>
-      <button class="btn" onclick="changePassword()">💾 Сохранить</button>
-    </div>
-    <div class="card" id="tgSettings" style="display:none">
-      <h3>🔔 Telegram уведомления</h3>
-      <div class="form-group"><label>Ваш Chat ID</label><input type="text" id="profileTgChatId" placeholder="@userinfobot"></div>
-      <div class="form-group"><label>Токен бота</label><input type="text" id="profileTgToken" placeholder="123456:ABC..."></div>
-      <button class="btn btn-green" onclick="saveProfileTG()">💾 Сохранить</button>
-    </div>
+    <div class="card"><h3>👤 Профиль</h3><div class="form-group"><label>Логин</label><input type="text" id="profileUsername" readonly></div><div class="form-group"><label>Пароль</label><input type="password" id="newPassword" placeholder="Мин. 4 символа"></div><button class="btn" onclick="changePassword()">💾 Сохранить</button></div>
+    <div class="card" id="tgSettings"><h3>🔔 Telegram</h3><div class="form-group"><label>Chat ID</label><input type="text" id="profileTgChatId"></div><div class="form-group"><label>Токен</label><input type="text" id="profileTgToken"></div><button class="btn btn-green" onclick="saveProfileTG()">💾 Сохранить</button></div>
   </div>
 
-  <!-- ПОДДЕРЖКА -->
   <div id="support" class="section">
-    <div class="card"><h3>💚 Связаться</h3><div class="support-links">
-      <a href="https://t.me/marketologdizayner" target="_blank" class="support-link"><span>✈️</span><div><b>Telegram</b><small>@marketologdizayner</small></div></a>
-      <a href="https://www.instagram.com/gap____ova_kristina/" target="_blank" class="support-link"><span>📸</span><div><b>Instagram</b><small>gap____ova_kristina</small></div></a>
-      <a href="https://vk.ru/kristinavcifre" target="_blank" class="support-link"><span>📱</span><div><b>ВК</b><small>kristinavcifre</small></div></a>
-      <a href="mailto:chatbotsmarketolog@gmail.com" class="support-link"><span>📧</span><div><b>Email</b><small>chatbotsmarketolog@gmail.com</small></div></a>
-    </div></div>
+    <div class="card"><h3>💚 Поддержка</h3><div class="support-links"><a href="https://t.me/marketologdizayner" class="support-link"><span>✈️</span><div><b>Telegram</b><small>@marketologdizayner</small></div></a><a href="mailto:chatbotsmarketolog@gmail.com" class="support-link"><span>📧</span><div><b>Email</b><small>chatbotsmarketolog@gmail.com</small></div></a></div></div>
   </div>
-
 </div>
 
 <script>
-const API = location.origin + '/api';
-const token = localStorage.getItem('token');
-const isAdmin = localStorage.getItem('isAdmin') === 'true';
-let activeChatId = null;
-let pollInterval = null;
-let uploadedFiles = [];
-let uploadedFileNames = [];
+const API=location.origin+'/api',token=localStorage.getItem('token'),isAdmin=localStorage.getItem('isAdmin")==='true';
+let activeChatId=null,pollInterval=null,uploadedFiles=[],uploadedFileNames=[];
+if(!token)window.location.href='/index.html';
+if(isAdmin)document.getElementById('adminBtn').style.display='inline-block';
 
-if(!token) window.location.href = '/index.html';
-if(isAdmin) document.getElementById('adminBtn').style.display = 'inline-block';
-if(isAdmin) document.getElementById('tgSettings').style.display = 'block';
+function showSection(id){document.querySelectorAll('.section').forEach(e=>e.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='chats')loadChats();if(id==='sites')loadSites();if(id==='ai')loadAI();if(id==='admin')loadUsers();if(id==='profile')loadProfile();}
+function switchTab(t){document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));event.target.classList.add('active');document.getElementById('tab-'+t).classList.add('active');}
+async function fetchAPI(url,method='GET',body=null){const r=await fetch(API+url,{method,headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):null});if(r.status===401)logout();return r.json();}
 
-function showSection(id){
-  document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  showChatList();
-  if(id==='chats') loadChats();
-  if(id==='sites') loadSites();
-  if(id==='ai') loadAI();
-  if(id==='admin') loadUsers();
-  if(id==='profile') loadProfile();
-}
+async function loadChats(){const c=await fetchAPI('/chats');if(!c)return;document.getElementById('chatList').innerHTML=c.length?c.map(x=>`<div class="chat-item ${x.id==activeChatId?'active':''}" onclick="openChat(${x.id},'${x.site}')"><div class="chat-meta"><span>${x.site}</span><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'Онлайн':'Ожидание'}</span></div></div>`).join(''):'<div class="empty-state">Нет диалогов</div>';}
+async function openChat(id,site){activeChatId=id;document.getElementById('chatTitle').textContent=site;document.getElementById('msgInput').disabled=false;document.getElementById('sendBtn').disabled=false;loadMessages();if(pollInterval)clearInterval(pollInterval);pollInterval=setInterval(loadMessages,3000);}
+async function loadMessages(){if(!activeChatId)return;const m=await fetchAPI(`/messages/${activeChatId}`);if(!m)return;document.getElementById('chatMessages').innerHTML=m.map(x=>`<div class="msg ${x.sender}">${x.text}</div>`).join('');document.getElementById('chatMessages').scrollTop=9999;}
+function sendMessage(){const t=document.getElementById('msgInput').value.trim();if(!t||!activeChatId)return;fetchAPI('/send','POST',{chat_id:activeChatId,text:t,sender:'operator'}).then(()=>{document.getElementById('msgInput').value='';loadMessages();loadChats();});}
 
-function showChatList(){
-  document.getElementById('chatListPanel').classList.remove('hidden');
-  document.getElementById('chatWindowPanel').classList.add('hidden');
-}
+async function loadSites(){const s=await fetchAPI('/sites');if(!s)return;const el=document.getElementById('siteList');if(!s.length){el.innerHTML='<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}let html='<h3>Мои сайты</h3>',approved=null;s.forEach(x=>{if(x.status=='active'&&!approved)approved=x;html+=`<div class="site-item"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API:${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅':'⏳'} ${x.status=='active'?'Активен':'Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${x.id})">🗑️</button></div>`;});el.innerHTML=html;if(approved)document.getElementById('widgetCode').textContent=`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;}
+function addSite(){const u=document.getElementById('siteUrl').value.trim();if(!u)return;fetchAPI('/sites','POST',{url:u}).then(()=>{document.getElementById('siteUrl').value='';loadSites();alert('✅ Добавлен!');});}
+function deleteSite(id){if(!confirm('Удалить?'))return;fetchAPI(`/sites/${id}/delete`,'POST').then(()=>loadSites());}
+function copyCode(){const c=document.getElementById('widgetCode').textContent;if(c.includes('После'))return alert('ℹ️ После одобрения');navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));}
 
-function showChatWindow(){
-  document.getElementById('chatListPanel').classList.add('hidden');
-  document.getElementById('chatWindowPanel').classList.remove('hidden');
-}
+async function loadAI(){const ai=await fetchAPI('/ai/get');if(!ai)return;document.getElementById('aiName').value=ai.name||'';document.getElementById('aiBehavior').value=ai.behavior||'';document.getElementById('aiKnowledge').value=ai.knowledge_base||'';document.getElementById('aiWebToggle').checked=ai.is_active_web||false;}
+function saveAI(){fetchAPI('/ai/setup','POST',{name:document.getElementById('aiName').value,behavior:document.getElementById('aiBehavior').value,knowledge_base:document.getElementById('aiKnowledge').value,is_active_web:document.getElementById('aiWebToggle').checked}).then(()=>alert('✅ Сохранено!'));}
+function saveTG(){const t=document.getElementById('tgToken').value.trim(),c=document.getElementById('tgChatId').value.trim();if(!t||!c)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>alert('✅ Telegram настроен!')));}
+function handleFiles(files){for(let f of files){if(f.type!=='application/pdf')return alert('❌ Только PDF');if(f.size>10*1024*1024)return alert('❌ Макс 10МБ');if(uploadedFiles.length>=10)return alert('❌ Макс 10 файлов');uploadedFiles.push(f);uploadedFileNames.push(f.name);}renderFileList();}
+function renderFileList(){const el=document.getElementById('fileList');if(!el)return;el.innerHTML=uploadedFileNames.map((n,i)=>`<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin:6px 0;font-size:0.85rem"><span>${n}</span><span onclick="removeFile(${i})" style="color:var(--danger);cursor:pointer">×</span></div>`).join('');}
+function removeFile(i){uploadedFiles.splice(i,1);uploadedFileNames.splice(i,1);renderFileList();}
 
-function switchTab(tab){
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  event.target.classList.add('active');
-  document.getElementById('tab-'+tab).classList.add('active');
-}
+async function loadUsers(){const u=await fetchAPI('/admin/users');if(!u)return;document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join('');document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':''}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join('');}
+function toggleUser(id){fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers);}
+function sendAdminMsg(){const u=document.getElementById('targetUser').value,t=document.getElementById('adminMsg').value.trim();if(!u||!t)return alert('❌ Выберите и введите');fetchAPI('/api/admin/send_to_user','POST',{user_id:parseInt(u),text:t}).then(()=>{alert('✅ Отправлено!');document.getElementById('adminMsg').value='';loadChats();});}
 
-async function fetchAPI(url, method='GET', body=null){
-  const options = {method, headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}};
-  if(body) options.body = JSON.stringify(body);
-  const r = await fetch(API+url, options);
-  if(r.status===401){logout();return null;}
-  return r.json();
-}
-
-// ЧАТЫ
-async function loadChats(){
-  const chats = await fetchAPI('/chats');
-  if(!chats) return;
-  document.getElementById('chatList').innerHTML = chats.length 
-    ? chats.map(c => `<div class="chat-item ${c.id===activeChatId?'active':''}" onclick="openChat(${c.id},'${c.site}')"><div class="chat-meta"><span>${c.site}</span><span class="status ${c.status==='active'?'status-active':'status-pending'}">${c.status==='active'?'Онлайн':'Ожидание'}</span></div></div>`).join('')
-    : '<div class="empty-state">Нет диалогов</div>';
-}
-
-async function openChat(id, site){
-  activeChatId = id;
-  document.getElementById('chatTitle').textContent = site;
-  document.getElementById('msgInput').disabled = false;
-  document.getElementById('sendBtn').disabled = false;
-  loadMessages();
-  if(pollInterval) clearInterval(pollInterval);
-  pollInterval = setInterval(loadMessages, 3000);
-  showChatWindow();
-}
-
-async function loadMessages(){
-  if(!activeChatId) return;
-  const msgs = await fetchAPI(`/messages/${activeChatId}`);
-  if(!msgs) return;
-  document.getElementById('chatMessages').innerHTML = msgs.map(m => `<div class="msg ${m.sender}">${m.text}</div>`).join('');
-  document.getElementById('chatMessages').scrollTop = 9999;
-}
-
-function sendMessage(){
-  const t = document.getElementById('msgInput').value.trim();
-  if(!t || !activeChatId) return;
-  fetchAPI('/send', 'POST', {chat_id:activeChatId, text:t, sender:'operator'}).then(()=>{
-    document.getElementById('msgInput').value = '';
-    loadMessages();
-    loadChats();
-  });
-}
-
-// САЙТЫ
-async function loadSites(){
-  const sites = await fetchAPI('/sites');
-  if(!sites) return;
-  const el = document.getElementById('siteList');
-  if(!sites.length){el.innerHTML = '<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}
-  let html = '<h3>Мои сайты</h3>';
-  let approved = null;
-  sites.forEach(s => {
-    if(s.status==='active' && !approved) approved = s;
-    html += `<div class="site-item"><div><div style="font-weight:600">${s.url}</div><div style="font-size:0.8rem;opacity:0.6">API: ${s.api_key}</div><span class="status ${s.status==='active'?'status-active':'status-pending'}">${s.status==='active'?'✅ Активен':'⏳ Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${s.id})">🗑️</button></div>`;
-  });
-  el.innerHTML = html;
-  if(approved){
-    document.getElementById('widgetCode').textContent = `<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;
-  }
-}
-
-function addSite(){
-  const u = document.getElementById('siteUrl').value.trim();
-  if(!u) return;
-  fetchAPI('/sites', 'POST', {url:u}).then(()=>{
-    document.getElementById('siteUrl').value = '';
-    loadSites();
-    alert('✅ Сайт добавлен! Ожидайте одобрения.');
-  });
-}
-
-function deleteSite(id){
-  if(!confirm('Удалить?')) return;
-  fetchAPI(`/sites/${id}/delete`, 'POST').then(()=>loadSites());
-}
-
-function copyCode(){
-  const c = document.getElementById('widgetCode').textContent;
-  if(c.includes('появится')) return alert('ℹ️ Код появится после одобрения');
-  navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));
-}
-
-// AI С ЗАГРУЗКОЙ PDF
-async function loadAI(){
-  const ai = await fetchAPI('/ai/get');
-  if(!ai) return;
-  document.getElementById('aiName').value = ai.name || '';
-  document.getElementById('aiBehavior').value = ai.behavior || '';
-  document.getElementById('aiKnowledge').value = ai.knowledge_base || '';
-  document.getElementById('aiForbidden').value = ai.forbidden || '';
-  document.getElementById('aiWebToggle').checked = ai.is_active_web || false;
-}
-
-function saveAI(){
-  const data = {
-    name: document.getElementById('aiName').value,
-    behavior: document.getElementById('aiBehavior').value,
-    knowledge_base: document.getElementById('aiKnowledge').value,
-    forbidden: document.getElementById('aiForbidden').value,
-    is_active_web: document.getElementById('aiWebToggle').checked
-  };
-  fetchAPI('/ai/setup', 'POST', data).then(()=>alert('✅ AI сохранён!'));
-}
-
-function saveTG(){
-  const tok = document.getElementById('tgToken').value.trim();
-  const cid = document.getElementById('tgChatId').value.trim();
-  if(!tok || !cid) return alert('❌ Заполните оба поля');
-  fetchAPI('/admin/save_chat_id', 'POST', {chat_id:cid}).then(()=>fetchAPI('/telegram/setup', 'POST', {token:tok, active:true}).then(()=>alert('✅ Telegram настроен!')));
-}
-
-// Загрузка PDF
-function handleFiles(files){
-  for(let f of files){
-    if(f.type !== 'application/pdf') return alert('❌ Только PDF');
-    if(f.size > 10*1024*1024) return alert('❌ Макс 10 МБ');
-    if(uploadedFiles.length >= 10) return alert('❌ Макс 10 файлов');
-    uploadedFiles.push(f);
-    uploadedFileNames.push(f.name);
-  }
-  renderFileList();
-}
-
-function renderFileList(){
-  const el = document.getElementById('fileList');
-  if(!el) return;
-  el.innerHTML = uploadedFileNames.map((name,i) => 
-    `<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin-bottom:6px;font-size:0.85rem">
-      <span>${name}</span>
-      <span onclick="removeFile(${i})" style="color:var(--danger);cursor:pointer;font-size:1.2rem">×</span>
-    </div>`
-  ).join('');
-}
-
-function removeFile(i){
-  uploadedFiles.splice(i,1);
-  uploadedFileNames.splice(i,1);
-  renderFileList();
-}
-
-// АДМИН
-async function loadUsers(){
-  const u = await fetchAPI('/admin/users');
-  if(!u) return;
-  document.getElementById('targetUser').innerHTML = '<option>Выберите</option>' + u.map(x => `<option value="${x.id}">${x.username}</option>`).join('');
-  document.getElementById('userTable').innerHTML = u.map(x => `<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':''}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join('');
-}
-
-function toggleUser(id){
-  fetchAPI('/admin/toggle_user', 'POST', {user_id:id}).then(loadUsers);
-}
-
-function sendAdminMsg(){
-  const u = document.getElementById('targetUser').value;
-  const t = document.getElementById('adminMsg').value.trim();
-  if(!u || !t) return alert('❌ Выберите и введите текст');
-  fetchAPI('/admin/send_to_user', 'POST', {user_id:parseInt(u), text:t}).then(()=>{
-    alert('✅ Отправлено! Пользователь получит сообщение в чат.');
-    document.getElementById('adminMsg').value = '';
-    loadChats();
-  });
-}
-
-// ПРОФИЛЬ
-async function loadProfile(){
-  document.getElementById('profileUsername').value = localStorage.getItem('username') || 'Загрузка...';
-}
-
-function changePassword(){
-  const p = document.getElementById('newPassword').value;
-  if(p.length < 4) return alert('❌ Мин. 4 символа');
-  fetchAPI('/change_password', 'POST', {password:p}).then(()=>{alert('✅ Готово');document.getElementById('newPassword').value='';});
-}
-
-function saveProfileTG(){
-  const cid = document.getElementById('profileTgChatId').value.trim();
-  const tok = document.getElementById('profileTgToken').value.trim();
-  if(!cid || !tok) return alert('❌ Заполните оба поля');
-  fetchAPI('/admin/save_chat_id', 'POST', {chat_id:cid}).then(()=>fetchAPI('/telegram/setup', 'POST', {token:tok, active:true}).then(()=>alert('✅ Настройки сохранены!')));
-}
-
-function logout(){
-  localStorage.clear();
-  window.location.href = '/index.html';
-}
-
-document.getElementById('msgInput').onkeypress = e => {if(e.key==='Enter') sendMessage();};
-
-loadProfile();
-showSection('chats');
+async function loadProfile(){document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...';}
+function changePassword(){const p=document.getElementById('newPassword').value;if(p.length<4)return alert('❌ Мин. 4');fetchAPI('/change_password','POST',{password:p}).then(()=>{alert('✅ Готово');document.getElementById('newPassword').value='';});}
+function saveProfileTG(){const c=document.getElementById('profileTgChatId').value.trim(),t=document.getElementById('profileTgToken').value.trim();if(!c||!t)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>{alert('✅ Сохранено!');loadProfile();}));}
+function logout(){localStorage.clear();window.location.href='/index.html';}
+document.getElementById('msgInput').onkeypress=e=>{if(e.key==='Enter')sendMessage();};
+loadProfile();showSection('chats');
 </script>
 </body>
 </html>
