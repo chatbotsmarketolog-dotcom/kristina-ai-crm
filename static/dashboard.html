@@ -10,20 +10,22 @@
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,sans-serif}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 
-/* Мобильное меню */
+/* Мобильное меню - отдельная страница */
 #mobileMenu{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:1000;padding:20px;overflow-y:auto}
 #mobileMenu.active{display:block}
 .menu-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.1)}
-.menu-item{display:flex;align-items:center;gap:16px;padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;margin-bottom:12px;cursor:pointer;transition:0.2s}
+.menu-header h3{font-size:1.2rem}
+.menu-item{display:flex;align-items:center;gap:16px;padding:18px;background:rgba(255,255,255,0.04);border-radius:12px;margin-bottom:12px;cursor:pointer;transition:0.2s;font-size:1rem}
 .menu-item:hover{background:rgba(59,130,246,0.15)}
 .menu-icon{font-size:1.5rem}
 
-/* Шапка */
+/* Шапка - только кнопка Меню на мобильном */
 .header{background:var(--panel);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center}
 .header h2{font-size:1.1rem;display:flex;align-items:center;gap:8px}
 .logo{width:28px;height:28px}
-.mobile-menu-btn{background:none;border:none;color:var(--text);font-size:1.5rem;cursor:pointer}
-.desktop-nav{display:flex;gap:6px;flex-wrap:wrap}
+.menu-btn{background:var(--acc);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.9rem;font-weight:600}
+.desktop-nav{display:none}
+@media(min-width:768px){.desktop-nav{display:flex;gap:6px}.menu-btn{display:none}}
 .btn{padding:6px 12px;background:var(--acc);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem}
 .btn:hover{opacity:0.85}
 .btn-red{background:var(--danger)}
@@ -34,20 +36,18 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .section{display:none}
 .section.active{display:block}
 
-/* ЧАТЫ - мобильная адаптация */
-.chat-container{display:grid;grid-template-columns:1fr;gap:16px}
-@media(min-width:768px){.chat-container{grid-template-columns:300px 1fr}}
-.chat-list{background:var(--panel);border-radius:12px;overflow:hidden}
+/* ЧАТЫ - на мобильном чат на весь экран, слева список */
+.chat-container{display:grid;grid-template-columns:1fr;gap:16px;height:calc(100vh - 150px)}
+@media(min-width:768px){.chat-container{grid-template-columns:280px 1fr}}
+.chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
 .chat-list-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:0.95rem}
-.chat-items{max-height:400px;overflow-y:auto}
-@media(min-width:768px){.chat-items{max-height:500px}}
+.chat-items{flex:1;overflow-y:auto}
 .chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer}
 .chat-item:hover,.chat-item.active{background:rgba(59,130,246,0.15)}
 .chat-meta{display:flex;justify-content:space-between;font-size:0.75rem;opacity:0.7;margin-bottom:4px}
 .chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column}
 .chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:0.95rem}
-.chat-messages{flex:1;min-height:200px;max-height:300px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
-@media(min-width:768px){.chat-messages{min-height:300px;max-height:400px}}
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
 .chat-input{padding:12px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px}
 .chat-input input{flex:1;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text);font-size:0.9rem}
 .msg{max-width:85%;padding:10px 12px;border-radius:12px;line-height:1.4;font-size:0.9rem}
@@ -108,24 +108,14 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 .support-links{display:grid;grid-template-columns:1fr;gap:10px}
 @media(min-width:640px){.support-links{grid-template-columns:repeat(2,1fr)}}
 .support-link{display:flex;align-items:center;gap:12px;padding:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:10px;text-decoration:none;color:var(--text)}
-
-/* Адаптация */
-@media (max-width: 640px) {
-  .header h2{font-size:1rem}
-  .logo{width:24px;height:24px}
-  .btn{padding:6px 10px;font-size:0.8rem}
-  .card{padding:14px}
-  .chat-input input{padding:8px}
-  .msg{font-size:0.85rem}
-}
 </style>
 </head>
 <body>
 
-<!-- Мобильное меню -->
+<!-- Мобильное меню (отдельная страница) -->
 <div id="mobileMenu">
   <div class="menu-header">
-    <h3>🤖 КРИСТИНА.AI CRM</h3>
+    <h3>КРИСТИНА.AI CRM</h3>
     <button class="btn btn-red" onclick="toggleMobileMenu()">✕ Закрыть</button>
   </div>
   <div class="menu-item" onclick="navTo('chats');toggleMobileMenu()"><span class="menu-icon">💬</span>Чаты</div>
@@ -140,19 +130,17 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 
 <!-- Шапка -->
 <div class="header">
-  <h2><img src="favicon.png" alt="🤖" class="logo" onerror="this.style.display='none'">🤖 КРИСТИНА.AI CRM</h2>
-  <div style="display:flex;align-items:center;gap:12px">
-    <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
-    <div class="desktop-nav">
-      <button class="btn" onclick="showSection('chats')">💬</button>
-      <button class="btn" onclick="showSection('sites')">🌐</button>
-      <button class="btn" onclick="showSection('ai-manager')">🤖</button>
-      <button class="btn" id="adminBtn" onclick="showSection('admin')" style="display:none">👑</button>
-      <button class="btn" onclick="showSection('profile')">👤</button>
-      <button class="btn" onclick="showSection('trash')">🗑️</button>
-      <button class="btn" onclick="showSection('support')">💚</button>
-      <button class="btn btn-red" onclick="logout()">🚪</button>
-    </div>
+  <h2><img src="favicon.png" alt="Logo" class="logo" onerror="this.style.display='none'">КРИСТИНА.AI CRM</h2>
+  <button class="menu-btn" onclick="toggleMobileMenu()">Меню</button>
+  <div class="desktop-nav">
+    <button class="btn" onclick="showSection('chats')">💬 Чаты</button>
+    <button class="btn" onclick="showSection('sites')">🌐 Сайты</button>
+    <button class="btn" onclick="showSection('ai-manager')">🤖 AI</button>
+    <button class="btn" id="adminBtn" onclick="showSection('admin')" style="display:none">👑 Админ</button>
+    <button class="btn" onclick="showSection('profile')">👤 Профиль</button>
+    <button class="btn" onclick="showSection('trash')">🗑️ Корзина</button>
+    <button class="btn" onclick="showSection('support')">💚 Поддержка</button>
+    <button class="btn btn-red" onclick="logout()">🚪 Выйти</button>
   </div>
 </div>
 
@@ -163,13 +151,13 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
   <div id="chats" class="section active">
     <div class="chat-container">
       <div class="chat-list">
-        <div class="chat-list-header">📂 Диалоги</div>
+        <div class="chat-list-header">📂 Активные диалоги</div>
         <div class="chat-items" id="chatList">Загрузка...</div>
       </div>
       <div class="chat-window">
         <div class="chat-header" id="chatTitle">Выберите диалог</div>
         <div class="chat-messages" id="chatMessages"><div class="empty-state">💬 Выберите чат слева</div></div>
-        <div class="chat-input"><input type="text" id="msgInput" placeholder="Ответ..." disabled><button class="btn" id="sendBtn" onclick="sendMessage()" disabled>➤</button></div>
+        <div class="chat-input"><input type="text" id="msgInput" placeholder="Введите ответ..." disabled><button class="btn" id="sendBtn" onclick="sendMessage()" disabled>Отправить</button></div>
       </div>
     </div>
   </div>
@@ -178,7 +166,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
   <div id="sites" class="section">
     <div class="card">
       <h3>🌐 Добавить сайт</h3>
-      <div style="display:flex;gap:8px"><input type="text" id="siteUrl" placeholder="https://site.com"><button class="btn" onclick="addSite()">➕</button></div>
+      <div style="display:flex;gap:8px"><input type="text" id="siteUrl" placeholder="https://site.com"><button class="btn" onclick="addSite()">➕ Добавить</button></div>
     </div>
     <div class="card">
       <h3>📋 Код виджета</h3>
@@ -193,10 +181,9 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
     <div class="card">
       <h3>🤖 Настройка AI</h3>
       
-      <!-- Табсы -->
       <div class="tabs">
-        <div class="tab active" onclick="switchTab('web')">🌐 Веб-агенты</div>
-        <div class="tab" onclick="switchTab('telegram')">✈️ Telegram-агенты</div>
+        <div class="tab active" onclick="switchTab('web')">🌐 Мои веб-агенты</div>
+        <div class="tab" onclick="switchTab('telegram')">✈️ Агенты для ТГ</div>
       </div>
       
       <!-- Веб-агенты -->
@@ -206,7 +193,6 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         <div class="form-group"><label>База знаний</label><textarea id="aiKnowledge" placeholder="Услуги, цены, контакты..."></textarea></div>
         <div class="form-group"><label>Запрещённые темы</label><textarea id="aiForbidden" placeholder="Политика, религия..."></textarea></div>
         
-        <!-- Загрузка PDF -->
         <div class="form-group">
           <label>📎 Файлы знаний (PDF, до 10 файлов, макс. 10 МБ)</label>
           <div class="file-upload" onclick="document.getElementById('pdfInput').click()">
@@ -217,7 +203,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         </div>
         
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0">
-          <div><div style="font-weight:600">🌐 Активен на сайте</div><div style="font-size:0.8rem;opacity:0.7">AI отвечает в веб-чате</div></div>
+          <div><div style="font-weight:600">🌐 Включить для сайта</div><div style="font-size:0.8rem;opacity:0.7">AI отвечает в веб-чате</div></div>
           <label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label>
         </div>
         <button class="btn btn-green" onclick="saveAISettings('web')" style="width:100%">💾 Сохранить веб-агента</button>
@@ -233,7 +219,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         </div>
         
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0">
-          <div><div style="font-weight:600">✈️ Активен в Telegram</div><div style="font-size:0.8rem;opacity:0.7">AI отвечает в боте</div></div>
+          <div><div style="font-weight:600">✈️ Включить для Telegram</div><div style="font-size:0.8rem;opacity:0.7">AI отвечает в боте</div></div>
           <label class="switch"><input type="checkbox" id="aiTgToggle"><span class="slider"></span></label>
         </div>
         <button class="btn btn-green" onclick="saveAISettings('telegram')" style="width:100%">💾 Сохранить Telegram-агента</button>
@@ -244,12 +230,23 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
   <!-- АДМИНКА -->
   <div id="admin" class="section">
     <div class="card"><h3>👥 Пользователи</h3><div style="overflow-x:auto"><table><thead><tr><th>Логин</th><th>Дата</th><th>Статус</th><th>Действия</th></tr></thead><tbody id="userTable"></tbody></table></div></div>
-    <div class="card"><h3>📢 Сообщение</h3><select id="targetUser" class="form-group" style="width:100%;padding:10px;margin-bottom:10px"><option>Выберите</option></select><textarea id="adminMsg" rows="3" placeholder="Текст..."></textarea><button class="btn" onclick="sendAdminMsg()">📩 Отправить</button></div>
+    <div class="card"><h3>📢 Сообщение</h3><select id="targetUser" style="width:100%;padding:10px;margin-bottom:10px"><option>Выберите</option></select><textarea id="adminMsg" rows="3" placeholder="Текст..."></textarea><button class="btn" onclick="sendAdminMsg()">📩 Отправить</button></div>
   </div>
 
-  <!-- ПРОФИЛЬ -->
+  <!-- ПРОФИЛЬ (с Telegram настройками) -->
   <div id="profile" class="section">
-    <div class="card"><h3>👤 Профиль</h3><div class="form-group"><label>Логин</label><input type="text" id="profileUsername" readonly></div><div class="form-group"><label>Новый пароль</label><input type="password" id="newPassword" placeholder="Мин. 4 символа"></div><button class="btn" onclick="changePassword()">💾 Сохранить</button></div>
+    <div class="card">
+      <h3>👤 Профиль</h3>
+      <div class="form-group"><label>Логин</label><input type="text" id="profileUsername" readonly></div>
+      <div class="form-group"><label>Новый пароль</label><input type="password" id="newPassword" placeholder="Мин. 4 символа"></div>
+      <button class="btn" onclick="changePassword()">💾 Сохранить пароль</button>
+    </div>
+    <div class="card">
+      <h3>🔔 Telegram уведомления</h3>
+      <div class="form-group"><label>Ваш Chat ID в Telegram</label><input type="text" id="profileTgChatId" placeholder="Напишите @userinfobot"></div>
+      <div class="form-group"><label>Токен бота (от @BotFather)</label><input type="text" id="profileTgToken" placeholder="123456:ABC-DEF..."></div>
+      <button class="btn btn-green" onclick="saveProfileTelegram()">💾 Сохранить настройки</button>
+    </div>
   </div>
 
   <!-- КОРЗИНА -->
@@ -277,6 +274,7 @@ const isAdmin = localStorage.getItem('isAdmin') === 'true';
 let activeChatId = null;
 let pollInterval = null;
 let uploadedFiles = [];
+let uploadedFileNames = [];
 
 if(!token) window.location.href = '/index.html';
 if(isAdmin) { document.getElementById('adminBtn').style.display = 'inline-block'; document.getElementById('adminMenuBtn').style.display = 'flex'; }
@@ -293,6 +291,7 @@ function showSection(id){
   if(id==='sites') loadSites();
   if(id==='ai-manager') loadAISettings();
   if(id==='admin') loadUsers();
+  if(id==='profile') loadProfile();
   if(id==='trash') loadTrash();
 }
 
@@ -343,7 +342,6 @@ function deleteSite(id){ if(!confirm('Переместить в корзину?'
 function copyCode(){ const c=document.getElementById('widgetCode').textContent; if(c.includes('появится')) return alert('ℹ️ Код после одобрения'); navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано')); }
 
 // AI MANAGER
-let uploadedFileNames = [];
 function handleFiles(files){
   for(let f of files){
     if(f.type!=='application/pdf') return alert('❌ Только PDF');
@@ -394,11 +392,22 @@ function toggleUser(id){ fetchAPI('/admin/toggle_user','POST',{user_id:id}).then
 function sendAdminMsg(){ const u=document.getElementById('targetUser').value,t=document.getElementById('adminMsg').value.trim(); if(!u||!t) return; fetchAPI('/admin/message','POST',{user_id:u,text:t}).then(()=>{alert('✅ Отправлено');document.getElementById('adminMsg').value='';}); }
 
 // ПРОФИЛЬ
-async function loadProfile(){ if(!localStorage.getItem('username')){ try{const r=await fetch(API+'/me',{headers:{Authorization:`Bearer ${token}`}});if(r.ok){const d=await r.json();localStorage.setItem('username',d.username);}}catch(e){}} document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...'; }
+async function loadProfile(){ 
+  if(!localStorage.getItem('username')){ 
+    try{const r=await fetch(API+'/me',{headers:{Authorization:`Bearer ${token}`}});if(r.ok){const d=await r.json();localStorage.setItem('username',d.username);}}catch(e){}
+  } 
+  document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...'; 
+}
 function changePassword(){ const p=document.getElementById('newPassword').value; if(p.length<4) return alert('❌ Мин. 4 символа'); fetchAPI('/change_password','POST',{password:p}).then(d=>{if(d?.ok){alert('✅ Готово');document.getElementById('newPassword').value='';}else alert('❌ Ошибка');}); }
+function saveProfileTelegram(){
+  const cid=document.getElementById('profileTgChatId').value.trim();
+  const tok=document.getElementById('profileTgToken').value.trim();
+  if(!cid||!tok) return alert('❌ Заполните оба поля');
+  fetchAPI('/admin/save_chat_id','POST',{chat_id:cid}).then(()=>fetchAPI('/telegram/setup','POST',{token:tok,active:true}).then(()=>alert('✅ Настройки Telegram сохранены!')));
+}
 
 // КОРЗИНА
-async function loadTrash(){ const s=await fetchAPI('/admin/trash'); if(!s) return; const el=document.getElementById('trashList'); if(!s.length){el.innerHTML='<p style="opacity:0.5">Пусто</p>';return;} el.innerHTML=s.map(x=>`<div class="site-item"><div class="site-info"><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.5">Удалён: ${new Date(x.deleted_at).toLocaleString()}</div></div><div class="site-actions"><button class="btn btn-green" onclick="restoreSite(${x.id})">♻️</button><button class="btn btn-red" onclick="permanentDelete(${x.id})">❌</button></div></div>`).join(''); }
+async function loadTrash(){ const s=await fetchAPI('/admin/trash'); if(!s) return; const el=document.getElementById('trashList'); if(!s.length){el.innerHTML='<p style="opacity:0.5">Пусто</p>';return;} el.innerHTML=s.map(x=>`<div class="site-item"><div class="site-info"><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.5">Удалён: ${new Date(x.deleted_at).toLocaleString()}</div></div><div class="site-actions"><button class="btn btn-green" onclick="restoreSite(${x.id})">♻️ Восстановить</button><button class="btn btn-red" onclick="permanentDelete(${x.id})">❌ Навсегда</button></div></div>`).join(''); }
 function restoreSite(id){ fetchAPI(`/admin/trash/${id}/restore`,'POST').then(()=>{loadTrash();alert('✅ Восстановлен');}); }
 function permanentDelete(id){ if(!confirm('Удалить навсегда?')) return; fetchAPI(`/admin/trash/${id}`,'DELETE').then(()=>{loadTrash();alert('✅ Удалено');}); }
 
