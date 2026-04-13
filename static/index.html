@@ -8,42 +8,116 @@
 <style>
 :root{--bg:#050a14;--glass:rgba(15,25,45,0.65);--border:rgba(59,130,246,0.25);--text:#e2e8f0;--blue:#3b82f6;--cyan:#00e5ff}
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
-body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{max-width:450px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:2.5rem;text-align:center}
-h1{color:var(--blue);margin-bottom:0.5rem;font-size:1.8rem}
-.subtitle{color:#94a3b8;margin-bottom:2rem;font-size:0.95rem}
-input{width:100%;padding:12px;margin:10px 0;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:#fff}
+body{background:var(--bg);color:var(--text);min-height:100vh}
+.view{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.hidden{display:none!important}
+.hero-card{max-width:900px;width:100%;background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:24px;padding:2.5rem}
+h1{font-size:2rem;margin-bottom:1rem;background:linear-gradient(135deg,#fff,var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:flex;align-items:center;justify-content:center;gap:12px}
+.logo{width:40px;height:40px}
+.subtitle{color:#94a3b8;margin-bottom:2rem;text-align:center;font-size:1.1rem}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin-bottom:2rem}
+.glass-card{background:rgba(10,18,32,0.7);border:1px solid var(--border);border-radius:16px;padding:1.5rem}
+.glass-card h3{margin:10px 0;color:#fff;font-size:1.1rem}
+.glass-card p{color:#94a3b8;font-size:0.9rem;line-height:1.5}
+.creator-card{display:flex;align-items:center;gap:1.5rem;background:rgba(10,18,32,0.6);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-bottom:2rem;flex-wrap:wrap;justify-content:center;text-align:center}
+.photo-ring{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));padding:3px;flex-shrink:0}
+.creator-photo{width:100%;height:100%;border-radius:50%;object-fit:cover;border:3px solid var(--bg);background:#1e3a8a}
+.creator-name{font-size:1.3rem;font-weight:700;color:#fff;margin:5px 0}
+.tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.tags span{padding:4px 10px;background:rgba(59,130,246,0.15);border:1px solid var(--border);border-radius:8px;font-size:0.75rem;color:var(--blue)}
+.cta-btn{width:100%;max-width:320px;padding:16px;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#000;font-weight:bold;border:none;border-radius:14px;cursor:pointer;margin:0 auto;display:block;font-size:1.1rem}
+.auth-card{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:20px;padding:2rem;width:100%;max-width:450px;text-align:center;margin:0 auto}
+.back-btn{position:relative;top:0;left:0;background:rgba(255,255,255,0.05);border:1px solid var(--border);color:#94a3b8;padding:10px 20px;border-radius:8px;cursor:pointer;margin:0 auto 20px;display:block}
+.auth-card input{width:100%;padding:12px;margin:10px 0;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:#fff}
 .btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#000;font-weight:bold;border:none;border-radius:8px;cursor:pointer;margin-top:15px;font-size:1rem}
 .toggle{display:block;margin-top:15px;color:var(--blue);cursor:pointer;font-size:0.9rem}
 .checkbox{display:flex;align-items:flex-start;gap:10px;margin:15px 0;text-align:left;font-size:0.85rem;color:#94a3b8}
 .checkbox a{color:var(--blue);text-decoration:underline}
-.hidden{display:none}
 #msg{margin-bottom:15px;padding:10px;border-radius:6px;font-size:0.9rem}
 .error{background:rgba(239,68,68,0.2);color:#f87171;border:1px solid #ef4444}
 .success{background:rgba(74,222,128,0.2);color:#4ade80;border:1px solid #4ade80}
-@media(max-width:640px){.card{padding:2rem}}
+@media(max-width:640px){.hero-card{padding:2rem}.auth-card{padding:1.5rem}}
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>🤖 КРИСТИНА.AI CRM</h1>
-  <p class="subtitle">Интеллектуальная система управления диалогами</p>
-  
-  <div id="msg"></div>
-  <input type="text" id="u" placeholder="Логин">
-  <input type="password" id="p" placeholder="Пароль">
-  
-  <div id="regBox" class="checkbox hidden">
-    <input type="checkbox" id="check" style="width:auto;margin:0;margin-top:3px">
-    <label for="check">Я согласен с <a href="/privacy.html" target="_blank">Политикой конфиденциальности</a> и <a href="/privacy.html#terms" target="_blank">Условиями использования</a></label>
-  </div>
 
-  <button class="btn" id="btn" onclick="go()">Войти</button>
-  <span class="toggle" id="tog" onclick="sw()">Нет аккаунта? Регистрация</span>
-</div>
+<main id="landing" class="view landing">
+  <div class="hero-card">
+    <h1><img src="favicon.png" alt="Logo" class="logo" onerror="this.style.display='none'">🤖 КРИСТИНА.AI CRM</h1>
+    <p class="subtitle">Интеллектуальная система управления диалогами</p>
+    
+    <div class="info-grid">
+      <div class="glass-card">
+        <h3>🔍 Что это?</h3>
+        <p>CRM-платформа для приёма диалогов с клиентами в реальном времени.</p>
+      </div>
+      <div class="glass-card">
+        <h3>⚡ Для чего?</h3>
+        <p>Не терять заявки и видеть историю переписки.</p>
+      </div>
+      <div class="glass-card">
+        <h3>🤖 AI-менеджер</h3>
+        <p>Автоматические ответы клиентам 24/7 без вашего участия.</p>
+      </div>
+      <div class="glass-card">
+        <h3>📱 Telegram-бот</h3>
+        <p>Интеграция с Telegram для мгновенных уведомлений.</p>
+      </div>
+    </div>
+
+    <div class="creator-card">
+      <div class="photo-ring">
+        <img src="avatar.jpg" alt="Кристина" class="creator-photo" onerror="this.style.display='none'; this.parentElement.innerHTML='👩‍💻'">
+      </div>
+      <div>
+        <div style="color:#94a3b8;font-size:0.85rem">СОЗДАТЕЛЬ ПРОДУКТА</div>
+        <div class="creator-name">Кристина</div>
+        <div class="tags">
+          <span>🎯 Маркетолог</span>
+          <span>💻 Разработчик</span>
+          <span>🔮 Визионер</span>
+          <span>🤖 Эксперт по AI</span>
+          <span>🎨 Архитектор брендов</span>
+        </div>
+      </div>
+    </div>
+
+    <button type="button" class="cta-btn" onclick="goToAuth()">Начать работу →</button>
+  </div>
+</main>
+
+<section id="auth" class="view auth hidden">
+  <div class="auth-card">
+    <button type="button" class="back-btn" onclick="goToLanding()">← Назад</button>
+    <h1 style="font-size:1.6rem;margin-bottom:1rem" id="authTitle">Вход в CRM</h1>
+    <div id="msg"></div>
+    <input type="text" id="u" placeholder="Логин">
+    <input type="password" id="p" placeholder="Пароль">
+    
+    <div id="regBox" class="checkbox hidden">
+      <input type="checkbox" id="check" style="width:auto;margin:0;margin-top:3px">
+      <label for="check">Я согласен с <a href="/privacy.html" target="_blank">Политикой конфиденциальности</a> и <a href="/privacy.html#terms" target="_blank">Условиями использования</a></label>
+    </div>
+
+    <button class="btn" id="btn" onclick="go()">Войти</button>
+    <span class="toggle" id="tog" onclick="sw()">Нет аккаунта? Регистрация</span>
+  </div>
+</section>
+
 <script>
 const API = location.origin + '/api';
 let isReg = false;
+
+function goToAuth(){
+  document.getElementById('landing').classList.add('hidden');
+  document.getElementById('auth').classList.remove('hidden');
+}
+
+function goToLanding(){
+  document.getElementById('auth').classList.add('hidden');
+  document.getElementById('landing').classList.remove('hidden');
+  document.getElementById('msg').innerHTML = '';
+}
 
 function sw(){
   isReg = !isReg;
@@ -51,7 +125,6 @@ function sw(){
   document.getElementById('tog').innerText = isReg ? 'Есть аккаунт? Войти' : 'Нет аккаунта? Регистрация';
   document.getElementById('regBox').classList.toggle('hidden');
   document.getElementById('msg').innerHTML = '';
-  document.getElementById('msg').className = '';
 }
 
 function showMsg(text, isError=true){
@@ -65,7 +138,7 @@ async function go(){
   const p = document.getElementById('p').value;
   
   if(isReg && !document.getElementById('check').checked) {
-    showMsg('❌ Необходимо согласиться с политикой конфиденциальности'); return;
+    showMsg('❌ Необходимо согласиться с политикой'); return;
   }
   
   if(!u || p.length < 4) {
@@ -85,7 +158,7 @@ async function go(){
   }catch(e){ showMsg('Ошибка сети'); }
 }
 
-if(new URLSearchParams(window.location.search).has('reg')) { sw(); }
+if(new URLSearchParams(window.location.search).has('reg')) { goToAuth(); sw(); }
 
 document.getElementById('p').onkeypress = e => { if(e.key==='Enter') go(); };
 </script>
