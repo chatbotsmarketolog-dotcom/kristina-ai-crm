@@ -36,7 +36,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .section{display:none}
 .section.active{display:block}
 
-/* ЧАТЫ - МОБИЛЬНАЯ АДАПТАЦИЯ */
+/* ЧАТЫ */
 .chat-container{display:grid;grid-template-columns:1fr;gap:0;height:calc(100vh - 70px)}
 @media(min-width:768px){.chat-container{grid-template-columns:300px 1fr;gap:16px;height:auto}}
 
@@ -211,6 +211,17 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         <div class="form-group"><label>Характер</label><textarea id="aiBehavior" placeholder="Ты вежливый помощник..."></textarea></div>
         <div class="form-group"><label>База знаний</label><textarea id="aiKnowledge" placeholder="Услуги, цены..."></textarea></div>
         <div class="form-group"><label>Запреты</label><textarea id="aiForbidden" placeholder="Политика, религия..."></textarea></div>
+        
+        <!-- Загрузка PDF -->
+        <div class="form-group">
+          <label>📎 Файлы (PDF, 10 шт, макс 10 МБ)</label>
+          <div class="file-upload" onclick="document.getElementById('pdfInput').click()" style="border:2px dashed rgba(59,130,246,0.5);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:rgba(59,130,246,0.05)">
+            📁 Нажмите для загрузки PDF
+            <input type="file" id="pdfInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)">
+          </div>
+          <div class="file-list" id="fileList" style="margin-top:12px"></div>
+        </div>
+        
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0">
           <div><div style="font-weight:600">🌐 Включить</div><div style="font-size:0.8rem;opacity:0.7">AI отвечает на сайте</div></div>
           <label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label>
@@ -246,12 +257,17 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
       <a href="mailto:chatbotsmarketolog@gmail.com" class="support-link"><span>📧</span><div><b>Email</b><small>chatbotsmarketolog@gmail.com</small></div></a>
     </div></div>
   </div>
-  <script>
+
+</div>
+
+<script>
 const API = location.origin + '/api';
 const token = localStorage.getItem('token');
 const isAdmin = localStorage.getItem('isAdmin') === 'true';
 let activeChatId = null;
 let pollInterval = null;
+let uploadedFiles = [];
+let uploadedFileNames = [];
 
 if(!token) window.location.href = '/index.html';
 if(isAdmin) { 
@@ -271,10 +287,7 @@ function navTo(section){
 function showSection(id){
   document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  
-  // Сброс видимости чатов при переходе
   showChatList();
-  
   if(id==='chats') loadChats();
   if(id==='sites') loadSites();
   if(id==='ai-manager') loadAISettings();
@@ -468,6 +481,35 @@ function saveTelegramConfig(){
     .then(()=>alert('✅ Telegram настроен!')));
 }
 
+// === Загрузка PDF файлов ===
+function handleFiles(files){
+  for(let f of files){
+    if(f.type !== 'application/pdf') return alert('❌ Только PDF');
+    if(f.size > 10*1024*1024) return alert('❌ Макс 10 МБ');
+    if(uploadedFiles.length >= 10) return alert('❌ Макс 10 файлов');
+    uploadedFiles.push(f);
+    uploadedFileNames.push(f.name);
+  }
+  renderFileList();
+}
+
+function renderFileList(){
+  const el = document.getElementById('fileList');
+  if(!el) return;
+  el.innerHTML = uploadedFileNames.map((name,i) => 
+    `<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin-bottom:6px;font-size:0.85rem">
+      <span>${name}</span>
+      <span onclick="removeFile(${i})" style="color:var(--danger);cursor:pointer;font-size:1.2rem">×</span>
+    </div>`
+  ).join('');
+}
+
+function removeFile(i){
+  uploadedFiles.splice(i,1);
+  uploadedFileNames.splice(i,1);
+  renderFileList();
+}
+
 // === АДМИНКА ===
 async function loadUsers(){ 
   const u = await fetchAPI('/admin/users'); 
@@ -538,5 +580,3 @@ showSection('chats');
 </script>
 </body>
 </html>
-
-</div>
