@@ -137,14 +137,14 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
   <h2><img src="favicon.png" alt="Logo" class="logo" onerror="this.style.display='none'">КРИСТИНА.AI CRM</h2>
   <button class="menu-btn" onclick="toggleMobileMenu()">Меню</button>
   <div class="desktop-nav">
-    <button class="btn" onclick="showSection('chats')">💬 Чаты</button>
-    <button class="btn" onclick="showSection('sites')">🌐 Сайты</button>
-    <button class="btn" onclick="showSection('ai-manager')">🤖 AI</button>
-    <button class="btn" id="adminBtn" onclick="showSection('admin')" style="display:none">👑 Админ</button>
-    <button class="btn" onclick="showSection('profile')">👤 Профиль</button>
-    <button class="btn" onclick="showSection('trash')">🗑️ Корзина</button>
-    <button class="btn" onclick="showSection('support')">💚 Поддержка</button>
-    <button class="btn btn-red" onclick="logout()">🚪 Выйти</button>
+    <button class="btn" onclick="showSection('chats'); return false;">💬 Чаты</button>
+    <button class="btn" onclick="showSection('sites'); return false;">🌐 Сайты</button>
+    <button class="btn" onclick="showSection('ai-manager'); return false;">🤖 AI</button>
+    <button class="btn" id="adminBtn" onclick="showSection('admin'); return false;" style="display:none">👑 Админ</button>
+    <button class="btn" onclick="showSection('profile'); return false;">👤 Профиль</button>
+    <button class="btn" onclick="showSection('trash'); return false;">🗑️ Корзина</button>
+    <button class="btn" onclick="showSection('support'); return false;">💚 Поддержка</button>
+    <button class="btn btn-red" onclick="logout(); return false;">🚪 Выйти</button>
   </div>
 </div>
 
@@ -446,10 +446,21 @@ async function loadUsers(){
   const u=await fetchAPI('/admin/users'); 
   if(!u) return; 
   document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join(''); 
+  // Добавлена кнопка Удалить, которая реально удаляет пользователя через API
   document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td><a href="${location.protocol}//${location.hostname}" target="_blank" style="color:var(--acc)">Сайт</a></td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':'🔴'}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button> <button class="btn btn-red" onclick="deleteUser(${x.id})">🗑️</button></td></tr>`).join(''); 
 }
 function toggleUser(id){ fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers); }
-function deleteUser(id){ if(!confirm('Удалить пользователя?')) return; alert('Функция в разработке'); }
+function deleteUser(id){ 
+  if(!confirm('Удалить пользователя навсегда? Это действие нельзя отменить.')) return; 
+  fetchAPI(`/admin/users/${id}`, 'DELETE').then(res => {
+      if(res && res.ok) {
+          alert('✅ Пользователь удален');
+          loadUsers();
+      } else {
+          alert('❌ Ошибка удаления');
+      }
+  }); 
+}
 function sendAdminMsg(){ const u=document.getElementById('targetUser').value,t=document.getElementById('adminMsg').value.trim(); if(!u||!t) return; fetchAPI('/admin/message','POST',{user_id:u,text:t}).then(()=>{alert('✅ Отправлено');document.getElementById('adminMsg').value='';}); }
 
 // ПРОФИЛЬ
