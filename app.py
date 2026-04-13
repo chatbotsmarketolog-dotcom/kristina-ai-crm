@@ -321,6 +321,8 @@ def setup_ai():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"AI setup error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": "Внутренняя ошибка"}), 500
 
 @app.route('/api/ai/get', methods=['GET'])
@@ -373,7 +375,9 @@ def toggle_user():
         user_id = request.json.get('user_id')
         u = User.query.get(user_id)
         if u: 
-            if u.username != request.current_user.username:
+            # ИСПРАВЛЕНО: безопасная проверка
+            current_username = request.current_user.username if request.current_user else None
+            if u.username != current_username:
                 u.is_active = not u.is_active
                 db.session.commit()
         return jsonify({"ok": True})
@@ -387,7 +391,8 @@ def delete_user_admin():
     try:
         u = User.query.get(user_id)
         if u:
-            if u.username == request.current_user.username:
+            current_username = request.current_user.username if request.current_user else None
+            if u.username == current_username:
                 return jsonify({"error": "Нельзя удалить себя"}), 400
             db.session.delete(u)
             db.session.commit()
@@ -494,7 +499,7 @@ def change_password():
         print(f"Change password error: {e}")
         return jsonify({"error": "Внутренняя ошибка"}), 500
 
-# === ИНИЦИАЛИЗАЦИЯ (ГАРАНТИЯ РАБОТЫ) ===
+# === ИНИЦИАЛИЗАЦИЯ ===
 with app.app_context():
     db.create_all()
     add_missing_columns()
