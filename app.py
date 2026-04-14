@@ -188,11 +188,8 @@ def approve_site():
 def delete_site(site_id):
     try:
         site = Website.query.get(site_id)
-        
-        # Проверяем: сайта нет ИЛИ (владелец не текущий юзер И текущий юзер НЕ админ)
         if not site or (site.owner_id != request.current_user.id and not request.current_user.is_admin):
             return jsonify({"error": "Не найдено или нет прав"}), 404
-        
         site.is_deleted = True
         site.deleted_at = datetime.datetime.utcnow()
         db.session.commit()
@@ -210,26 +207,32 @@ def get_chats():
         u = request.current_user
         
         if u.is_admin:
-            # Админ видит ВСЕ чаты в системе
             chats = Chat.query.order_by(Chat.created_at.desc()).all()
         else:
-            # Пользователь видит ТОЛЬКО свои чаты:
-            # 1. Привязанные к его сайтам
-            # 2. Личные сообщения от админа (где website_id=None, но visitor_id начинается с "admin_" и чат создан для него)
             user_site_ids = [s.id for s in Website.query.filter_by(owner_id=u.id, is_deleted=False).all()]
             chats = Chat.query.filter(
                 db.or_(
                     Chat.website_id.in_(user_site_ids) if user_site_ids else db.false(),
-                    db.and_(Chat.website_id == None, Chat.visitor_id.like(f"admin_%"))
+                    db.and_(Chat.website_id == None, Chat.visitor_id.like(f"user_{u.id}"))
                 )
             ).order_by(Chat.created_at.desc()).all()
         
         result = []
         for c in chats:
-            site = Website.query.get(c.website_id) if c.website_id else None
+            if c.website_id:
+                site = Website.query.get(c.website_id)
+                site_name = site.url if site else "Unknown"
+            else:
+                if c.visitor_id and c.visitor_id.startswith("user_"):
+                    target_user_id = c.visitor_id.replace("user_", "")
+                    target_user = User.query.get(int(target_user_id))
+                    site_name = target_user.username if target_user else "Пользователь"
+                else:
+                    site_name = "Пользователь"
+            
             result.append({
                 "id": c.id,
-                "site": site.url if site else "Сообщение от админа",
+                "site": site_name,
                 "status": c.status,
                 "time": c.created_at.isoformat()
             })
@@ -330,18 +333,13 @@ def admin_send_to_user():
         if not user_id or not text:
             return jsonify({"error": "user_id и text обязательны"}), 400
         
-        # Находим сайты пользователя
         user_sites = Website.query.filter_by(owner_id=user_id, is_deleted=False).all()
-        
-        # Если есть сайты - создаём чат для первого сайта
-        # Если нет сайтов - создаём чат без привязки к сайту (website_id=None)
         website_id = user_sites[0].id if user_sites else None
         
-        chat = Chat(website_id=website_id, visitor_id=f"admin_{uuid.uuid4().hex[:8]}", status='waiting', operator_id=None)
+        chat = Chat(website_id=website_id, visitor_id=f"user_{user_id}", status='waiting', operator_id=None)
         db.session.add(chat)
         db.session.commit()
         
-        # Добавляем сообщение
         db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
         db.session.commit()
         
