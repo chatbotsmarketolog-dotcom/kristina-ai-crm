@@ -109,11 +109,11 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 <div class="container">
   <div id="chats" class="section active">
     <div class="chat-container">
-      <div class="chat-list">
+      <div class="chat-list" id="chatListPanel">
         <div class="chat-list-header">📂 Активные диалоги</div>
         <div class="chat-items" id="chatList"><div class="empty-state">Нет диалогов</div></div>
       </div>
-      <div class="chat-window">
+      <div class="chat-window hidden" id="chatWindowPanel">
         <div class="chat-header" id="chatTitle">Выберите диалог</div>
         <div class="chat-messages" id="chatMessages"><div class="empty-state">💬 Выберите чат</div></div>
         <div class="chat-input"><input type="text" id="msgInput" placeholder="Ответ..." disabled><button class="btn" id="sendBtn" onclick="sendMessage()" disabled>Отправить</button></div>
@@ -189,6 +189,16 @@ async function loadChats(){
         : '<div class="empty-state">Нет диалогов</div>';
 }
 
+function showChatList(){
+    document.getElementById('chatListPanel').classList.remove('hidden');
+    document.getElementById('chatWindowPanel').classList.add('hidden');
+}
+
+function showChatWindow(){
+    document.getElementById('chatListPanel').classList.add('hidden');
+    document.getElementById('chatWindowPanel').classList.remove('hidden');
+}
+
 async function openChat(id, site){
     activeChatId = id;
     document.getElementById('chatTitle').textContent = site;
@@ -205,18 +215,9 @@ async function loadMessages(){
     const m = await fetchAPI(`/messages/${activeChatId}`);
     if(!m) return;
     
-    // Определяем, кто текущий пользователь
     const isAdminUser = localStorage.getItem('isAdmin') === 'true';
     
     document.getElementById('chatMessages').innerHTML = m.map(x => {
-        // Логика отображения:
-        // Если я АДМИН:
-        //   - сообщения от 'admin' → это МОИ (справа, класс operator)
-        //   - сообщения от 'operator' → это ЧУЖИЕ (слева, класс visitor)
-        // Если я ПОЛЬЗОВАТЕЛЬ:
-        //   - сообщения от 'admin' → это ЧУЖИЕ (слева, класс visitor)
-        //   - сообщения от 'operator' → это МОИ (справа, класс operator)
-        
         let msgClass = '';
         if (x.sender === 'admin') {
             msgClass = isAdminUser ? 'operator' : 'visitor';
