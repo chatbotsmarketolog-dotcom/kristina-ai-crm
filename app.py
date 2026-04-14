@@ -41,7 +41,7 @@ class Chat(db.Model):
     __tablename__ = 'chat'
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))  # ← НОВОЕ: привязка к пользователю
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     status = db.Column(db.String(20), default='waiting')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -49,7 +49,7 @@ class Message(db.Model):
     __tablename__ = 'message'
     id = db.Column(db.Integer, primary_key=True)
     chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'))
-    sender = db.Column(db.String(20))  # 'admin' или 'user'
+    sender = db.Column(db.String(20))
     text = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -101,14 +101,23 @@ def admin_required(f):
 def add_missing_columns():
     with app.app_context():
         try:
+            # Добавляем колонки если их нет
             db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)'))
             db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_web BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
-            # Добавляем user_id в chat если нет
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES "user"(id)'))
+            
+            # Добавляем user_id в chat
+            try:
+                db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
+                db.session.commit()
+                print("✅ Добавлена колонка user_id в таблицу chat")
+            except:
+                db.session.rollback()
+                print("ℹ️ Колонка user_id уже существует")
+            
             db.session.commit()
         except Exception as e:
             print(f"Migration error: {e}")
@@ -208,7 +217,6 @@ def get_chats():
         u = request.current_user
         
         if u.is_admin:
-            # Админ видит все чаты, показываем логин пользователя
             chats = Chat.query.order_by(Chat.created_at.desc()).all()
             result = []
             for c in chats:
@@ -220,12 +228,13 @@ def get_chats():
                 result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
             return jsonify(result)
         else:
-            # Пользователь видит только свои чаты с админом
             chats = Chat.query.filter_by(user_id=u.id).order_by(Chat.created_at.desc()).all()
             return jsonify([{"id": c.id, "site": "Админ", "status": c.status, "time": c.created_at.isoformat()} for c in chats])
             
     except Exception as e:
         print(f"Get chats error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify([]), 500
 
 @app.route('/api/messages/<int:chat_id>', methods=['GET'])
@@ -243,7 +252,6 @@ def get_messages(chat_id):
 def send_message():
     try:
         d = request.json
-        # Разрешаем отправку только админу
         if not request.current_user.is_admin:
             return jsonify({"error": "Только админ может отправлять"}), 403
         db.session.add(Message(chat_id=d['chat_id'], sender='admin', text=d['text']))
