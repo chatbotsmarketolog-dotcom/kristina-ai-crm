@@ -188,14 +188,19 @@ def approve_site():
 def delete_site():
     try:
         site = Website.query.get(site_id)
-        if not site or site.owner_id != request.current_user.id: return jsonify({"error": "Не найдено"}), 404
+        
+        # Проверяем: сайта нет ИЛИ (владелец не текущий юзер И текущий юзер НЕ админ)
+        if not site or (site.owner_id != request.current_user.id and not request.current_user.is_admin):
+            return jsonify({"error": "Не найдено или нет прав"}), 404
+        
         site.is_deleted = True
         site.deleted_at = datetime.datetime.utcnow()
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Delete error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        # Возвращаем текст ошибки, чтобы было понятно, что сломалось
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/chats', methods=['GET'])
 @token_required
