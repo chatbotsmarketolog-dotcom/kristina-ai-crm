@@ -212,13 +212,20 @@ async function loadMessages(){
     const m = await fetchAPI(`/messages/${activeChatId}`);
     if(!m) return;
     
+    // Определяем кто мы: админ или пользователь
+    const iAmAdmin = localStorage.getItem('isAdmin') === 'true';
+    
     document.getElementById('chatMessages').innerHTML = m.map(x => {
-        let msgClass = '';
-        if (x.sender === 'admin') {
-            msgClass = isAdmin ? 'operator' : 'visitor';
-        } else {
-            msgClass = isAdmin ? 'visitor' : 'operator';
-        }
+        // Простая логика:
+        // - Если sender='admin' И я админ → это МОЁ (справа)
+        // - Если sender='admin' И я НЕ админ → это ЧУЖОЕ (слева)
+        // - Если sender='operator' И я админ → это ЧУЖОЕ (слева)
+        // - Если sender='operator' И я НЕ админ → это МОЁ (справа)
+        
+        const isMyMessage = (x.sender === 'admin' && iAmAdmin) || 
+                           (x.sender === 'operator' && !iAmAdmin);
+        
+        const msgClass = isMyMessage ? 'operator' : 'visitor';
         
         return `<div class="msg ${msgClass}">${x.text}</div>`;
     }).join('');
