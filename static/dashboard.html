@@ -17,6 +17,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .btn:hover{opacity:0.85}
 .btn-red{background:var(--danger)}
 .btn-green{background:var(--success)}
+.btn-sm{padding:4px 8px;font-size:0.75rem}
 
 .container{padding:16px;flex:1;overflow-y:auto}
 .section{display:none}
@@ -37,9 +38,11 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
 .chat-list-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600}
 .chat-items{flex:1;overflow-y:auto}
-.chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer}
+.chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
 .chat-item:hover,.chat-item.active{background:rgba(59,130,246,0.15)}
-.chat-meta{display:flex;justify-content:space-between;font-size:0.75rem;opacity:0.7;margin-bottom:4px}
+.chat-meta{display:flex;flex-direction:column;gap:4px;flex:1}
+.chat-title{font-size:0.85rem;font-weight:500}
+.chat-status{font-size:0.75rem;opacity:0.7}
 
 .chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column;height:100%}
 .chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600}
@@ -48,7 +51,6 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .chat-input input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
 .chat-input input:disabled{opacity:0.5;cursor:not-allowed}
 
-/* СТИЛИ СООБЩЕНИЙ */
 .msg{max-width:85%;padding:10px 14px;border-radius:12px;align-self:flex-start;margin:4px 0;color:#fff}
 .msg-admin{background:rgba(255,255,255,0.15)}
 .msg-user{background:rgba(16,185,129,0.35)}
@@ -160,7 +162,6 @@ let activeChatId=null,pollInterval=null;
 if(!token)window.location.href='/index.html';
 if(isAdmin)document.getElementById('adminBtn').style.display='inline-block';
 
-// Блокируем ввод для пользователей
 if(!isAdmin){
     document.getElementById('msgInput').disabled = true;
     document.getElementById('sendBtn').disabled = true;
@@ -183,7 +184,11 @@ async function loadChats(){
     if(!c) return;
     document.getElementById('chatList').innerHTML = c.length 
         ? c.map(x => `<div class="chat-item ${x.id==activeChatId?'active':''}" onclick="openChat(${x.id},'${x.site}')">
-            <div class="chat-meta"><span>${x.site}</span><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'Онлайн':'Ожидание'}</span></div>
+            <div class="chat-meta">
+                <div class="chat-title">${x.site}</div>
+                <div class="chat-status"><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'Онлайн':'Ожидание'}</span></div>
+            </div>
+            ${isAdmin ? `<button class="btn btn-red btn-sm" onclick="event.stopPropagation();deleteChat(${x.id})">🗑️</button>` : ''}
         </div>`).join('')
         : '<div class="empty-state">Нет диалогов</div>';
 }
@@ -194,7 +199,6 @@ function showChatWindow(){document.getElementById('chatListPanel').classList.add
 async function openChat(id, site){
     activeChatId = id;
     document.getElementById('chatTitle').textContent = site;
-    // Включаем ввод только для админа
     if(isAdmin){
         document.getElementById('msgInput').disabled = false;
         document.getElementById('sendBtn').disabled = false;
@@ -236,35 +240,34 @@ function sendMessage(){
     });
 }
 
+async function deleteChat(id){
+    if(!confirm('Удалить чат и всю переписку?')) return;
+    try {
+        await fetchAPI(`/chats/${id}/delete`, 'POST');
+        loadChats();
+        if(activeChatId === id) {
+            document.getElementById('chatListPanel').classList.remove('hidden');
+            document.getElementById('chatWindowPanel').classList.add('hidden');
+            activeChatId = null;
+        }
+    } catch(e) {
+        alert('❌ Ошибка удаления');
+    }
+}
+
 async function loadSites(){const s=await fetchAPI('/sites');if(!s)return;const el=document.getElementById('siteList');if(!s.length){el.innerHTML='<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}let html='<h3>Мои сайты</h3>',approved=null;s.forEach(x=>{if(x.status=='active'&&!approved)approved=x;html+=`<div class="site-item"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API:${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅':'⏳'} ${x.status=='active'?'Активен':'Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${x.id})">🗑️</button></div>`;});el.innerHTML=html;if(approved)document.getElementById('widgetCode').textContent=`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;}
 function addSite(){const u=document.getElementById('siteUrl').value.trim();if(!u)return;fetchAPI('/sites','POST',{url:u}).then(()=>{document.getElementById('siteUrl').value='';loadSites();alert('✅ Добавлен!');});}
-
 async function deleteSite(id){if(!confirm('Удалить сайт?'))return;try{const r=await fetch(API+`/sites/${id}/delete`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});const data=await r.json().catch(()=>({error:'Ошибка'}));if(r.ok){loadSites();alert('✅ Удален!');}else{alert('❌ '+(data.error||'Ошибка'));}}catch(e){alert('❌ Ошибка соединения');}}
-
 function copyCode(){const c=document.getElementById('widgetCode').textContent;if(c.includes('После'))return alert('ℹ️ После одобрения');navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));}
-
 async function loadAI(){const ai=await fetchAPI('/ai/get');if(!ai)return;document.getElementById('aiName').value=ai.name||'';document.getElementById('aiBehavior').value=ai.behavior||'';document.getElementById('aiKnowledge').value=ai.knowledge_base||'';document.getElementById('aiWebToggle').checked=ai.is_active_web||false;}
 function saveAI(){fetchAPI('/ai/setup','POST',{name:document.getElementById('aiName').value,behavior:document.getElementById('aiBehavior').value,knowledge_base:document.getElementById('aiKnowledge').value,is_active_web:document.getElementById('aiWebToggle').checked}).then(()=>alert('✅ Сохранено!'));}
 function saveTG(){const t=document.getElementById('tgToken').value.trim(),c=document.getElementById('tgChatId').value.trim();if(!t||!c)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>alert('✅ Telegram настроен!')));}
 function handleFiles(files){for(let f of files){if(f.type!=='application/pdf')return alert('❌ Только PDF');if(f.size>10*1024*1024)return alert('❌ Макс 10МБ');if(uploadedFiles.length>=10)return alert('❌ Макс 10 файлов');uploadedFiles.push(f);uploadedFileNames.push(f.name);}renderFileList();}
 function renderFileList(){const el=document.getElementById('fileList');if(!el)return;el.innerHTML=uploadedFileNames.map((n,i)=>`<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin:6px 0;font-size:0.85rem"><span>${n}</span><span onclick="removeFile(${i})" style="color:var(--danger);cursor:pointer">×</span></div>`).join('');}
 function removeFile(i){uploadedFiles.splice(i,1);uploadedFileNames.splice(i,1);renderFileList();}
-
 async function loadUsers(){const u=await fetchAPI('/admin/users');if(!u)return;document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join('');document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':''}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join('');}
 function toggleUser(id){fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers);}
-
-function sendAdminMsg(){
-    const u = document.getElementById('targetUser').value;
-    const t = document.getElementById('adminMsg').value.trim();
-    if(!u || !t) return alert('❌ Выберите пользователя и введите текст');
-    fetchAPI('/admin/send_to_user', 'POST', {user_id: parseInt(u), text: t})
-        .then(result => {
-            if(result && result.ok) { alert('✅ Сообщение отправлено!'); document.getElementById('adminMsg').value = ''; loadChats(); }
-            else { alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная')); }
-        })
-        .catch(error => { console.error('Error:', error); alert('❌ Ошибка отправки'); });
-}
-
+function sendAdminMsg(){const u=document.getElementById('targetUser').value;const t=document.getElementById('adminMsg').value.trim();if(!u||!t)return alert('❌ Выберите пользователя и введите текст');fetchAPI('/admin/send_to_user','POST',{user_id:parseInt(u),text:t}).then(result=>{if(result&&result.ok){alert('✅ Сообщение отправлено!');document.getElementById('adminMsg').value='';loadChats();}else{alert('❌ Ошибка: '+(result?result.error:'Неизвестная'));}}).catch(error=>{console.error('Error:',error);alert('❌ Ошибка отправки');});}
 async function loadProfile(){document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...';}
 function changePassword(){const p=document.getElementById('newPassword').value;if(p.length<4)return alert('❌ Мин. 4');fetchAPI('/change_password','POST',{password:p}).then(()=>{alert('✅ Готово');document.getElementById('newPassword').value='';});}
 function saveProfileTG(){const c=document.getElementById('profileTgChatId').value.trim(),t=document.getElementById('profileTgToken').value.trim();if(!c||!t)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>{alert('✅ Сохранено!');loadProfile();}));}
