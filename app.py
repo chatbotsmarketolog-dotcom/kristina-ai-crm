@@ -40,7 +40,7 @@ class Website(db.Model):
 class Chat(db.Model):
     __tablename__ = 'chat'
     id = db.Column(db.Integer, primary_key=True)
-    website_id = db.Column(db.Integer, db.ForeignKey('website.id'))
+    website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)  # ← ИЗМЕНЕНО: добавлено nullable=True
     visitor_id = db.Column(db.String(50))
     status = db.Column(db.String(20), default='waiting')
     operator_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -301,20 +301,25 @@ def admin_send_to_user():
         d = request.json
         user_id = d.get('user_id')
         text = d.get('text')
+        
         if not user_id or not text:
             return jsonify({"error": "user_id и text обязательны"}), 400
         
+        # Находим сайты пользователя
         user_sites = Website.query.filter_by(owner_id=user_id, is_deleted=False).all()
-        if not user_sites:
-            return jsonify({"error": "У пользователя нет сайтов"}), 404
         
-        site = user_sites[0]
-        chat = Chat(website_id=site.id, visitor_id=f"admin_{uuid.uuid4().hex[:8]}", status='waiting', operator_id=None)
+        # Если есть сайты - создаём чат для первого сайта
+        # Если нет сайтов - создаём чат без привязки к сайту (website_id=None)
+        website_id = user_sites[0].id if user_sites else None
+        
+        chat = Chat(website_id=website_id, visitor_id=f"admin_{uuid.uuid4().hex[:8]}", status='waiting', operator_id=None)
         db.session.add(chat)
         db.session.commit()
         
+        # Добавляем сообщение
         db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
         db.session.commit()
+        
         return jsonify({"ok": True, "chat_id": chat.id})
     except Exception as e:
         print(f"Admin send error: {e}")
