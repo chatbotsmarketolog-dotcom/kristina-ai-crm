@@ -1,412 +1,275 @@
-import os, json, uuid, hashlib, datetime, secrets, requests
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
-from openai import OpenAI
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Панель | КРИСТИНА.AI CRM</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--text:#e2e8f0;--success:#10b981;--danger:#ef4444}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
+body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 
-app = Flask(__name__, static_folder='static', static_url_path='')
-CORS(app, supports_credentials=True, origins=["*"])
+.header{background:var(--panel);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.header h2{font-size:1rem;display:flex;align-items:center;gap:8px}
+.nav{display:flex;gap:6px;flex-wrap:wrap}
+.btn{padding:6px 12px;background:var(--acc);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem}
+.btn:hover{opacity:0.85}
+.btn-red{background:var(--danger)}
+.btn-green{background:var(--success)}
+.btn-sm{padding:4px 8px;font-size:0.75rem}
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
-db = SQLAlchemy(app)
+.container{padding:16px;flex:1;overflow-y:auto}
+.section{display:none}
+.section.active{display:block}
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+@media(max-width:768px){
+  .header{padding:10px}
+  .header h2{font-size:0.9rem;width:100%;order:1;margin-bottom:10px}
+  .nav{width:100%;order:2;justify-content:space-between}
+  .nav .btn{flex:1;margin:2px;padding:8px;font-size:0.8rem}
+  .card{padding:12px;margin-bottom:12px}
+  .chat-container{grid-template-columns:1fr!important;height:calc(100vh - 60px)!important}
+  table{font-size:0.75rem}
+  th,td{padding:6px}
+}
 
-class User(db.Model):
-    __tablename__ = 'user'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
-    is_admin = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    api_token = db.Column(db.String(100), unique=True, default=lambda: secrets.token_urlsafe(32))
-    telegram_chat_id = db.Column(db.String(100))
+.chat-container{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 100px)}
+.chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.chat-list-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.chat-items{flex:1;overflow-y:auto}
+.chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.chat-item:hover,.chat-item.active{background:rgba(59,130,246,0.15)}
+.chat-meta{display:flex;flex-direction:column;gap:4px;flex:1}
+.chat-title{font-size:0.85rem;font-weight:500}
+.chat-status{font-size:0.75rem;opacity:0.7}
 
-class Website(db.Model):
-    __tablename__ = 'website'
-    id = db.Column(db.Integer, primary_key=True)
-    url = db.Column(db.String(200), unique=True, nullable=False)
-    api_key = db.Column(db.String(50), unique=True, nullable=False)
-    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    status = db.Column(db.String(20), default='pending')
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    is_deleted = db.Column(db.Boolean, default=False)
-    deleted_at = db.Column(db.DateTime, nullable=True)
+.chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column;height:100%}
+.chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600}
+.chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:8px}
+.chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px}
+.chat-input input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
 
-class Chat(db.Model):
-    __tablename__ = 'chat'
-    id = db.Column(db.Integer, primary_key=True)
-    website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    status = db.Column(db.String(20), default='waiting')
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+.msg{max-width:85%;padding:10px 14px;border-radius:12px;align-self:flex-start;margin:4px 0;color:#fff}
+.msg-admin{background:rgba(255,255,255,0.15)}
+.msg-user{background:rgba(16,185,129,0.35)}
+.msg-header{font-size:0.75rem;margin-bottom:4px;font-weight:600;opacity:0.9;color:#93c5fd}
+.msg-text{line-height:1.4}
 
-class Message(db.Model):
-    __tablename__ = 'message'
-    id = db.Column(db.Integer, primary_key=True)
-    chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'))
-    sender = db.Column(db.String(20))
-    text = db.Column(db.Text)
-    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+.empty-state{text-align:center;padding:40px;opacity:0.6}
 
-class AIManager(db.Model):
-    __tablename__ = 'aimanager'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    name = db.Column(db.String(100), default='AI Assistant')
-    behavior = db.Column(db.Text, default='Ты полезный помощник')
-    forbidden = db.Column(db.Text, default='')
-    knowledge_base = db.Column(db.Text, default='')
-    is_active_web = db.Column(db.Boolean, default=False)
-    is_active_telegram = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+.card{background:var(--panel);border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.08)}
+.card h3{margin-bottom:16px;color:#fff}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;margin-bottom:6px;color:#94a3b8}
+.form-group input,.form-group textarea{width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
+.form-group textarea{resize:vertical;min-height:100px}
 
-class TelegramBot(db.Model):
-    __tablename__ = 'telegrambot'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    bot_token = db.Column(db.String(200), unique=True)
-    is_active = db.Column(db.Boolean, default=False)
+.switch{position:relative;display:inline-block;width:44px;height:24px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#444;transition:.3s;border-radius:24px}
+.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%}
+input:checked+.slider{background:var(--success)}
+input:checked+.slider:before{transform:translateX(20px)}
 
-def hash_pwd(p): 
-    return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
+.site-item{padding:16px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.status{padding:4px 10px;border-radius:6px;font-size:0.8rem}
+.status-active{background:rgba(16,185,129,0.2);color:var(--success)}
+.status-pending{background:rgba(251,191,36,0.2);color:#fbbf24}
+.instruction{background:rgba(59,130,246,0.05);border-left:4px solid var(--acc);padding:16px;border-radius:6px;margin:16px 0}
+.instruction ol{margin-left:20px;line-height:1.8}
+.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:6px;padding:10px;font-family:monospace;font-size:0.75rem;overflow-x:auto}
+.copy-btn{padding:4px 10px;background:var(--acc);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:0.75rem;margin-top:8px}
 
-def get_token(): 
-    return request.headers.get('Authorization', '').replace('Bearer ', '')
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:rgba(0,0,0,0.2);padding:4px;border-radius:8px}
+.tab{flex:1;padding:10px;text-align:center;border-radius:6px;cursor:pointer}
+.tab.active{background:var(--acc);color:#fff}
+.tab-content{display:none}
+.tab-content.active{display:block}
 
-def token_required(f):
-    def wrapper(*args, **kwargs):
-        token = get_token()
-        user = User.query.filter_by(api_token=token).first()
-        if not user or not user.is_active: return jsonify({"error": "Unauthorized"}), 401
-        request.current_user = user
-        return f(*args, **kwargs)
-    wrapper.__name__ = f.__name__
-    return wrapper
+.file-upload{border:2px dashed rgba(59,130,246,0.5);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:rgba(59,130,246,0.05);margin:10px 0}
+.file-list{margin-top:12px}
 
-def admin_required(f):
-    def wrapper(*args, **kwargs):
-        token = get_token()
-        user = User.query.filter_by(api_token=token, is_admin=True).first()
-        if not user: return jsonify({"error": "Admin only"}), 403
-        request.current_user = user
-        return f(*args, **kwargs)
-    wrapper.__name__ = f.__name__
-    return wrapper
+table{width:100%;border-collapse:collapse}
+th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08)}
 
-def add_missing_columns():
-    with app.app_context():
-        try:
-            # Добавляем колонки если их нет
-            db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)'))
-            db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_web BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
-            
-            # Добавляем user_id в chat
-            try:
-                db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
-                db.session.commit()
-                print("✅ Добавлена колонка user_id в таблицу chat")
-            except:
-                db.session.rollback()
-                print("ℹ️ Колонка user_id уже существует")
-            
-            db.session.commit()
-        except Exception as e:
-            print(f"Migration error: {e}")
-            db.session.rollback()
+.support-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.support-link{display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;text-decoration:none;color:var(--text)}
+</style>
+</head>
+<body>
 
-@app.route('/api/login', methods=['POST'])
-def login():
-    try:
-        d = request.json
-        username = d.get('username', '').strip()
-        password = d.get('password', '')
-        user = User.query.filter_by(username=username).first()
-        if not user: return jsonify({"error": "Неверные данные"}), 401
-        if not user.is_active: return jsonify({"error": "Аккаунт отключен"}), 401
-        if user.password_hash != hash_pwd(password): return jsonify({"error": "Неверные данные"}), 401
-        return jsonify({"ok": True, "token": user.api_token, "is_admin": user.is_admin, "username": user.username})
-    except Exception as e:
-        print(f"Login error: {e}")
-        return jsonify({"error": "Ошибка сервера"}), 500
+<div class="header">
+  <h2>🤖 КРИСТИНА.AI CRM</h2>
+  <div class="nav">
+    <button class="btn" onclick="showSection('chats')">💬 Чаты</button>
+    <button class="btn" onclick="showSection('sites')">🌐 Сайты</button>
+    <button class="btn" onclick="showSection('ai')">🤖 AI</button>
+    <button class="btn" id="adminBtn" onclick="showSection('admin')" style="display:none">👑 Админ</button>
+    <button class="btn" onclick="showSection('profile')">👤 Профиль</button>
+    <button class="btn" onclick="showSection('support')">💚 Поддержка</button>
+    <button class="btn btn-red" onclick="logout()">🚪 Выйти</button>
+  </div>
+</div>
 
-@app.route('/api/register', methods=['POST'])
-def register():
-    try:
-        d = request.json
-        username = d.get('username', '').strip()
-        password = d.get('password', '')
-        if not username or len(password) < 4: return jsonify({"error": "Логин мин. 2 символа, пароль мин. 4"}), 400
-        if User.query.filter_by(username=username).first(): return jsonify({"error": "Пользователь существует"}), 409
-        u = User(username=username, password_hash=hash_pwd(password))
-        db.session.add(u)
-        db.session.commit()
-        return jsonify({"ok": True, "token": u.api_token, "username": u.username})
-    except Exception as e:
-        print(f"Register error: {e}")
-        return jsonify({"error": "Ошибка сервера"}), 500
+<div class="container">
+  <div id="chats" class="section active">
+    <div class="chat-container">
+      <div class="chat-list" id="chatListPanel">
+        <div class="chat-list-header">
+          <span>📂 Активные диалоги</span>
+        </div>
+        <div class="chat-items" id="chatList"><div class="empty-state">Нет диалогов</div></div>
+      </div>
+      <div class="chat-window hidden" id="chatWindowPanel">
+        <div class="chat-header" id="chatTitle">Выберите диалог</div>
+        <div class="chat-messages" id="chatMessages"><div class="empty-state">💬 Выберите чат</div></div>
+        <div class="chat-input">
+          <input type="text" id="msgInput" placeholder="Введите сообщение..." disabled>
+          <button class="btn" id="sendBtn" onclick="sendMessage()" disabled>Отправить</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-@app.route('/api/sites', methods=['GET'])
-@token_required
-def get_sites():
-    try:
-        u = request.current_user
-        sites = Website.query.filter_by(owner_id=u.id, is_deleted=False).all() if not u.is_admin else Website.query.filter_by(is_deleted=False).all()
-        return jsonify([{"id":s.id, "url":s.url, "api_key":s.api_key, "status":s.status, "owner":s.owner_id} for s in sites])
-    except Exception as e:
-        print(f"Get sites error: {e}")
-        return jsonify([]), 500
+  <div id="sites" class="section">
+    <div class="card"><h3>🌐 Добавить сайт</h3><div style="display:flex;gap:10px"><input type="text" id="siteUrl" placeholder="https://site.com" style="flex:1;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)"><button class="btn" onclick="addSite()">➕ Добавить</button></div></div>
+    <div class="card"><h3>📋 Инструкция</h3><div class="instruction"><ol><li>Добавьте сайт</li><li>Дождитесь одобрения</li><li>Скопируйте код</li><li>Вставьте перед &lt;/body&gt;</li></ol></div><div class="code-box" id="widgetCode">&lt;!-- После одобрения --&gt;</div><button class="copy-btn" onclick="copyCode()">📋 Копировать</button></div>
+    <div class="card" id="siteList"><h3>Мои сайты</h3><p style="opacity:0.6">Загрузка...</p></div>
+  </div>
 
-@app.route('/api/sites', methods=['POST'])
-@token_required
-def add_site():
-    try:
-        url = request.json.get('url')
-        if not url: return jsonify({"error": "URL обязателен"}), 400
-        key = f"site_{uuid.uuid4().hex[:8]}"
-        site = Website(url=url, api_key=key, owner_id=request.current_user.id, status='pending')
-        db.session.add(site)
-        db.session.commit()
-        return jsonify({"ok": True, "id": site.id})
-    except Exception as e:
-        print(f"Add site error: {e}")
-        return jsonify({"error": str(e)}), 500
+  <div id="ai" class="section">
+    <div class="card"><h3>🤖 AI Настройки</h3><div class="tabs"><div class="tab active" onclick="switchTab('web')">🌐 Веб</div><div class="tab" onclick="switchTab('tg')">Telegram</div></div><div id="tab-web" class="tab-content active"><div class="form-group"><label>Имя</label><input type="text" id="aiName"></div><div class="form-group"><label>Характер</label><textarea id="aiBehavior"></textarea></div><div class="form-group"><label>База знаний</label><textarea id="aiKnowledge"></textarea></div><div class="form-group"><label>📎 PDF файлы</label><div class="file-upload" onclick="document.getElementById('pdfInput').click()">📁 Загрузить PDF<input type="file" id="pdfInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)"></div><div class="file-list" id="fileList"></div></div><div style="display:flex;justify-content:space-between;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0"><span>🌐 Включить AI</span><label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label></div><button class="btn btn-green" onclick="saveAI()" style="width:100%">💾 Сохранить</button></div><div id="tab-tg" class="tab-content"><div class="form-group"><label>Токен</label><input type="text" id="tgToken"></div><div class="form-group"><label>Chat ID</label><input type="text" id="tgChatId"></div><button class="btn" onclick="saveTG()">💾 Сохранить</button></div></div>
+  </div>
 
-@app.route('/api/sites/<int:site_id>/approve', methods=['POST'])
-@admin_required
-def approve_site():
-    try:
-        site = Website.query.get(site_id)
-        if site and not site.is_deleted:
-            site.status = 'active'
-            db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Approve error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+  <div id="admin" class="section">
+    <div class="card"><h3>👥 Пользователи</h3><div style="overflow-x:auto"><table><thead><tr><th>Логин</th><th>Дата</th><th>Статус</th><th>Действия</th></tr></thead><tbody id="userTable"></tbody></table></div></div>
+    <div class="card"><h3>📢 Сообщение</h3><select id="targetUser" style="width:100%;padding:10px;margin-bottom:10px;border-radius:6px;background:rgba(0,0,0,0.3);color:var(--text);border:1px solid rgba(255,255,255,0.1)"><option>Выберите</option></select><textarea id="adminMsg" rows="3" placeholder="Текст..."></textarea><button class="btn" onclick="sendAdminMsg()">📩 Отправить</button></div>
+  </div>
 
-@app.route('/api/sites/<int:site_id>/delete', methods=['POST'])
-@token_required
-def delete_site(site_id):
-    try:
-        site = Website.query.get(site_id)
-        if not site or (site.owner_id != request.current_user.id and not request.current_user.is_admin):
-            return jsonify({"error": "Не найдено или нет прав"}), 404
-        site.is_deleted = True
-        site.deleted_at = datetime.datetime.utcnow()
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Delete error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+  <div id="profile" class="section">
+    <div class="card"><h3>👤 Профиль</h3><div class="form-group"><label>Логин</label><input type="text" id="profileUsername" readonly></div><div class="form-group"><label>Пароль</label><input type="password" id="newPassword" placeholder="Мин. 4 символа"></div><button class="btn" onclick="changePassword()">💾 Сохранить</button></div>
+    <div class="card" id="tgSettings"><h3>🔔 Telegram</h3><div class="form-group"><label>Chat ID</label><input type="text" id="profileTgChatId"></div><div class="form-group"><label>Токен</label><input type="text" id="profileTgToken"></div><button class="btn btn-green" onclick="saveProfileTG()">💾 Сохранить</button></div>
+  </div>
 
-@app.route('/api/chats', methods=['GET'])
-@token_required
-def get_chats():
-    try:
-        u = request.current_user
+  <div id="support" class="section">
+    <div class="card"><h3>💚 Поддержка</h3><div class="support-links"><a href="https://t.me/marketologdizayner" class="support-link"><span>✈️</span><div><b>Telegram</b><small>@marketologdizayner</small></div></a><a href="mailto:chatbotsmarketolog@gmail.com" class="support-link"><span>📧</span><div><b>Email</b><small>chatbotsmarketolog@gmail.com</small></div></a></div></div>
+  </div>
+</div>
+
+<script>
+const API=location.origin+'/api',token=localStorage.getItem('token'),isAdmin=localStorage.getItem('isAdmin')==='true';
+let activeChatId=null,pollInterval=null;
+if(!token)window.location.href='/index.html';
+if(isAdmin)document.getElementById('adminBtn').style.display='inline-block';
+
+function showSection(id){document.querySelectorAll('.section').forEach(e=>e.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='chats')loadChats();if(id==='sites')loadSites();if(id==='ai')loadAI();if(id==='admin')loadUsers();if(id==='profile')loadProfile();}
+
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+  if(window.event && window.event.target){window.event.target.classList.add('active');}
+  document.getElementById('tab-'+t).classList.add('active');
+}
+
+async function fetchAPI(url,method='GET',body=null){const r=await fetch(API+url,{method,headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):null});if(r.status===401)logout();return r.json();}
+
+async function loadChats(){
+    const c = await fetchAPI('/chats');
+    if(!c) return;
+    document.getElementById('chatList').innerHTML = c.length 
+        ? c.map(x => `<div class="chat-item ${x.id==activeChatId?'active':''}" onclick="openChat(${x.id},'${x.site}')">
+            <div class="chat-meta">
+                <div class="chat-title">${x.site}</div>
+                <div class="chat-status"><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'Онлайн':'Ожидание'}</span></div>
+            </div>
+            ${isAdmin ? `<button class="btn btn-red btn-sm" onclick="event.stopPropagation();deleteChat(${x.id})">🗑️</button>` : ''}
+        </div>`).join('')
+        : '<div class="empty-state">Нет диалогов</div>';
+}
+
+function showChatList(){document.getElementById('chatListPanel').classList.remove('hidden');document.getElementById('chatWindowPanel').classList.add('hidden');}
+function showChatWindow(){document.getElementById('chatListPanel').classList.add('hidden');document.getElementById('chatWindowPanel').classList.remove('hidden');}
+
+async function openChat(id, site){
+    activeChatId = id;
+    document.getElementById('chatTitle').textContent = site;
+    document.getElementById('msgInput').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    loadMessages();
+    if(pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(loadMessages, 3000);
+    showChatWindow();
+}
+
+async function loadMessages(){
+    if(!activeChatId) return;
+    const m = await fetchAPI(`/messages/${activeChatId}`);
+    if(!m) return;
+    
+    const chatTitle = document.getElementById('chatTitle').textContent;
+    
+    document.getElementById('chatMessages').innerHTML = m.map(x => {
+        const isFromAdmin = x.sender === 'admin';
+        const senderName = isFromAdmin ? 'Админ' : (isAdmin ? chatTitle : 'Я');
+        const msgClass = isFromAdmin ? 'msg-admin' : 'msg-user';
         
-        if u.is_admin:
-            chats = Chat.query.order_by(Chat.created_at.desc()).all()
-            result = []
-            for c in chats:
-                if c.user_id:
-                    target = User.query.get(c.user_id)
-                    chat_name = target.username if target else "Пользователь"
-                else:
-                    chat_name = "Пользователь"
-                result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
-            return jsonify(result)
-        else:
-            chats = Chat.query.filter_by(user_id=u.id).order_by(Chat.created_at.desc()).all()
-            return jsonify([{"id": c.id, "site": "Админ", "status": c.status, "time": c.created_at.isoformat()} for c in chats])
-            
-    except Exception as e:
-        print(f"Get chats error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify([]), 500
+        return `<div class="msg ${msgClass}">
+            <div class="msg-header">${senderName}</div>
+            <div class="msg-text">${x.text}</div>
+        </div>`;
+    }).join('');
+    
+    document.getElementById('chatMessages').scrollTop = 9999;
+}
 
-@app.route('/api/messages/<int:chat_id>', methods=['GET'])
-@token_required
-def get_messages(chat_id):
-    try:
-        msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
-        return jsonify([{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msgs])
-    except Exception as e:
-        print(f"Get messages error: {e}")
-        return jsonify([]), 500
+async function sendMessage(){
+    const t = document.getElementById('msgInput').value.trim();
+    if(!t || !activeChatId) return;
+    try {
+        await fetchAPI('/send', 'POST', {chat_id: activeChatId, text: t});
+        document.getElementById('msgInput').value = '';
+        loadMessages();
+        loadChats();
+    } catch(e) {
+        alert('❌ Ошибка отправки');
+    }
+}
 
-@app.route('/api/send', methods=['POST'])
-@token_required
-def send_message():
-    try:
-        d = request.json
-        if not request.current_user.is_admin:
-            return jsonify({"error": "Только админ может отправлять"}), 403
-        db.session.add(Message(chat_id=d['chat_id'], sender='admin', text=d['text']))
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Send error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+async function deleteChat(id){
+    if(!confirm('Удалить чат и всю переписку?')) return;
+    try {
+        await fetchAPI(`/chats/${id}/delete`, 'POST');
+        loadChats();
+        if(activeChatId === id) {
+            document.getElementById('chatListPanel').classList.remove('hidden');
+            document.getElementById('chatWindowPanel').classList.add('hidden');
+            activeChatId = null;
+        }
+    } catch(e) {
+        alert('❌ Ошибка удаления');
+    }
+}
 
-@app.route('/api/ai/setup', methods=['POST'])
-@token_required
-def setup_ai():
-    try:
-        d = request.json
-        ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
-        if ai:
-            ai.name = d.get('name', ai.name)
-            ai.behavior = d.get('behavior', ai.behavior)
-            ai.forbidden = d.get('forbidden', ai.forbidden)
-            ai.knowledge_base = d.get('knowledge_base', ai.knowledge_base)
-            ai.is_active_web = d.get('is_active_web', ai.is_active_web)
-            ai.is_active_telegram = d.get('is_active_telegram', ai.is_active_telegram)
-        else:
-            ai = AIManager(user_id=request.current_user.id, name=d.get('name','AI'), behavior=d.get('behavior',''), forbidden=d.get('forbidden',''), knowledge_base=d.get('knowledge_base',''), is_active_web=d.get('is_active_web',False), is_active_telegram=d.get('is_active_telegram',False))
-            db.session.add(ai)
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"AI setup error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/ai/get', methods=['GET'])
-@token_required
-def get_ai():
-    try:
-        ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
-        if ai:
-            return jsonify({"name": ai.name, "behavior": ai.behavior, "forbidden": ai.forbidden, "knowledge_base": ai.knowledge_base, "is_active_web": ai.is_active_web, "is_active_telegram": ai.is_active_telegram})
-        return jsonify({})
-    except Exception as e:
-        print(f"AI get error: {e}")
-        return jsonify({}), 500
-
-@app.route('/api/admin/users', methods=['GET'])
-@admin_required
-def admin_users():
-    try:
-        users = User.query.order_by(User.created_at.desc()).all()
-        return jsonify([{"id":u.id, "username":u.username, "created_at":u.created_at.isoformat(), "is_active":u.is_active, "is_admin":u.is_admin} for u in users])
-    except Exception as e:
-        print(f"Admin users error: {e}")
-        return jsonify([]), 500
-
-@app.route('/api/admin/toggle_user', methods=['POST'])
-@admin_required
-def toggle_user():
-    try:
-        user_id = request.json.get('user_id')
-        u = User.query.get(user_id)
-        if u and u.username != request.current_user.username:
-            u.is_active = not u.is_active
-            db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Toggle error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
-
-@app.route('/api/admin/send_to_user', methods=['POST'])
-@admin_required
-def admin_send_to_user():
-    try:
-        d = request.json
-        user_id = d.get('user_id')
-        text = d.get('text')
-        
-        if not user_id or not text:
-            return jsonify({"error": "user_id и text обязательны"}), 400
-        
-        # Создаём чат привязанный к пользователю
-        chat = Chat(user_id=user_id, status='waiting')
-        db.session.add(chat)
-        db.session.commit()
-        
-        # Добавляем сообщение от админа
-        db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
-        db.session.commit()
-        
-        return jsonify({"ok": True, "chat_id": chat.id})
-    except Exception as e:
-        print(f"Admin send error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/telegram/setup', methods=['POST'])
-@token_required
-def setup_tg():
-    try:
-        d = request.json
-        tb = TelegramBot.query.filter_by(user_id=request.current_user.id).first()
-        if tb: 
-            tb.bot_token = d.get('token')
-            tb.is_active = d.get('active', False)
-        else: 
-            tb = TelegramBot(user_id=request.current_user.id, bot_token=d.get('token'), is_active=d.get('active', False))
-            db.session.add(tb)
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Telegram error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/admin/save_chat_id', methods=['POST'])
-@admin_required
-def save_chat_id():
-    try:
-        user = request.current_user
-        user.telegram_chat_id = request.json.get('chat_id')
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Save chat ID error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/change_password', methods=['POST'])
-@token_required
-def change_password():
-    try:
-        user = request.current_user
-        p = request.json.get('password')
-        if not p or len(p) < 4: return jsonify({"error": "Минимум 4 символа"}), 400
-        user.password_hash = hash_pwd(p)
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Password error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
-
-with app.app_context():
-    db.create_all()
-    add_missing_columns()
-    admin = User.query.filter_by(username='Kristina').first()
-    if not admin:
-        admin = User(username='Kristina', is_admin=True)
-        db.session.add(admin)
-    admin.is_active = True
-    admin.password_hash = hash_pwd('zaqqaz')
-    db.session.commit()
-    print("✅ Admin Kristina: ACTIVE | Password: zaqqaz")
-
-@app.route('/', defaults={'path': 'index.html'})
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory(app.static_folder, path)
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+async function loadSites(){const s=await fetchAPI('/sites');if(!s)return;const el=document.getElementById('siteList');if(!s.length){el.innerHTML='<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}let html='<h3>Мои сайты</h3>',approved=null;s.forEach(x=>{if(x.status=='active'&&!approved)approved=x;html+=`<div class="site-item"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API:${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅':'⏳'} ${x.status=='active'?'Активен':'Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${x.id})">🗑️</button></div>`;});el.innerHTML=html;if(approved)document.getElementById('widgetCode').textContent=`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;}
+function addSite(){const u=document.getElementById('siteUrl').value.trim();if(!u)return;fetchAPI('/sites','POST',{url:u}).then(()=>{document.getElementById('siteUrl').value='';loadSites();alert('✅ Добавлен!');});}
+async function deleteSite(id){if(!confirm('Удалить сайт?'))return;try{const r=await fetch(API+`/sites/${id}/delete`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});const data=await r.json().catch(()=>({error:'Ошибка'}));if(r.ok){loadSites();alert('✅ Удален!');}else{alert('❌ '+(data.error||'Ошибка'));}}catch(e){alert('❌ Ошибка соединения');}}
+function copyCode(){const c=document.getElementById('widgetCode').textContent;if(c.includes('После'))return alert('ℹ️ После одобрения');navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));}
+async function loadAI(){const ai=await fetchAPI('/ai/get');if(!ai)return;document.getElementById('aiName').value=ai.name||'';document.getElementById('aiBehavior').value=ai.behavior||'';document.getElementById('aiKnowledge').value=ai.knowledge_base||'';document.getElementById('aiWebToggle').checked=ai.is_active_web||false;}
+function saveAI(){fetchAPI('/ai/setup','POST',{name:document.getElementById('aiName').value,behavior:document.getElementById('aiBehavior').value,knowledge_base:document.getElementById('aiKnowledge').value,is_active_web:document.getElementById('aiWebToggle').checked}).then(()=>alert('✅ Сохранено!'));}
+function saveTG(){const t=document.getElementById('tgToken').value.trim(),c=document.getElementById('tgChatId').value.trim();if(!t||!c)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>alert('✅ Telegram настроен!')));}
+function handleFiles(files){for(let f of files){if(f.type!=='application/pdf')return alert('❌ Только PDF');if(f.size>10*1024*1024)return alert('❌ Макс 10МБ');if(uploadedFiles.length>=10)return alert('❌ Макс 10 файлов');uploadedFiles.push(f);uploadedFileNames.push(f.name);}renderFileList();}
+function renderFileList(){const el=document.getElementById('fileList');if(!el)return;el.innerHTML=uploadedFileNames.map((n,i)=>`<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin:6px 0;font-size:0.85rem"><span>${n}</span><span onclick="removeFile(${i})" style="color:var(--danger);cursor:pointer">×</span></div>`).join('');}
+function removeFile(i){uploadedFiles.splice(i,1);uploadedFileNames.splice(i,1);renderFileList();}
+async function loadUsers(){const u=await fetchAPI('/admin/users');if(!u)return;document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join('');document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':''}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join('');}
+function toggleUser(id){fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers);}
+function sendAdminMsg(){const u=document.getElementById('targetUser').value;const t=document.getElementById('adminMsg').value.trim();if(!u||!t)return alert('❌ Выберите пользователя и введите текст');fetchAPI('/admin/send_to_user','POST',{user_id:parseInt(u),text:t}).then(result=>{if(result&&result.ok){alert('✅ Сообщение отправлено!');document.getElementById('adminMsg').value='';loadChats();}else{alert('❌ Ошибка: '+(result?result.error:'Неизвестная'));}}).catch(error=>{console.error('Error:',error);alert('❌ Ошибка отправки');});}
+async function loadProfile(){document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...';}
+function changePassword(){const p=document.getElementById('newPassword').value;if(p.length<4)return alert('❌ Мин. 4');fetchAPI('/change_password','POST',{password:p}).then(()=>{alert('✅ Готово');document.getElementById('newPassword').value='';});}
+function saveProfileTG(){const c=document.getElementById('profileTgChatId').value.trim(),t=document.getElementById('profileTgToken').value.trim();if(!c||!t)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>{alert('✅ Сохранено!');loadProfile();}));}
+function logout(){localStorage.clear();window.location.href='/index.html';}
+document.getElementById('msgInput').onkeypress=e=>{if(e.key==='Enter')sendMessage();};
+loadProfile();showSection('chats');
+</script>
+</body>
+</html>
