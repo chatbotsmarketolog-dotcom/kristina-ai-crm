@@ -15,6 +15,20 @@ db = SQLAlchemy(app)
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
+BOT_TOKEN = "8694190622:AAEVveNpF60fGx8wMl5ViJWawsdWAOqk9Yk"
+
+def send_telegram_notification(chat_id, text):
+    """Отправка уведомления в Telegram"""
+    if not chat_id:
+        return
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+        )
+    except Exception as e:
+        print(f"Telegram notification error: {e}")
+
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
@@ -171,23 +185,94 @@ def add_site():
         site = Website(url=url, api_key=key, owner_id=request.current_user.id, status='pending')
         db.session.add(site)
         db.session.commit()
+        
+        # Уведомляем админа о новом сайте
+        admin = User.query.filter_by(is_admin=True).first()
+        if admin and admin.telegram_chat_id:
+            send_telegram_notification(
+                admin.telegram_chat_id,
+                f"🔔 <b>Новый сайт на модерации!</b>\n\n"
+                f"👤 Владелец: {request.current_user.username}\n"
+                f"🔗 Сайт: {url}\n\n"
+                f"Зайдите в админ-панель для одобрения."
+            )
+        
         return jsonify({"ok": True, "id": site.id})
     except Exception as e:
         print(f"Add site error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/sites/pending', methods=['GET'])
+@admin_required
+def get_pending_sites():
+    try:
+        sites = Website.query.filter_by(status='pending', is_deleted=False).all()
+        result = []
+        for site in sites:
+            owner = User.query.get(site.owner_id)
+            result.append({
+                "id": site.id,
+                "url": site.url,
+                "api_key": site.api_key,
+                "owner": owner.username if owner else "Unknown",
+                "owner_id": site.owner_id,
+                "created_at": site.created_at.isoformat()
+            })
+        return jsonify(result)
+    except Exception as e:
+        print(f"Get pending sites error: {e}")
+        return jsonify([]), 500
+
 @app.route('/api/sites/<int:site_id>/approve', methods=['POST'])
 @admin_required
-def approve_site():
+def approve_site_endpoint(site_id):
     try:
         site = Website.query.get(site_id)
-        if site and not site.is_deleted:
-            site.status = 'active'
-            db.session.commit()
+        if not site:
+            return jsonify({"error": "Сайт не найден"}), 404
+        
+        site.status = 'active'
+        db.session.commit()
+        
+        # Уведомляем владельца
+        owner = User.query.get(site.owner_id)
+        if owner:
+            if owner.telegram_chat_id:
+                send_telegram_notification(
+                    owner.telegram_chat_id,
+                    f"✅ <b>Ваш сайт одобрен!</b>\n\n"
+                    f"🔗 {site.url}\n\n"
+                    f"Теперь вы можете использовать виджет КРИСТИНА.AI CRM"
+                )
+        
+        # Уведомляем админа
+        admin = User.query.filter_by(is_admin=True).first()
+        if admin and admin.telegram_chat_id:
+            send_telegram_notification(
+                admin.telegram_chat_id,
+                f"✅ Сайт одобрен: {site.url}\nВладелец: {owner.username if owner else 'Unknown'}"
+            )
+        
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Approve error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sites/<int:site_id>/reject', methods=['POST'])
+@admin_required
+def reject_site(site_id):
+    try:
+        site = Website.query.get(site_id)
+        if not site:
+            return jsonify({"error": "Сайт не найден"}), 404
+        
+        db.session.delete(site)
+        db.session.commit()
+        
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Reject error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/sites/<int:site_id>/delete', methods=['POST'])
 @token_required
@@ -211,13 +296,10 @@ def delete_site(site_id):
 def get_chats():
     try:
         u = request.current_user
-        
         if u.is_admin:
-            # Админ видит все чаты
             chats = Chat.query.order_by(Chat.created_at.desc()).all()
             result = []
             for c in chats:
-                # Безопасно получаем имя пользователя
                 if hasattr(c, 'user_id') and c.user_id:
                     target = User.query.get(c.user_id)
                     chat_name = target.username if target else "Пользователь"
@@ -226,10 +308,8 @@ def get_chats():
                 result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
             return jsonify(result)
         else:
-            # Пользователь видит только свои чаты
             chats = Chat.query.filter_by(user_id=u.id).order_by(Chat.created_at.desc()).all() if hasattr(Chat, 'user_id') else []
             return jsonify([{"id": c.id, "site": "Админ", "status": c.status, "time": c.created_at.isoformat()} for c in chats])
-            
     except Exception as e:
         print(f"Get chats error: {e}")
         import traceback
@@ -267,11 +347,39 @@ def send_message():
     try:
         d = request.json
         sender = 'admin' if request.current_user.is_admin else 'user'
+        
+        # Добавляем сообщение
         db.session.add(Message(chat_id=d['chat_id'], sender=sender, text=d['text']))
         db.session.commit()
+        
+        # Отправляем уведомление в Telegram
+        chat = Chat.query.get(d['chat_id'])
+        if chat and chat.user_id:
+            if sender == 'admin':
+                # Админ пишет → уведомляем пользователя
+                user = User.query.get(chat.user_id)
+                if user and user.telegram_chat_id:
+                    send_telegram_notification(
+                        user.telegram_chat_id,
+                        f"💬 <b>Новое сообщение от админа!</b>\n\n"
+                        f"{d['text'][:100]}..." if len(d['text']) > 100 else d['text']
+                    )
+            else:
+                # Пользователь пишет → уведомляем админа
+                admin = User.query.filter_by(is_admin=True).first()
+                if admin and admin.telegram_chat_id:
+                    user = User.query.get(chat.user_id)
+                    send_telegram_notification(
+                        admin.telegram_chat_id,
+                        f"💬 <b>Ответ от {user.username if user else 'Пользователя'}</b>\n\n"
+                        f"{d['text'][:100]}..." if len(d['text']) > 100 else d['text']
+                    )
+        
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Send error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/ai/setup', methods=['POST'])
@@ -348,6 +456,16 @@ def admin_send_to_user():
         db.session.commit()
         db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
         db.session.commit()
+        
+        # Уведомляем пользователя в Telegram
+        user = User.query.get(user_id)
+        if user and user.telegram_chat_id:
+            send_telegram_notification(
+                user.telegram_chat_id,
+                f"💬 <b>Новое сообщение от админа!</b>\n\n"
+                f"{text[:100]}..." if len(text) > 100 else text
+            )
+        
         return jsonify({"ok": True, "chat_id": chat.id})
     except Exception as e:
         print(f"Admin send error: {e}")
