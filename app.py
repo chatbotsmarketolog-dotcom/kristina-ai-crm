@@ -1,6 +1,3 @@
-Вот полный код `app.py` с исправленной функцией `get_chats`. Копируй и вставляй полностью:
-
-```python
 import os, json, uuid, hashlib, datetime, secrets, requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -43,7 +40,7 @@ class Website(db.Model):
 class Chat(db.Model):
     __tablename__ = 'chat'
     id = db.Column(db.Integer, primary_key=True)
-    website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)  # ← ИЗМЕНЕНО: добавлено nullable=True
+    website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)
     visitor_id = db.Column(db.String(50))
     status = db.Column(db.String(20), default='waiting')
     operator_id = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -419,4 +416,3 @@ def serve_static(path):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=True)
-```
