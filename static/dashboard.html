@@ -22,7 +22,6 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .section{display:none}
 .section.active{display:block}
 
-/* МОБИЛЬНАЯ АДАПТАЦИЯ */
 @media(max-width:768px){
   .header{padding:10px}
   .header h2{font-size:0.9rem;width:100%;order:1;margin-bottom:10px}
@@ -169,11 +168,9 @@ async function loadChats(){
     const c = await fetchAPI('/chats');
     if(!c) return;
     
-    const isAdminUser = localStorage.getItem('isAdmin') === 'true';
-    
     document.getElementById('chatList').innerHTML = c.length 
         ? c.map(x => {
-            const chatName = isAdminUser 
+            const chatName = isAdmin 
                 ? (x.site === "Сообщение от админа" ? "Пользователь" : x.site)
                 : "Сообщение от админа";
             
@@ -215,14 +212,12 @@ async function loadMessages(){
     const m = await fetchAPI(`/messages/${activeChatId}`);
     if(!m) return;
     
-    const isAdminUser = localStorage.getItem('isAdmin') === 'true';
-    
     document.getElementById('chatMessages').innerHTML = m.map(x => {
         let msgClass = '';
         if (x.sender === 'admin') {
-            msgClass = isAdminUser ? 'operator' : 'visitor';
+            msgClass = isAdmin ? 'operator' : 'visitor';
         } else {
-            msgClass = isAdminUser ? 'visitor' : 'operator';
+            msgClass = isAdmin ? 'visitor' : 'operator';
         }
         
         return `<div class="msg ${msgClass}">${x.text}</div>`;
