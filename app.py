@@ -185,7 +185,7 @@ def approve_site():
 
 @app.route('/api/sites/<int:site_id>/delete', methods=['POST'])
 @token_required
-def delete_site():
+def delete_site(site_id):
     try:
         site = Website.query.get(site_id)
         
@@ -199,7 +199,8 @@ def delete_site():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Delete error: {e}")
-        # Возвращаем текст ошибки, чтобы было понятно, что сломалось
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/chats', methods=['GET'])
@@ -296,30 +297,24 @@ def toggle_user():
 @app.route('/api/admin/send_to_user', methods=['POST'])
 @admin_required
 def admin_send_to_user():
-    """ОТПРАВКА СООБЩЕНИЯ ПОЛЬЗОВАТЕЛЮ - СОЗДАЁТ ЧАТ"""
     try:
         d = request.json
         user_id = d.get('user_id')
         text = d.get('text')
-        
         if not user_id or not text:
             return jsonify({"error": "user_id и text обязательны"}), 400
         
-        # Находим сайты пользователя
         user_sites = Website.query.filter_by(owner_id=user_id, is_deleted=False).all()
         if not user_sites:
             return jsonify({"error": "У пользователя нет сайтов"}), 404
         
-        # Создаём чат для первого сайта
         site = user_sites[0]
         chat = Chat(website_id=site.id, visitor_id=f"admin_{uuid.uuid4().hex[:8]}", status='waiting', operator_id=None)
         db.session.add(chat)
         db.session.commit()
         
-        # Добавляем сообщение
         db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
         db.session.commit()
-        
         return jsonify({"ok": True, "chat_id": chat.id})
     except Exception as e:
         print(f"Admin send error: {e}")
