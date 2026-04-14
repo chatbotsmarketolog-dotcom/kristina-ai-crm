@@ -1,3 +1,6 @@
+Вот полный код `app.py` с исправленной функцией `get_chats`. Копируй и вставляй полностью:
+
+```python
 import os, json, uuid, hashlib, datetime, secrets, requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -208,8 +211,33 @@ def delete_site(site_id):
 def get_chats():
     try:
         u = request.current_user
-        chats = Chat.query.join(Website).filter(Website.owner_id==u.id, Website.is_deleted==False).order_by(Chat.created_at.desc()).all()
-        return jsonify([{"id":c.id, "site":Website.query.get(c.website_id).url if Website.query.get(c.website_id) else "Unknown", "status":c.status, "time":c.created_at.isoformat()} for c in chats])
+        
+        if u.is_admin:
+            # Админ видит ВСЕ чаты в системе
+            chats = Chat.query.order_by(Chat.created_at.desc()).all()
+        else:
+            # Пользователь видит ТОЛЬКО свои чаты:
+            # 1. Привязанные к его сайтам
+            # 2. Личные сообщения от админа (где website_id=None, но visitor_id начинается с "admin_" и чат создан для него)
+            user_site_ids = [s.id for s in Website.query.filter_by(owner_id=u.id, is_deleted=False).all()]
+            chats = Chat.query.filter(
+                db.or_(
+                    Chat.website_id.in_(user_site_ids) if user_site_ids else db.false(),
+                    db.and_(Chat.website_id == None, Chat.visitor_id.like(f"admin_%"))
+                )
+            ).order_by(Chat.created_at.desc()).all()
+        
+        result = []
+        for c in chats:
+            site = Website.query.get(c.website_id) if c.website_id else None
+            result.append({
+                "id": c.id,
+                "site": site.url if site else "Сообщение от админа",
+                "status": c.status,
+                "time": c.created_at.isoformat()
+            })
+        
+        return jsonify(result)
     except Exception as e:
         print(f"Get chats error: {e}")
         return jsonify([]), 500
@@ -391,3 +419,4 @@ def serve_static(path):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=True)
+```
