@@ -172,7 +172,30 @@ function sendMessage(){const t=document.getElementById('msgInput').value.trim();
 
 async function loadSites(){const s=await fetchAPI('/sites');if(!s)return;const el=document.getElementById('siteList');if(!s.length){el.innerHTML='<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}let html='<h3>Мои сайты</h3>',approved=null;s.forEach(x=>{if(x.status=='active'&&!approved)approved=x;html+=`<div class="site-item"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API:${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅':'⏳'} ${x.status=='active'?'Активен':'Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${x.id})">🗑️</button></div>`;});el.innerHTML=html;if(approved)document.getElementById('widgetCode').textContent=`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;}
 function addSite(){const u=document.getElementById('siteUrl').value.trim();if(!u)return;fetchAPI('/sites','POST',{url:u}).then(()=>{document.getElementById('siteUrl').value='';loadSites();alert('✅ Добавлен!');});}
-function deleteSite(id){if(!confirm('Удалить?'))return;fetchAPI(`/sites/${id}/delete`,'POST').then(()=>loadSites());}
+
+async function deleteSite(id){
+    if(!confirm('Удалить сайт?')) return;
+    try {
+        // Используем прямой fetch, чтобы контролировать ответ
+        const r = await fetch(API + `/sites/${id}/delete`, {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'}
+        });
+        
+        // Пытаемся прочитать JSON, если сервер вернул ошибку (HTML) - не падаем
+        const data = await r.json().catch(() => ({error: 'Ошибка сервера'}));
+
+        if (r.ok) {
+            loadSites();
+            alert('✅ Сайт удален!');
+        } else {
+            alert('❌ ' + (data.error || 'Не удалось удалить'));
+        }
+    } catch (e) {
+        alert('❌ Ошибка соединения');
+    }
+}
+
 function copyCode(){const c=document.getElementById('widgetCode').textContent;if(c.includes('После'))return alert('ℹ️ После одобрения');navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));}
 
 async function loadAI(){const ai=await fetchAPI('/ai/get');if(!ai)return;document.getElementById('aiName').value=ai.name||'';document.getElementById('aiBehavior').value=ai.behavior||'';document.getElementById('aiKnowledge').value=ai.knowledge_base||'';document.getElementById('aiWebToggle').checked=ai.is_active_web||false;}
