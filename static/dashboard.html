@@ -213,12 +213,12 @@ function sendAdminMsg(){
     const t = document.getElementById('adminMsg').value.trim();
     if(!u || !t) return alert('❌ Выберите пользователя и введите текст');
     
-    fetchAPI('/api/admin/send_to_user', 'POST', {user_id: parseInt(u), text: t})
+    fetchAPI('/admin/send_to_user', 'POST', {user_id: parseInt(u), text: t})
         .then(result => {
             if(result && result.ok) {
                 alert('✅ Сообщение отправлено!');
                 document.getElementById('adminMsg').value = '';
-                loadChats(); // Обновить чаты
+                loadChats();
             } else {
                 alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
             }
