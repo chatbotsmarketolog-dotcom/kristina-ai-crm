@@ -22,6 +22,7 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .section{display:none}
 .section.active{display:block}
 
+/* МОБИЛЬНАЯ АДАПТАЦИЯ */
 @media(max-width:768px){
   .header{padding:10px}
   .header h2{font-size:0.9rem;width:100%;order:1;margin-bottom:10px}
@@ -43,12 +44,15 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 
 .chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column;height:100%}
 .chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600}
-.chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:8px}
 .chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px}
 .chat-input input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
-.msg{max-width:80%;padding:12px 16px;border-radius:12px}
-.msg.visitor{background:#1e3a8a;color:#dbeafe;align-self:flex-start}
-.msg.operator{background:rgba(59,130,246,0.25);color:var(--text);align-self:flex-end}
+
+/* НОВЫЙ СТИЛЬ СООБЩЕНИЙ (КАК В TELEGRAM) */
+.msg{max-width:85%;padding:10px 14px;border-radius:12px;align-self:flex-start;background:#1e3a8a;color:#dbeafe;margin:4px 0}
+.msg-header{font-size:0.75rem;color:#93c5fd;margin-bottom:4px;font-weight:600}
+.msg-text{line-height:1.4}
+
 .empty-state{text-align:center;padding:40px;opacity:0.6}
 
 .card{background:var(--panel);border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.08)}
@@ -170,10 +174,8 @@ async function loadChats(){
     
     document.getElementById('chatList').innerHTML = c.length 
         ? c.map(x => {
-            const chatName = isAdmin 
-                ? (x.site === "Сообщение от админа" ? "Пользователь" : x.site)
-                : "Сообщение от админа";
-            
+            // Название чата = логин пользователя (берём из поля site, т.к. там теперь хранится логин для прямых сообщений)
+            const chatName = x.site || "Пользователь";
             return `<div class="chat-item ${x.id==activeChatId?'active':''}" onclick="openChat(${x.id},'${chatName}')">
                 <div class="chat-meta">
                     <span>${chatName}</span>
@@ -212,22 +214,15 @@ async function loadMessages(){
     const m = await fetchAPI(`/messages/${activeChatId}`);
     if(!m) return;
     
-    // Определяем кто мы: админ или пользователь
-    const iAmAdmin = localStorage.getItem('isAdmin') === 'true';
+    const chatPartner = document.getElementById('chatTitle').textContent;
     
     document.getElementById('chatMessages').innerHTML = m.map(x => {
-        // Простая логика:
-        // - Если sender='admin' И я админ → это МОЁ (справа)
-        // - Если sender='admin' И я НЕ админ → это ЧУЖОЕ (слева)
-        // - Если sender='operator' И я админ → это ЧУЖОЕ (слева)
-        // - Если sender='operator' И я НЕ админ → это МОЁ (справа)
-        
-        const isMyMessage = (x.sender === 'admin' && iAmAdmin) || 
-                           (x.sender === 'operator' && !iAmAdmin);
-        
-        const msgClass = isMyMessage ? 'operator' : 'visitor';
-        
-        return `<div class="msg ${msgClass}">${x.text}</div>`;
+        const senderName = x.sender === 'admin' ? 'Админ' : chatPartner;
+        return `
+        <div class="msg">
+            <div class="msg-header">${senderName}</div>
+            <div class="msg-text">${x.text}</div>
+        </div>`;
     }).join('');
     
     document.getElementById('chatMessages').scrollTop = 9999;
