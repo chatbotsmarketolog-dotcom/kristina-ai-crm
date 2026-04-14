@@ -165,9 +165,71 @@ function switchTab(t){
 
 async function fetchAPI(url,method='GET',body=null){const r=await fetch(API+url,{method,headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):null});if(r.status===401)logout();return r.json();}
 
-async function loadChats(){const c=await fetchAPI('/chats');if(!c)return;document.getElementById('chatList').innerHTML=c.length?c.map(x=>`<div class="chat-item ${x.id==activeChatId?'active':''}" onclick="openChat(${x.id},'${x.site}')"><div class="chat-meta"><span>${x.site}</span><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'Онлайн':'Ожидание'}</span></div></div>`).join(''):'<div class="empty-state">Нет диалогов</div>';}
-async function openChat(id,site){activeChatId=id;document.getElementById('chatTitle').textContent=site;document.getElementById('msgInput').disabled=false;document.getElementById('sendBtn').disabled=false;loadMessages();if(pollInterval)clearInterval(pollInterval);pollInterval=setInterval(loadMessages,3000);}
-async function loadMessages(){if(!activeChatId)return;const m=await fetchAPI(`/messages/${activeChatId}`);if(!m)return;document.getElementById('chatMessages').innerHTML=m.map(x=>`<div class="msg ${x.sender}">${x.text}</div>`).join('');document.getElementById('chatMessages').scrollTop=9999;}
+async function loadChats(){
+    const c = await fetchAPI('/chats');
+    if(!c) return;
+    
+    const isAdminUser = localStorage.getItem('isAdmin') === 'true';
+    
+    document.getElementById('chatList').innerHTML = c.length 
+        ? c.map(x => {
+            // Для админа показываем имя пользователя или "Без сайта"
+            // Для пользователя показываем "Сообщение от админа"
+            const chatName = isAdminUser 
+                ? (x.site === "Сообщение от админа" ? "Пользователь" : x.site)
+                : "Сообщение от админа";
+            
+            return `<div class="chat-item ${x.id==activeChatId?'active':''}" onclick="openChat(${x.id},'${chatName}')">
+                <div class="chat-meta">
+                    <span>${chatName}</span>
+                    <span class="status ${x.status=='active'?'status-active':'status-pending'}">
+                        ${x.status=='active'?'Онлайн':'Ожидание'}
+                    </span>
+                </div>
+            </div>`;
+        }).join('')
+        : '<div class="empty-state">Нет диалогов</div>';
+}
+
+async function openChat(id, site){
+    activeChatId = id;
+    document.getElementById('chatTitle').textContent = site;
+    document.getElementById('msgInput').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    loadMessages();
+    if(pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(loadMessages, 3000);
+    showChatWindow();
+}
+
+async function loadMessages(){
+    if(!activeChatId) return;
+    const m = await fetchAPI(`/messages/${activeChatId}`);
+    if(!m) return;
+    
+    // Определяем, кто текущий пользователь
+    const currentUsername = localStorage.getItem('username') || '';
+    const isAdminUser = localStorage.getItem('isAdmin') === 'true';
+    
+    document.getElementById('chatMessages').innerHTML = m.map(x => {
+        // Если сообщение от админа И мы админ → это МОЁ сообщение (справа)
+        // Если сообщение от админа И мы НЕ админ → это ВХОДЯЩЕЕ (слева)
+        // Если сообщение от оператора И мы админ → это ВХОДЯЩЕЕ (слева)
+        // Если сообщение от оператора И мы НЕ админ → это МОЁ сообщение (справа)
+        
+        let msgClass = '';
+        if (x.sender === 'admin') {
+            msgClass = isAdminUser ? 'operator' : 'visitor';
+        } else {
+            msgClass = isAdminUser ? 'visitor' : 'operator';
+        }
+        
+        return `<div class="msg ${msgClass}">${x.text}</div>`;
+    }).join('');
+    
+    document.getElementById('chatMessages').scrollTop = 9999;
+}
+
 function sendMessage(){const t=document.getElementById('msgInput').value.trim();if(!t||!activeChatId)return;fetchAPI('/send','POST',{chat_id:activeChatId,text:t,sender:'operator'}).then(()=>{document.getElementById('msgInput').value='';loadMessages();loadChats();});}
 
 async function loadSites(){const s=await fetchAPI('/sites');if(!s)return;const el=document.getElementById('siteList');if(!s.length){el.innerHTML='<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}let html='<h3>Мои сайты</h3>',approved=null;s.forEach(x=>{if(x.status=='active'&&!approved)approved=x;html+=`<div class="site-item"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API:${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅':'⏳'} ${x.status=='active'?'Активен':'Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${x.id})">🗑️</button></div>`;});el.innerHTML=html;if(approved)document.getElementById('widgetCode').textContent=`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;}
