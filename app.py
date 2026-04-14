@@ -41,16 +41,15 @@ class Chat(db.Model):
     __tablename__ = 'chat'
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)
-    visitor_id = db.Column(db.String(50))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))  # ← НОВОЕ: привязка к пользователю
     status = db.Column(db.String(20), default='waiting')
-    operator_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 class Message(db.Model):
     __tablename__ = 'message'
     id = db.Column(db.Integer, primary_key=True)
     chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'))
-    sender = db.Column(db.String(20))
+    sender = db.Column(db.String(20))  # 'admin' или 'user'
     text = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -108,6 +107,8 @@ def add_missing_columns():
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_web BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
+            # Добавляем user_id в chat если нет
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES "user"(id)'))
             db.session.commit()
         except Exception as e:
             print(f"Migration error: {e}")
@@ -207,37 +208,22 @@ def get_chats():
         u = request.current_user
         
         if u.is_admin:
+            # Админ видит все чаты, показываем логин пользователя
             chats = Chat.query.order_by(Chat.created_at.desc()).all()
-        else:
-            user_site_ids = [s.id for s in Website.query.filter_by(owner_id=u.id, is_deleted=False).all()]
-            chats = Chat.query.filter(
-                db.or_(
-                    Chat.website_id.in_(user_site_ids) if user_site_ids else db.false(),
-                    db.and_(Chat.website_id == None, Chat.visitor_id.like(f"user_{u.id}"))
-                )
-            ).order_by(Chat.created_at.desc()).all()
-        
-        result = []
-        for c in chats:
-            if c.website_id:
-                site = Website.query.get(c.website_id)
-                site_name = site.url if site else "Unknown"
-            else:
-                if c.visitor_id and c.visitor_id.startswith("user_"):
-                    target_user_id = c.visitor_id.replace("user_", "")
-                    target_user = User.query.get(int(target_user_id))
-                    site_name = target_user.username if target_user else "Пользователь"
+            result = []
+            for c in chats:
+                if c.user_id:
+                    target = User.query.get(c.user_id)
+                    chat_name = target.username if target else "Пользователь"
                 else:
-                    site_name = "Пользователь"
+                    chat_name = "Пользователь"
+                result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
+            return jsonify(result)
+        else:
+            # Пользователь видит только свои чаты с админом
+            chats = Chat.query.filter_by(user_id=u.id).order_by(Chat.created_at.desc()).all()
+            return jsonify([{"id": c.id, "site": "Админ", "status": c.status, "time": c.created_at.isoformat()} for c in chats])
             
-            result.append({
-                "id": c.id,
-                "site": site_name,
-                "status": c.status,
-                "time": c.created_at.isoformat()
-            })
-        
-        return jsonify(result)
     except Exception as e:
         print(f"Get chats error: {e}")
         return jsonify([]), 500
@@ -257,7 +243,10 @@ def get_messages(chat_id):
 def send_message():
     try:
         d = request.json
-        db.session.add(Message(chat_id=d['chat_id'], sender=d.get('sender','operator'), text=d['text']))
+        # Разрешаем отправку только админу
+        if not request.current_user.is_admin:
+            return jsonify({"error": "Только админ может отправлять"}), 403
+        db.session.add(Message(chat_id=d['chat_id'], sender='admin', text=d['text']))
         db.session.commit()
         return jsonify({"ok": True})
     except Exception as e:
@@ -333,13 +322,12 @@ def admin_send_to_user():
         if not user_id or not text:
             return jsonify({"error": "user_id и text обязательны"}), 400
         
-        user_sites = Website.query.filter_by(owner_id=user_id, is_deleted=False).all()
-        website_id = user_sites[0].id if user_sites else None
-        
-        chat = Chat(website_id=website_id, visitor_id=f"user_{user_id}", status='waiting', operator_id=None)
+        # Создаём чат привязанный к пользователю
+        chat = Chat(user_id=user_id, status='waiting')
         db.session.add(chat)
         db.session.commit()
         
+        # Добавляем сообщение от админа
         db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
         db.session.commit()
         
