@@ -207,7 +207,27 @@ function removeFile(i){uploadedFiles.splice(i,1);uploadedFileNames.splice(i,1);r
 
 async function loadUsers(){const u=await fetchAPI('/admin/users');if(!u)return;document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join('');document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':''}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join('');}
 function toggleUser(id){fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers);}
-function sendAdminMsg(){const u=document.getElementById('targetUser').value,t=document.getElementById('adminMsg').value.trim();if(!u||!t)return alert('❌ Выберите и введите');fetchAPI('/admin/send_to_user','POST',{user_id:parseInt(u),text:t}).then(()=>{alert('✅ Отправлено!');document.getElementById('adminMsg').value='';loadChats();});}
+
+function sendAdminMsg(){
+    const u = document.getElementById('targetUser').value;
+    const t = document.getElementById('adminMsg').value.trim();
+    if(!u || !t) return alert('❌ Выберите пользователя и введите текст');
+    
+    fetchAPI('/api/admin/send_to_user', 'POST', {user_id: parseInt(u), text: t})
+        .then(result => {
+            if(result && result.ok) {
+                alert('✅ Сообщение отправлено!');
+                document.getElementById('adminMsg').value = '';
+                loadChats(); // Обновить чаты
+            } else {
+                alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Ошибка отправки');
+        });
+}
 
 async function loadProfile(){document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...';}
 function changePassword(){const p=document.getElementById('newPassword').value;if(p.length<4)return alert('❌ Мин. 4');fetchAPI('/change_password','POST',{password:p}).then(()=>{alert('✅ Готово');document.getElementById('newPassword').value='';});}
