@@ -173,8 +173,6 @@ async function loadChats(){
     
     document.getElementById('chatList').innerHTML = c.length 
         ? c.map(x => {
-            // Для админа показываем имя пользователя или "Без сайта"
-            // Для пользователя показываем "Сообщение от админа"
             const chatName = isAdminUser 
                 ? (x.site === "Сообщение от админа" ? "Пользователь" : x.site)
                 : "Сообщение от админа";
@@ -208,14 +206,16 @@ async function loadMessages(){
     if(!m) return;
     
     // Определяем, кто текущий пользователь
-    const currentUsername = localStorage.getItem('username') || '';
     const isAdminUser = localStorage.getItem('isAdmin') === 'true';
     
     document.getElementById('chatMessages').innerHTML = m.map(x => {
-        // Если сообщение от админа И мы админ → это МОЁ сообщение (справа)
-        // Если сообщение от админа И мы НЕ админ → это ВХОДЯЩЕЕ (слева)
-        // Если сообщение от оператора И мы админ → это ВХОДЯЩЕЕ (слева)
-        // Если сообщение от оператора И мы НЕ админ → это МОЁ сообщение (справа)
+        // Логика отображения:
+        // Если я АДМИН:
+        //   - сообщения от 'admin' → это МОИ (справа, класс operator)
+        //   - сообщения от 'operator' → это ЧУЖИЕ (слева, класс visitor)
+        // Если я ПОЛЬЗОВАТЕЛЬ:
+        //   - сообщения от 'admin' → это ЧУЖИЕ (слева, класс visitor)
+        //   - сообщения от 'operator' → это МОИ (справа, класс operator)
         
         let msgClass = '';
         if (x.sender === 'admin') {
@@ -238,15 +238,11 @@ function addSite(){const u=document.getElementById('siteUrl').value.trim();if(!u
 async function deleteSite(id){
     if(!confirm('Удалить сайт?')) return;
     try {
-        // Используем прямой fetch, чтобы контролировать ответ
         const r = await fetch(API + `/sites/${id}/delete`, {
             method: 'POST',
             headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'}
         });
-        
-        // Пытаемся прочитать JSON, если сервер вернул ошибку (HTML) - не падаем
         const data = await r.json().catch(() => ({error: 'Ошибка сервера'}));
-
         if (r.ok) {
             loadSites();
             alert('✅ Сайт удален!');
