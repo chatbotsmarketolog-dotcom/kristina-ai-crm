@@ -133,6 +133,18 @@ def add_missing_columns():
             print(f"Migration error: {e}")
             db.session.rollback()
 
+@app.route('/api/admin/clear_deleted_sites', methods=['POST'])
+@admin_required
+def clear_deleted_sites():
+    """Полностью удалить все удалённые сайты"""
+    try:
+        # Удаляем все сайты с is_deleted=True
+        deleted_count = Website.query.filter_by(is_deleted=True).delete()
+        db.session.commit()
+        return jsonify({"ok": True, "deleted": deleted_count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/login', methods=['POST'])
 def login():
     try:
@@ -181,6 +193,15 @@ def add_site():
     try:
         url = request.json.get('url')
         if not url: return jsonify({"error": "URL обязателен"}), 400
+        
+        # Проверяем, существует ли уже такой сайт
+        existing_site = Website.query.filter_by(url=url).first()
+        if existing_site:
+            if existing_site.owner_id == request.current_user.id:
+                return jsonify({"error": "Этот сайт уже добавлен", "id": existing_site.id}), 400
+            else:
+                return jsonify({"error": "Этот сайт уже добавлен другим пользователем"}), 400
+        
         key = f"site_{uuid.uuid4().hex[:8]}"
         site = Website(url=url, api_key=key, owner_id=request.current_user.id, status='pending')
         db.session.add(site)
@@ -200,6 +221,8 @@ def add_site():
         return jsonify({"ok": True, "id": site.id})
     except Exception as e:
         print(f"Add site error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/sites/pending', methods=['GET'])
