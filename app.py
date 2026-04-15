@@ -67,6 +67,7 @@ class Chat(db.Model):
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     visitor_name = db.Column(db.String(100))
+    form_requested = db.Column(db.Boolean, default=False)  # ← НОВОЕ: была ли отправлена форма заявки
     status = db.Column(db.String(20), default='waiting')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -167,6 +168,7 @@ def add_missing_columns():
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS forbidden TEXT'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS humanity_level INTEGER DEFAULT 3'))
             db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
             try:
                 db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
                 db.session.execute(text('CREATE TABLE IF NOT EXISTS aiwebsite (id SERIAL PRIMARY KEY, agent_id INTEGER REFERENCES aimanager(id), website_id INTEGER REFERENCES website(id), is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())'))
@@ -225,6 +227,7 @@ def migrate_deals_table():
     try:
         with app.app_context():
             db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('''
                 CREATE TABLE IF NOT EXISTS deal (
                     id SERIAL PRIMARY KEY,
@@ -421,11 +424,15 @@ def delete_chat(chat_id):
 @token_required
 def get_messages(chat_id):
     try:
+        chat = Chat.query.get(chat_id)
         msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
-        return jsonify([{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msgs])
+        return jsonify({
+            "messages": [{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msgs],
+            "form_requested": chat.form_requested if chat else False
+        })
     except Exception as e:
         print(f"Get messages error: {e}")
-        return jsonify([]), 500
+        return jsonify({"messages": [], "form_requested": False}), 500
 
 @app.route('/api/send', methods=['POST'])
 @token_required
@@ -433,8 +440,27 @@ def send_message():
     try:
         d = request.json
         sender = 'admin' if request.current_user.is_admin else 'user'
+        text = d.get('text', '').lower()
+        
+        # Авто-триггер формы от агента: если пользователь написал и текст содержит согласие
+        if sender == 'user' and not request.current_user.is_admin:
+            consent_keywords = ['да', 'хочу', 'готов', 'согласен', 'ок', 'хорошо', 'давайте', 'пригласите', 'встреча', 'личная встреча', 'записаться']
+            if any(kw in text for kw in consent_keywords):
+                chat = Chat.query.get(d['chat_id'])
+                if chat and not chat.form_requested:
+                    chat.form_requested = True
+                    db.session.commit()
+                    # Уведомление в ТГ
+                    user = User.query.get(chat.user_id)
+                    if user and user.telegram_chat_id:
+                        send_telegram_notification(
+                            user.telegram_chat_id,
+                            "🤖 Агент предлагает заполнить заявку на личную встречу!\n\nЗайдите в чат чтобы заполнить форму."
+                        )
+        
         db.session.add(Message(chat_id=d['chat_id'], sender=sender, text=d['text']))
         db.session.commit()
+        
         chat = Chat.query.get(d['chat_id'])
         if chat and chat.user_id:
             if sender == 'admin':
@@ -446,7 +472,8 @@ def send_message():
                 if admin and admin.telegram_chat_id:
                     user = User.query.get(chat.user_id)
                     send_telegram_notification(admin.telegram_chat_id, f"💬 <b>Ответ от {user.username if user else 'Пользователя'}</b>\n\n{d['text'][:100]}..." if len(d['text']) > 100 else d['text'])
-        return jsonify({"ok": True})
+        
+        return jsonify({"ok": True, "form_requested": chat.form_requested if chat else False})
     except Exception as e:
         print(f"Send error: {e}")
         import traceback
@@ -790,6 +817,30 @@ def set_client_name(chat_id):
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Set client name error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/chat/<int:chat_id>/request_form', methods=['POST'])
+@token_required
+def request_deal_form(chat_id):
+    """Пометить чат что форма заявки запрошена"""
+    try:
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return jsonify({"error": "Чат не найден"}), 404
+        chat.form_requested = True
+        db.session.commit()
+        
+        # Уведомление клиенту в ТГ
+        user = User.query.get(chat.user_id)
+        if user and user.telegram_chat_id:
+            send_telegram_notification(
+                user.telegram_chat_id,
+                "📋 Вам предложено заполнить заявку на личную встречу!\n\nЗайдите в чат чтобы заполнить форму."
+            )
+        
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Request form error: {e}")
         return jsonify({"error": str(e)}), 500
 
 # === TELEGRAM ===
