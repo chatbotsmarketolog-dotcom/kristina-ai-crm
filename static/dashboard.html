@@ -137,7 +137,53 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
   </div>
 
   <div id="ai" class="section">
-    <div class="card"><h3>🤖 AI Настройки</h3><div class="tabs"><div class="tab active" onclick="switchTab('web')">🌐 Веб</div><div class="tab" onclick="switchTab('tg')">Telegram</div></div><div id="tab-web" class="tab-content active"><div class="form-group"><label>Имя</label><input type="text" id="aiName"></div><div class="form-group"><label>Характер</label><textarea id="aiBehavior"></textarea></div><div class="form-group"><label>База знаний</label><textarea id="aiKnowledge"></textarea></div><div class="form-group"><label>📎 PDF файлы</label><div class="file-upload" onclick="document.getElementById('pdfInput').click()">📁 Загрузить PDF<input type="file" id="pdfInput" accept=".pdf" multiple style="display:none" onchange="handleFiles(this.files)"></div><div class="file-list" id="fileList"></div></div><div style="display:flex;justify-content:space-between;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0"><span>🌐 Включить AI</span><label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label></div><button class="btn btn-green" onclick="saveAI()" style="width:100%">💾 Сохранить</button></div><div id="tab-tg" class="tab-content"><div class="form-group"><label>Токен</label><input type="text" id="tgToken"></div><div class="form-group"><label>Chat ID</label><input type="text" id="tgChatId"></div><button class="btn" onclick="saveTG()">💾 Сохранить</button></div></div>
+    <div class="tabs">
+        <div class="tab active" onclick="switchAiTab('create')">⚙️ Создать агента</div>
+        <div class="tab" onclick="switchAiTab('my')">🤖 Мои веб-агенты</div>
+    </div>
+    
+    <!-- Вкладка создания агента -->
+    <div id="ai-create" class="tab-content active">
+        <div class="card">
+            <div class="form-group">
+                <label>Имя агента</label>
+                <input type="text" id="aiName" placeholder="Например: Кристина-помощник">
+            </div>
+            <div class="form-group">
+                <label>Характер и стиль общения</label>
+                <textarea id="aiBehavior" placeholder="Опиши, как агент должен общаться с клиентами..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>🚫 Запретные темы</label>
+                <textarea id="aiForbidden" placeholder="Темы, которые агент НЕ должен обсуждать (через запятую)..." style="min-height:60px"></textarea>
+            </div>
+            <div class="form-group">
+                <label>📚 База знаний</label>
+                <textarea id="aiKnowledge" placeholder="Информация, которую агент должен знать о бизнесе..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>😊 Уровень человечности: <span id="humanityValue">3</span>/5</label>
+                <input type="range" id="aiHumanity" min="1" max="5" value="3" style="width:100%" oninput="document.getElementById('humanityValue').textContent=this.value">
+                <small style="opacity:0.7;display:block;margin-top:4px">
+                    <b>1-2:</b> Холодные, чёткие ответы без смайликов • 
+                    <b>3:</b> Баланс • 
+                    <b>4-5:</b> Тёплое, живое общение как у человека
+                </small>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;margin:12px 0">
+                <span>🌐 Активировать в веб-чате</span>
+                <label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label>
+            </div>
+            <button class="btn btn-green" onclick="saveAI()" style="width:100%">💾 Сохранить агента</button>
+        </div>
+    </div>
+    
+    <!-- Вкладка моих агентов -->
+    <div id="ai-my" class="tab-content">
+        <div class="card" id="myAgentsList">
+            <p style="opacity:0.6">Загрузка...</p>
+        </div>
+    </div>
   </div>
 
   <div id="admin" class="section">
@@ -172,7 +218,7 @@ function showSection(id){
     document.getElementById(id).classList.add('active');
     if(id==='chats')loadChats();
     if(id==='sites')loadSites();
-    if(id==='ai')loadAI();
+    if(id==='ai'){loadAI(); delete window.editingAgentId;}
     if(id==='admin'){loadUsers(); loadPendingSites();}
     if(id==='profile')loadProfile();
 }
@@ -182,6 +228,14 @@ function switchTab(t){
   document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
   if(window.event && window.event.target){window.event.target.classList.add('active');}
   document.getElementById('tab-'+t).classList.add('active');
+}
+
+function switchAiTab(tab){
+    document.querySelectorAll('#ai .tab').forEach(e=>e.classList.remove('active'));
+    document.querySelectorAll('#ai .tab-content').forEach(e=>e.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('ai-'+tab).classList.add('active');
+    if(tab==='my') loadMyAgents();
 }
 
 async function fetchAPI(url,method='GET',body=null){const r=await fetch(API+url,{method,headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):null});if(r.status===401)logout();return r.json();}
@@ -317,8 +371,110 @@ async function loadSites(){const s=await fetchAPI('/sites');if(!s)return;const e
 function addSite(){const u=document.getElementById('siteUrl').value.trim();if(!u)return;fetchAPI('/sites','POST',{url:u}).then(()=>{document.getElementById('siteUrl').value='';loadSites();alert('✅ Добавлен!');});}
 async function deleteSite(id){if(!confirm('Удалить сайт?'))return;try{const r=await fetch(API+`/sites/${id}/delete`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});const data=await r.json().catch(()=>({error:'Ошибка'}));if(r.ok){loadSites();alert('✅ Удален!');}else{alert('❌ '+(data.error||'Ошибка'));}}catch(e){alert('❌ Ошибка соединения');}}
 function copyCode(){const c=document.getElementById('widgetCode').textContent;if(c.includes('После'))return alert('ℹ️ После одобрения');navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));}
-async function loadAI(){const ai=await fetchAPI('/ai/get');if(!ai)return;document.getElementById('aiName').value=ai.name||'';document.getElementById('aiBehavior').value=ai.behavior||'';document.getElementById('aiKnowledge').value=ai.knowledge_base||'';document.getElementById('aiWebToggle').checked=ai.is_active_web||false;}
-function saveAI(){fetchAPI('/ai/setup','POST',{name:document.getElementById('aiName').value,behavior:document.getElementById('aiBehavior').value,knowledge_base:document.getElementById('aiKnowledge').value,is_active_web:document.getElementById('aiWebToggle').checked}).then(()=>alert('✅ Сохранено!'));}
+
+async function loadAI(){
+    const ai=await fetchAPI('/ai/get');
+    if(!ai)return;
+    document.getElementById('aiName').value=ai.name||'';
+    document.getElementById('aiBehavior').value=ai.behavior||'';
+    document.getElementById('aiForbidden').value=ai.forbidden||'';
+    document.getElementById('aiKnowledge').value=ai.knowledge_base||'';
+    document.getElementById('aiWebToggle').checked=ai.is_active_web||false;
+    document.getElementById('aiHumanity').value=ai.humanity_level||3;
+    document.getElementById('humanityValue').textContent=ai.humanity_level||3;
+}
+
+function saveAI(){
+    const data = {
+        name: document.getElementById('aiName').value,
+        behavior: document.getElementById('aiBehavior').value,
+        forbidden: document.getElementById('aiForbidden').value,
+        knowledge_base: document.getElementById('aiKnowledge').value,
+        is_active_web: document.getElementById('aiWebToggle').checked,
+        humanity_level: parseInt(document.getElementById('aiHumanity').value)
+    };
+    
+    const url = window.editingAgentId ? `/ai/agents/${window.editingAgentId}` : '/ai/setup';
+    const method = window.editingAgentId ? 'PUT' : 'POST';
+    
+    fetchAPI(url, method, data).then(result => {
+        if(result && result.ok) {
+            alert('✅ Агент сохранён!');
+            if(window.editingAgentId) {
+                delete window.editingAgentId;
+                loadMyAgents();
+            }
+        } else {
+            alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
+        }
+    });
+}
+
+async function loadMyAgents(){
+    try {
+        const agents = await fetchAPI('/ai/agents');
+        const el = document.getElementById('myAgentsList');
+        if(!agents || agents.length === 0) {
+            el.innerHTML = '<p style="opacity:0.6;text-align:center;padding:20px">У вас пока нет веб-агентов.<br>Создайте первого на вкладке "Создать агента" 👆</p>';
+            return;
+        }
+        el.innerHTML = agents.map(a => `
+            <div style="padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;margin:12px 0">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
+                    <div>
+                        <div style="font-weight:600;font-size:1.1rem">${a.name}</div>
+                        <div style="font-size:0.8rem;opacity:0.7;margin-top:4px">
+                            Человечность: ${'😊'.repeat(a.humanity_level)}${'🤖'.repeat(5-a.humanity_level)} (${a.humanity_level}/5)
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <span style="font-size:0.75rem;opacity:0.7">${a.is_active_web?'🟢 ВКЛ':'🔴 ВЫКЛ'}</span>
+                        <label class="switch" style="transform:scale(0.9)">
+                            <input type="checkbox" ${a.is_active_web?'checked':''} onchange="toggleAgent(${a.id})">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="btn btn-sm" onclick="editAgent(${a.id}, '${a.name.replace(/'/g, "\\'")}', '${a.behavior.replace(/'/g, "\\'")}', '${a.forbidden.replace(/'/g, "\\'")}', '${a.knowledge_base.replace(/'/g, "\\'")}', ${a.humanity_level})">✏️ Изменить</button>
+                    <button class="btn btn-red btn-sm" onclick="deleteAgent(${a.id})">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {
+        console.error('Load agents error:', e);
+        document.getElementById('myAgentsList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>';
+    }
+}
+
+function toggleAgent(id){
+    fetchAPI(`/ai/agents/${id}/toggle`, 'POST')
+        .then(r => { if(r.ok) loadMyAgents(); })
+        .catch(e => alert('❌ Ошибка переключения'));
+}
+
+function editAgent(id, name, behavior, forbidden, knowledge, humanity){
+    document.querySelectorAll('#ai .tab')[0].click();
+    document.getElementById('aiName').value = name;
+    document.getElementById('aiBehavior').value = behavior;
+    document.getElementById('aiForbidden').value = forbidden;
+    document.getElementById('aiKnowledge').value = knowledge;
+    document.getElementById('aiHumanity').value = humanity;
+    document.getElementById('humanityValue').textContent = humanity;
+    window.editingAgentId = id;
+    alert('✏️ Внесите изменения и нажмите "Сохранить"');
+}
+
+async function deleteAgent(id){
+    if(!confirm('Удалить этого агента?')) return;
+    try {
+        await fetchAPI(`/ai/agents/${id}/delete`, 'DELETE');
+        loadMyAgents();
+    } catch(e) {
+        alert('❌ Ошибка удаления');
+    }
+}
+
 function saveTG(){const t=document.getElementById('tgToken').value.trim(),c=document.getElementById('tgChatId').value.trim();if(!t||!c)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>alert('✅ Telegram настроен!')));}
 function handleFiles(files){for(let f of files){if(f.type!=='application/pdf')return alert('❌ Только PDF');if(f.size>10*1024*1024)return alert('❌ Макс 10МБ');if(uploadedFiles.length>=10)return alert('❌ Макс 10 файлов');uploadedFiles.push(f);uploadedFileNames.push(f.name);}renderFileList();}
 function renderFileList(){const el=document.getElementById('fileList');if(!el)return;el.innerHTML=uploadedFileNames.map((n,i)=>`<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin:6px 0;font-size:0.85rem"><span>${n}</span><span onclick="removeFile(${i})" style="color:var(--danger);cursor:pointer">×</span></div>`).join('');}
