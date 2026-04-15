@@ -95,9 +95,6 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 
 .support-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
 .support-link{display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;text-decoration:none;color:var(--text)}
-
-.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal{background:var(--panel);padding:24px;border-radius:12px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -129,7 +126,6 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         <div class="chat-input">
           <input type="text" id="msgInput" placeholder="Введите сообщение...">
           <button class="btn" id="sendBtn" onclick="sendMessage()">Отправить</button>
-          <button class="btn btn-green" id="dealBtn" onclick="openDealModal()" style="display:none">📋 Заявка</button>
         </div>
       </div>
     </div>
@@ -253,53 +249,9 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
   </div>
 </div>
 
-<!-- Модальное окно формы заявки -->
-<div id="dealModal" class="modal-overlay" style="display:none">
-    <div class="modal">
-        <h3 style="margin-bottom:16px">📋 Заявка на личную встречу</h3>
-        
-        <div class="form-group">
-            <label>1. Имя *</label>
-            <input type="text" id="dealClientName" placeholder="Ваше имя" required>
-        </div>
-        <div class="form-group">
-            <label>2. Сфера деятельности *</label>
-            <input type="text" id="dealSphere" placeholder="Например: маркетинг, дизайн, образование" required>
-        </div>
-        <div class="form-group">
-            <label>3. Какой запрос хочется разобрать? *</label>
-            <textarea id="dealRequest" placeholder="Опишите, что хотите обсудить на встрече..." required style="min-height:80px"></textarea>
-        </div>
-        <div class="form-group">
-            <label>4. Бюджет *</label>
-            <input type="text" id="dealBudget" placeholder="Например: 15 000 ₽, 50 000 ₽, договорная" required>
-        </div>
-        <div class="form-group">
-            <label>5. Способ связи *</label>
-            <select id="dealContactMethod" required style="width:100%;padding:10px;border-radius:6px;background:rgba(0,0,0,0.3);color:var(--text);border:1px solid rgba(255,255,255,0.1)">
-                <option value="">Выберите мессенджер</option>
-                <option value="Telegram">Telegram</option>
-                <option value="VK">ВКонтакте</option>
-                <option value="Одноклассники">Одноклассники</option>
-                <option value="Instagram">Instagram</option>
-                <option value="TenChat">TenChat</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>6. Никнейм для связи *</label>
-            <input type="text" id="dealContactNickname" placeholder="@username или ссылка на профиль" required>
-        </div>
-        
-        <div style="display:flex;gap:8px;margin-top:20px">
-            <button class="btn" onclick="closeDealModal()">Отмена</button>
-            <button class="btn btn-green" onclick="submitDeal()">✅ Подтвердить заявку</button>
-        </div>
-    </div>
-</div>
-
 <script>
 const API=location.origin+'/api',token=localStorage.getItem('token'),isAdmin=localStorage.getItem('isAdmin')==='true';
-let activeChatId=null, pollInterval=null, editingAgentId=null, shownDealForms={};
+let activeChatId=null, pollInterval=null, editingAgentId=null;
 if(!token)window.location.href='/index.html';
 if(isAdmin)document.getElementById('adminBtn').style.display='inline-block';
 
@@ -382,25 +334,6 @@ async function openChat(id, site){
     document.getElementById('msgInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     
-    const dealBtn = document.getElementById('dealBtn');
-    if(isAdmin) {
-        dealBtn.style.display = 'inline-block';
-        dealBtn.onclick = () => {
-            fetchAPI(`/chat/${activeChatId}/request_form`, 'POST')
-                .then(r => {
-                    if(r.ok) {
-                        alert('✅ Форма заявки отправлена клиенту!');
-                        dealBtn.style.display = 'none';
-                    } else {
-                        alert('❌ Ошибка: ' + (r.error || 'Неизвестная'));
-                    }
-                });
-        };
-    } else {
-        dealBtn.style.display = 'none';
-        handleFirstMessage();
-    }
-    
     loadMessages();
     if(pollInterval) clearInterval(pollInterval);
     pollInterval = setInterval(loadMessages, 3000);
@@ -413,7 +346,6 @@ async function loadMessages(){
     if(!response) return;
     
     const m = response.messages || [];
-    const formRequested = response.form_requested;
     
     const chatTitle = document.getElementById('chatTitle').textContent;
     
@@ -428,27 +360,16 @@ async function loadMessages(){
     }).join('');
     
     document.getElementById('chatMessages').scrollTop = 9999;
-    
-    // Если форма запрошена, это не админ, и форма ещё не показывалась для этого чата
-    if(formRequested && !isAdmin && !shownDealForms[activeChatId]) {
-        openDealModal();
-        shownDealForms[activeChatId] = true;
-    }
 }
 
 async function sendMessage(){
     const t = document.getElementById('msgInput').value.trim();
     if(!t || !activeChatId) return;
     try {
-        const result = await fetchAPI('/send', 'POST', {chat_id: activeChatId, text: t});
+        await fetchAPI('/send', 'POST', {chat_id: activeChatId, text: t});
         document.getElementById('msgInput').value = '';
         loadMessages();
         loadChats();
-        
-        if(result.form_requested && !isAdmin && !shownDealForms[activeChatId]) {
-            openDealModal();
-            shownDealForms[activeChatId] = true;
-        }
     } catch(e) {
         alert('❌ Ошибка отправки');
     }
@@ -807,63 +728,6 @@ async function loadDeals(status){
     } catch(e) {
         console.error('Load deals error:', e);
         document.getElementById(status === 'completed' ? 'completedDealsList' : 'declinedDealsList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>';
-    }
-}
-
-function openDealModal(){
-    document.getElementById('dealModal').style.display = 'flex';
-    if(activeChatId) {
-        fetchAPI(`/chat/${activeChatId}`).then(chat => {
-            if(chat && chat.visitor_name) {
-                document.getElementById('dealClientName').value = chat.visitor_name;
-            }
-        });
-    }
-}
-
-function closeDealModal(){
-    document.getElementById('dealModal').style.display = 'none';
-    document.getElementById('dealClientName').value = '';
-    document.getElementById('dealSphere').value = '';
-    document.getElementById('dealRequest').value = '';
-    document.getElementById('dealBudget').value = '';
-    document.getElementById('dealContactMethod').value = '';
-    document.getElementById('dealContactNickname').value = '';
-}
-
-async function submitDeal(){
-    const data = {
-        chat_id: activeChatId,
-        client_name: document.getElementById('dealClientName').value.trim(),
-        sphere: document.getElementById('dealSphere').value.trim(),
-        request: document.getElementById('dealRequest').value.trim(),
-        budget: document.getElementById('dealBudget').value.trim(),
-        contact_method: document.getElementById('dealContactMethod').value,
-        contact_nickname: document.getElementById('dealContactNickname').value.trim()
-    };
-    
-    if(!data.client_name || !data.sphere || !data.request || !data.budget || !data.contact_method || !data.contact_nickname) {
-        return alert('❌ Заполните все обязательные поля');
-    }
-    
-    // Валидация мессенджера (техническая, без визуального предупреждения)
-    const blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k'];
-    if(blocked.includes(data.contact_method.toLowerCase())) {
-        return alert('❌ Укажите Telegram, VK, Одноклассники, Instagram или TenChat');
-    }
-    
-    try {
-        const result = await fetchAPI('/deals', 'POST', data);
-        if(result.ok) {
-            alert('✅ Заявка отправлена!');
-            closeDealModal();
-            document.getElementById('dealBtn').style.display = 'none';
-            shownDealForms[activeChatId] = true;
-        } else {
-            alert('❌ Ошибка: ' + (result.error || 'Неизвестная'));
-        }
-    } catch(e) {
-        alert('❌ Ошибка отправки');
     }
 }
 
