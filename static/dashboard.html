@@ -97,7 +97,7 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 .support-link{display:flex;align-items:center;gap:12px;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;text-decoration:none;color:var(--text)}
 
 .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal{background:var(--panel);padding:24px;border-radius:12px;max-width:400px;width:90%}
+.modal{background:var(--panel);padding:24px;border-radius:12px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -108,6 +108,7 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
     <button class="btn" onclick="showSection('chats')">💬 Чаты</button>
     <button class="btn" onclick="showSection('sites')">🌐 Сайты</button>
     <button class="btn" onclick="showSection('ai')">🤖 AI</button>
+    <button class="btn" onclick="showSection('deals')">🤝 Сделки</button>
     <button class="btn" id="adminBtn" onclick="showSection('admin')" style="display:none">👑 Админ</button>
     <button class="btn" onclick="showSection('profile')">👤 Профиль</button>
     <button class="btn" onclick="showSection('support')">💚 Поддержка</button>
@@ -128,6 +129,7 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         <div class="chat-input">
           <input type="text" id="msgInput" placeholder="Введите сообщение...">
           <button class="btn" id="sendBtn" onclick="sendMessage()">Отправить</button>
+          <button class="btn btn-green" id="dealBtn" onclick="openDealModal()" style="display:none">📋 Заявка</button>
         </div>
       </div>
     </div>
@@ -211,6 +213,25 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
     </div>
   </div>
 
+  <div id="deals" class="section">
+    <div class="tabs">
+        <div class="tab active" onclick="switchDealTab('completed')">✅ Совершённые</div>
+        <div class="tab" onclick="switchDealTab('declined')">❌ Отклонённые</div>
+    </div>
+    
+    <div id="deals-completed" class="tab-content active">
+        <div class="card" id="completedDealsList">
+            <p style="opacity:0.6">Загрузка...</p>
+        </div>
+    </div>
+    
+    <div id="deals-declined" class="tab-content">
+        <div class="card" id="declinedDealsList">
+            <p style="opacity:0.6">Загрузка...</p>
+        </div>
+    </div>
+  </div>
+
   <div id="admin" class="section">
     <div class="card">
         <h3>📋 Запросы на одобрение</h3>
@@ -232,6 +253,53 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
   </div>
 </div>
 
+<!-- Модальное окно формы заявки -->
+<div id="dealModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+        <h3 style="margin-bottom:16px">📋 Заявка на личную встречу</h3>
+        
+        <div class="form-group">
+            <label>1. Имя *</label>
+            <input type="text" id="dealClientName" placeholder="Ваше имя" required>
+        </div>
+        <div class="form-group">
+            <label>2. Сфера деятельности *</label>
+            <input type="text" id="dealSphere" placeholder="Например: маркетинг, дизайн, образование" required>
+        </div>
+        <div class="form-group">
+            <label>3. Какой запрос хочется разобрать? *</label>
+            <textarea id="dealRequest" placeholder="Опишите, что хотите обсудить на встрече..." required style="min-height:80px"></textarea>
+        </div>
+        <div class="form-group">
+            <label>4. Бюджет *</label>
+            <input type="text" id="dealBudget" placeholder="Например: 15 000 ₽, 50 000 ₽, договорная" required>
+        </div>
+        <div class="form-group">
+            <label>5. Способ связи *</label>
+            <select id="dealContactMethod" required style="width:100%;padding:10px;border-radius:6px;background:rgba(0,0,0,0.3);color:var(--text);border:1px solid rgba(255,255,255,0.1)">
+                <option value="">Выберите мессенджер</option>
+                <option value="Telegram">Telegram</option>
+                <option value="VK">ВКонтакте</option>
+                <option value="Одноклассники">Одноклассники</option>
+                <option value="Instagram">Instagram</option>
+                <option value="TenChat">TenChat</option>
+            </select>
+            <small style="opacity:0.7;display:block;margin-top:4px;color:var(--danger)">
+                ⚠️ MAX/МАКС запрещён. Пожалуйста, выберите из списка выше.
+            </small>
+        </div>
+        <div class="form-group">
+            <label>6. Никнейм для связи *</label>
+            <input type="text" id="dealContactNickname" placeholder="@username или ссылка на профиль" required>
+        </div>
+        
+        <div style="display:flex;gap:8px;margin-top:20px">
+            <button class="btn" onclick="closeDealModal()">Отмена</button>
+            <button class="btn btn-green" onclick="submitDeal()">✅ Подтвердить заявку</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const API=location.origin+'/api',token=localStorage.getItem('token'),isAdmin=localStorage.getItem('isAdmin')==='true';
 let activeChatId=null,pollInterval=null,editingAgentId=null;
@@ -244,6 +312,7 @@ function showSection(id){
     if(id==='chats')loadChats();
     if(id==='sites')loadSites();
     if(id==='ai'){loadAI(); editingAgentId=null;}
+    if(id==='deals')loadDeals('completed');
     if(id==='admin'){loadUsers(); loadPendingSites();}
     if(id==='profile')loadProfile();
 }
@@ -272,6 +341,14 @@ function switchAiTab(tab){
         document.getElementById('aiWebToggle').checked = false;
         document.getElementById('pdfFileList').innerHTML = '';
     }
+}
+
+function switchDealTab(tab){
+    document.querySelectorAll('#deals .tab').forEach(e=>e.classList.remove('active'));
+    document.querySelectorAll('#deals .tab-content').forEach(e=>e.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('deals-'+tab).classList.add('active');
+    loadDeals(tab);
 }
 
 async function fetchAPI(url,method='GET',body=null){
@@ -306,6 +383,15 @@ async function openChat(id, site){
     document.getElementById('chatTitle').textContent = site;
     document.getElementById('msgInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
+    
+    const dealBtn = document.getElementById('dealBtn');
+    if(isAdmin) {
+        dealBtn.style.display = 'inline-block';
+    } else {
+        dealBtn.style.display = 'none';
+        handleFirstMessage();
+    }
+    
     loadMessages();
     if(pollInterval) clearInterval(pollInterval);
     pollInterval = setInterval(loadMessages, 3000);
@@ -658,6 +744,145 @@ function toggleAgent(agentId){
     fetchAPI(`/ai/agents/${agentId}/toggle`, 'POST')
         .then(r => { if(r.ok) loadMyAgents(); })
         .catch(e => alert('❌ Ошибка переключения'));
+}
+
+// === СДЕЛКИ ===
+
+async function loadDeals(status){
+    try {
+        const deals = await fetchAPI(`/deals?status=${status}`);
+        const el = document.getElementById(status === 'completed' ? 'completedDealsList' : 'declinedDealsList');
+        
+        if(!deals || deals.length === 0) {
+            el.innerHTML = `<p style="opacity:0.6;text-align:center;padding:20px">Нет ${status === 'completed' ? 'совершённых' : 'отклонённых'} сделок</p>`;
+            return;
+        }
+        
+        el.innerHTML = deals.map(deal => `
+            <div style="padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;margin:12px 0">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
+                    <div>
+                        <div style="font-weight:600;font-size:1.1rem">${escapeHtml(deal.client_name)}</div>
+                        <div style="font-size:0.75rem;opacity:0.7;margin-top:4px">📅 ${new Date(deal.created_at).toLocaleDateString('ru-RU')}</div>
+                        ${deal.status === 'declined' && deal.decline_reason ? `<div style="font-size:0.75rem;color:var(--danger);margin-top:4px">❌ ${escapeHtml(deal.decline_reason)}</div>` : ''}
+                    </div>
+                    <button class="btn btn-red btn-sm" onclick="deleteDeal(${deal.id})">🗑️</button>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-sm" onclick="expandDeal(${deal.id})">🔍 Развернуть заявку</button>
+                    ${deal.status === 'declined' ? `<button class="btn btn-sm" onclick="openChatFromDeal(${deal.chat_id})">💬 Открыть переписку</button>` : ''}
+                </div>
+                <div id="deal-details-${deal.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1)">
+                    <div style="font-size:0.85rem;line-height:1.8">
+                        <b>💼 Сфера:</b> ${escapeHtml(deal.sphere)}<br>
+                        <b>📝 Запрос:</b> ${escapeHtml(deal.request)}<br>
+                        <b>💰 Бюджет:</b> ${escapeHtml(deal.budget)}<br>
+                        <b>📱 Контакт:</b> ${escapeHtml(deal.contact_method)} @${escapeHtml(deal.contact_nickname)}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {
+        console.error('Load deals error:', e);
+        document.getElementById(status === 'completed' ? 'completedDealsList' : 'declinedDealsList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>';
+    }
+}
+
+function openDealModal(){
+    document.getElementById('dealModal').style.display = 'flex';
+    if(activeChatId) {
+        fetchAPI(`/chat/${activeChatId}`).then(chat => {
+            if(chat && chat.visitor_name) {
+                document.getElementById('dealClientName').value = chat.visitor_name;
+            }
+        });
+    }
+}
+
+function closeDealModal(){
+    document.getElementById('dealModal').style.display = 'none';
+    document.getElementById('dealClientName').value = '';
+    document.getElementById('dealSphere').value = '';
+    document.getElementById('dealRequest').value = '';
+    document.getElementById('dealBudget').value = '';
+    document.getElementById('dealContactMethod').value = '';
+    document.getElementById('dealContactNickname').value = '';
+}
+
+async function submitDeal(){
+    const data = {
+        chat_id: activeChatId,
+        client_name: document.getElementById('dealClientName').value.trim(),
+        sphere: document.getElementById('dealSphere').value.trim(),
+        request: document.getElementById('dealRequest').value.trim(),
+        budget: document.getElementById('dealBudget').value.trim(),
+        contact_method: document.getElementById('dealContactMethod').value,
+        contact_nickname: document.getElementById('dealContactNickname').value.trim()
+    };
+    
+    if(!data.client_name || !data.sphere || !data.request || !data.budget || !data.contact_method || !data.contact_nickname) {
+        return alert('❌ Заполните все обязательные поля');
+    }
+    
+    const blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k'];
+    if(blocked.includes(data.contact_method.toLowerCase())) {
+        return alert('❌ Мессенджер MAX/МАКС запрещён. Пожалуйста, выберите из списка: Telegram, ВК, Одноклассники, Instagram, TenChat');
+    }
+    
+    try {
+        const result = await fetchAPI('/deals', 'POST', data);
+        if(result.ok) {
+            alert('✅ Заявка отправлена!');
+            closeDealModal();
+            document.getElementById('dealBtn').style.display = 'none';
+        } else {
+            alert('❌ Ошибка: ' + (result.error || 'Неизвестная'));
+        }
+    } catch(e) {
+        alert('❌ Ошибка отправки');
+    }
+}
+
+function expandDeal(dealId){
+    const details = document.getElementById(`deal-details-${dealId}`);
+    details.style.display = details.style.display === 'none' ? 'block' : 'none';
+}
+
+async function deleteDeal(dealId){
+    if(!confirm('Удалить эту заявку?')) return;
+    try {
+        await fetchAPI(`/deals/${dealId}`, 'DELETE');
+        const activeTab = document.querySelector('#deals .tab.active').onclick.toString().match(/'(\w+)'/)?.[1];
+        loadDeals(activeTab);
+    } catch(e) {
+        alert('❌ Ошибка удаления');
+    }
+}
+
+function openChatFromDeal(chatId){
+    openChat(chatId, 'Клиент');
+    showSection('chats');
+}
+
+async function setClientName(name){
+    if(!activeChatId || !name) return;
+    try {
+        await fetchAPI(`/chat/${activeChatId}/set_client_name`, 'POST', {name});
+        document.getElementById('chatTitle').textContent = name;
+        loadChats();
+    } catch(e) {
+        console.error('Set client name error:', e);
+    }
+}
+
+async function handleFirstMessage(){
+    if(!activeChatId || isAdmin) return;
+    const chat = await fetchAPI(`/chat/${activeChatId}`);
+    if(chat && chat.visitor_name) return;
+    const name = prompt('👋 Привет! Как к вам обращаться?', '');
+    if(name && name.trim()) {
+        setClientName(name.trim());
+    }
 }
 
 function saveTG(){const t=document.getElementById('tgToken').value.trim(),c=document.getElementById('tgChatId').value.trim();if(!t||!c)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>alert('✅ Telegram настроен!')));}
