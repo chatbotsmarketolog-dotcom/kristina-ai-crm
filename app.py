@@ -66,7 +66,7 @@ class Chat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    visitor_name = db.Column(db.String(100))  # ← НОВОЕ ПОЛЕ: имя клиента
+    visitor_name = db.Column(db.String(100))
     status = db.Column(db.String(20), default='waiting')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -216,6 +216,35 @@ def migrate_ai_columns():
             db.session.commit()
         return jsonify({"ok": True, "message": "Колонки добавлены"})
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/migrate_deals_table', methods=['POST'])
+@admin_required
+def migrate_deals_table():
+    """Добавить колонку visitor_name и таблицу deal"""
+    try:
+        with app.app_context():
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
+            db.session.execute(text('''
+                CREATE TABLE IF NOT EXISTS deal (
+                    id SERIAL PRIMARY KEY,
+                    chat_id INTEGER REFERENCES chat(id),
+                    user_id INTEGER REFERENCES "user"(id),
+                    client_name VARCHAR(100),
+                    sphere VARCHAR(200),
+                    request TEXT,
+                    budget VARCHAR(100),
+                    contact_method VARCHAR(50),
+                    contact_nickname VARCHAR(100),
+                    status VARCHAR(20) DEFAULT 'pending',
+                    decline_reason VARCHAR(200),
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            '''))
+            db.session.commit()
+        return jsonify({"ok": True, "message": "Миграция завершена"})
+    except Exception as e:
+        print(f"Migration error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/login', methods=['POST'])
