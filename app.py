@@ -159,16 +159,24 @@ def admin_required(f):
 def add_missing_columns():
     with app.app_context():
         try:
+            # Миграции для user
             db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)'))
+            
+            # Миграции для website
             db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP'))
+            
+            # Миграции для aimanager
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_web BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS forbidden TEXT'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS humanity_level INTEGER DEFAULT 3'))
+            
+            # Миграции для chat
             db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
             db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
+            
             try:
                 db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
                 db.session.execute(text('CREATE TABLE IF NOT EXISTS aiwebsite (id SERIAL PRIMARY KEY, agent_id INTEGER REFERENCES aimanager(id), website_id INTEGER REFERENCES website(id), is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())'))
@@ -189,10 +197,10 @@ def add_missing_columns():
                     )
                 '''))
                 db.session.commit()
-                print("✅ Добавлены колонки и таблицы")
-            except:
+                print("✅ Все миграции выполнены")
+            except Exception as e:
                 db.session.rollback()
-                print("ℹ️ Колонки/таблицы уже существуют")
+                print(f"ℹ️ Некоторые таблицы уже существуют: {e}")
             db.session.commit()
         except Exception as e:
             print(f"Migration error: {e}")
@@ -246,6 +254,19 @@ def migrate_deals_table():
             '''))
             db.session.commit()
         return jsonify({"ok": True, "message": "Миграция завершена"})
+    except Exception as e:
+        print(f"Migration error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/migrate_form_requested', methods=['POST'])
+@admin_required
+def migrate_form_requested():
+    """Добавить колонку form_requested в таблицу chat"""
+    try:
+        with app.app_context():
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
+            db.session.commit()
+        return jsonify({"ok": True, "message": "Колонка form_requested добавлена"})
     except Exception as e:
         print(f"Migration error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -394,7 +415,6 @@ def get_chats():
             chats = Chat.query.order_by(Chat.created_at.desc()).all()
             result = []
             for c in chats:
-                # Безопасное получение имени
                 chat_name = c.visitor_name
                 if not chat_name and c.user_id:
                     user = User.query.get(c.user_id)
@@ -432,9 +452,10 @@ def get_messages(chat_id):
     try:
         chat = Chat.query.get(chat_id)
         msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
+        # Возвращаем объект с сообщениями и флагом form_requested
         return jsonify({
             "messages": [{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msgs],
-            "form_requested": chat.form_requested if chat else False
+            "form_requested": bool(chat.form_requested) if chat and hasattr(chat, 'form_requested') else False
         })
     except Exception as e:
         print(f"Get messages error: {e}")
@@ -456,7 +477,6 @@ def send_message():
                 if chat and not chat.form_requested:
                     chat.form_requested = True
                     db.session.commit()
-                    # Уведомление в ТГ
                     user = User.query.get(chat.user_id)
                     if user and user.telegram_chat_id:
                         send_telegram_notification(
@@ -479,12 +499,13 @@ def send_message():
                     user = User.query.get(chat.user_id)
                     send_telegram_notification(admin.telegram_chat_id, f"💬 <b>Ответ от {user.username if user else 'Пользователя'}</b>\n\n{d['text'][:100]}..." if len(d['text']) > 100 else d['text'])
         
-        return jsonify({"ok": True, "form_requested": chat.form_requested if chat else False})
+        # Возвращаем form_requested для фронтенда
+        return jsonify({"ok": True, "form_requested": bool(chat.form_requested) if chat and hasattr(chat, 'form_requested') else False})
     except Exception as e:
         print(f"Send error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({"error": "Ошибка"}), 500
+        return jsonify({"error": str(e)}), 500
 
 # === АГЕНТЫ ===
 
@@ -836,7 +857,6 @@ def request_deal_form(chat_id):
         chat.form_requested = True
         db.session.commit()
         
-        # Уведомление клиенту в ТГ
         user = User.query.get(chat.user_id)
         if user and user.telegram_chat_id:
             send_telegram_notification(
