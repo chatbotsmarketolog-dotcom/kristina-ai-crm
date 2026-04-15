@@ -162,6 +162,14 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
                 <textarea id="aiKnowledge" placeholder="Информация, которую агент должен знать о бизнесе..."></textarea>
             </div>
             <div class="form-group">
+                <label>📎 PDF файлы</label>
+                <div class="file-upload" onclick="document.getElementById('pdfInput').click()">
+                    📁 Загрузить PDF
+                    <input type="file" id="pdfInput" accept=".pdf" multiple style="display:none" onchange="handlePdfFiles(this.files)">
+                </div>
+                <div class="file-list" id="pdfFileList"></div>
+            </div>
+            <div class="form-group">
                 <label>😊 Уровень человечности: <span id="humanityValue">3</span>/5</label>
                 <input type="range" id="aiHumanity" min="1" max="5" value="3" style="width:100%" oninput="document.getElementById('humanityValue').textContent=this.value">
                 <small style="opacity:0.7;display:block;margin-top:4px">
@@ -209,7 +217,7 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 
 <script>
 const API=location.origin+'/api',token=localStorage.getItem('token'),isAdmin=localStorage.getItem('isAdmin')==='true';
-let activeChatId=null,pollInterval=null;
+let activeChatId=null,pollInterval=null,editingAgentId=null;
 if(!token)window.location.href='/index.html';
 if(isAdmin)document.getElementById('adminBtn').style.display='inline-block';
 
@@ -218,7 +226,7 @@ function showSection(id){
     document.getElementById(id).classList.add('active');
     if(id==='chats')loadChats();
     if(id==='sites')loadSites();
-    if(id==='ai'){loadAI(); delete window.editingAgentId;}
+    if(id==='ai'){loadAI(); editingAgentId=null;}
     if(id==='admin'){loadUsers(); loadPendingSites();}
     if(id==='profile')loadProfile();
 }
@@ -238,7 +246,15 @@ function switchAiTab(tab){
     if(tab==='my') loadMyAgents();
 }
 
-async function fetchAPI(url,method='GET',body=null){const r=await fetch(API+url,{method,headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):null});if(r.status===401)logout();return r.json();}
+async function fetchAPI(url,method='GET',body=null){
+    const r=await fetch(API+url,{
+        method,
+        headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+        body:body?JSON.stringify(body):null
+    });
+    if(r.status===401)logout();
+    return r.json();
+}
 
 async function loadChats(){
     const c = await fetchAPI('/chats');
@@ -367,7 +383,19 @@ async function rejectSite(id){
     }
 }
 
-async function loadSites(){const s=await fetchAPI('/sites');if(!s)return;const el=document.getElementById('siteList');if(!s.length){el.innerHTML='<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}let html='<h3>Мои сайты</h3>',approved=null;s.forEach(x=>{if(x.status=='active'&&!approved)approved=x;html+=`<div class="site-item"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API:${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅':'⏳'} ${x.status=='active'?'Активен':'Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${x.id})">🗑️</button></div>`;});el.innerHTML=html;if(approved)document.getElementById('widgetCode').textContent=`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;}
+async function loadSites(){
+    const s=await fetchAPI('/sites');
+    if(!s)return;
+    const el=document.getElementById('siteList');
+    if(!s.length){el.innerHTML='<h3>Мои сайты</h3><p style="opacity:0.6">Пусто</p>';return;}
+    let html='<h3>Мои сайты</h3>',approved=null;
+    s.forEach(x=>{
+        if(x.status=='active'&&!approved)approved=x;
+        html+=`<div class="site-item"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API:${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅':'⏳'} ${x.status=='active'?'Активен':'Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${x.id})">🗑️</button></div>`;
+    });
+    el.innerHTML=html;
+    if(approved)document.getElementById('widgetCode').textContent=`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;
+}
 function addSite(){const u=document.getElementById('siteUrl').value.trim();if(!u)return;fetchAPI('/sites','POST',{url:u}).then(()=>{document.getElementById('siteUrl').value='';loadSites();alert('✅ Добавлен!');});}
 async function deleteSite(id){if(!confirm('Удалить сайт?'))return;try{const r=await fetch(API+`/sites/${id}/delete`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});const data=await r.json().catch(()=>({error:'Ошибка'}));if(r.ok){loadSites();alert('✅ Удален!');}else{alert('❌ '+(data.error||'Ошибка'));}}catch(e){alert('❌ Ошибка соединения');}}
 function copyCode(){const c=document.getElementById('widgetCode').textContent;if(c.includes('После'))return alert('ℹ️ После одобрения');navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));}
@@ -384,30 +412,10 @@ async function loadAI(){
     document.getElementById('humanityValue').textContent=ai.humanity_level||3;
 }
 
-function saveAI(){
-    const data = {
-        name: document.getElementById('aiName').value,
-        behavior: document.getElementById('aiBehavior').value,
-        forbidden: document.getElementById('aiForbidden').value,
-        knowledge_base: document.getElementById('aiKnowledge').value,
-        is_active_web: document.getElementById('aiWebToggle').checked,
-        humanity_level: parseInt(document.getElementById('aiHumanity').value)
-    };
-    
-    const url = window.editingAgentId ? `/ai/agents/${window.editingAgentId}` : '/ai/setup';
-    const method = window.editingAgentId ? 'PUT' : 'POST';
-    
-    fetchAPI(url, method, data).then(result => {
-        if(result && result.ok) {
-            alert('✅ Агент сохранён!');
-            if(window.editingAgentId) {
-                delete window.editingAgentId;
-                loadMyAgents();
-            }
-        } else {
-            alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
-        }
-    });
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 async function loadMyAgents(){
@@ -422,10 +430,11 @@ async function loadMyAgents(){
             <div style="padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;margin:12px 0">
                 <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
                     <div>
-                        <div style="font-weight:600;font-size:1.1rem">${a.name}</div>
+                        <div style="font-weight:600;font-size:1.1rem">${escapeHtml(a.name)}</div>
                         <div style="font-size:0.8rem;opacity:0.7;margin-top:4px">
                             Человечность: ${'😊'.repeat(a.humanity_level)}${'🤖'.repeat(5-a.humanity_level)} (${a.humanity_level}/5)
                         </div>
+                        ${a.pdfs && a.pdfs.length > 0 ? `<div style="font-size:0.75rem;opacity:0.6;margin-top:4px">📎 PDF: ${a.pdfs.length} файл(ов)</div>` : ''}
                     </div>
                     <div style="display:flex;gap:8px;align-items:center">
                         <span style="font-size:0.75rem;opacity:0.7">${a.is_active_web?'🟢 ВКЛ':'🔴 ВЫКЛ'}</span>
@@ -435,8 +444,9 @@ async function loadMyAgents(){
                         </label>
                     </div>
                 </div>
-                <div style="display:flex;gap:8px">
-                    <button class="btn btn-sm" onclick="editAgent(${a.id}, '${a.name.replace(/'/g, "\\'")}', '${a.behavior.replace(/'/g, "\\'")}', '${a.forbidden.replace(/'/g, "\\'")}', '${a.knowledge_base.replace(/'/g, "\\'")}', ${a.humanity_level})">✏️ Изменить</button>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-sm" onclick="editAgent(${a.id})">✏️ Изменить</button>
+                    <button class="btn btn-sm" onclick="connectTelegram(${a.id})">🔔 Подключить к ТГ</button>
                     <button class="btn btn-red btn-sm" onclick="deleteAgent(${a.id})">🗑️</button>
                 </div>
             </div>
@@ -447,32 +457,145 @@ async function loadMyAgents(){
     }
 }
 
-function toggleAgent(id){
-    fetchAPI(`/ai/agents/${id}/toggle`, 'POST')
-        .then(r => { if(r.ok) loadMyAgents(); })
-        .catch(e => alert('❌ Ошибка переключения'));
+function editAgent(agentId){
+    fetchAPI('/ai/agents').then(agents => {
+        const agent = agents.find(a => a.id === agentId);
+        if(!agent) return alert('❌ Агент не найден');
+        
+        document.querySelectorAll('#ai .tab')[0].click();
+        
+        document.getElementById('aiName').value = agent.name || '';
+        document.getElementById('aiBehavior').value = agent.behavior || '';
+        document.getElementById('aiForbidden').value = agent.forbidden || '';
+        document.getElementById('aiKnowledge').value = agent.knowledge_base || '';
+        document.getElementById('aiHumanity').value = agent.humanity_level || 3;
+        document.getElementById('humanityValue').textContent = agent.humanity_level || 3;
+        document.getElementById('aiWebToggle').checked = agent.is_active_web || false;
+        
+        editingAgentId = agentId;
+        
+        if(agent.pdfs && agent.pdfs.length > 0) {
+            const pdfList = document.getElementById('pdfFileList');
+            pdfList.innerHTML = agent.pdfs.map(pdf => `
+                <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin:6px 0;font-size:0.85rem">
+                    <span>📄 ${escapeHtml(pdf.filename)}</span>
+                    <span onclick="deletePdf(${pdf.id})" style="color:var(--danger);cursor:pointer">×</span>
+                </div>
+            `).join('');
+        }
+        
+        alert('✏️ Внесите изменения и нажмите "Сохранить"');
+    }).catch(e => {
+        console.error('Error loading agent:', e);
+        alert('❌ Ошибка загрузки данных агента');
+    });
 }
 
-function editAgent(id, name, behavior, forbidden, knowledge, humanity){
-    document.querySelectorAll('#ai .tab')[0].click();
-    document.getElementById('aiName').value = name;
-    document.getElementById('aiBehavior').value = behavior;
-    document.getElementById('aiForbidden').value = forbidden;
-    document.getElementById('aiKnowledge').value = knowledge;
-    document.getElementById('aiHumanity').value = humanity;
-    document.getElementById('humanityValue').textContent = humanity;
-    window.editingAgentId = id;
-    alert('✏️ Внесите изменения и нажмите "Сохранить"');
+function connectTelegram(agentId){
+    showSection('profile');
+    setTimeout(() => {
+        document.getElementById('profileTgChatId').focus();
+        alert('🔔 Введите Chat ID и токен бота, затем нажмите "Сохранить" для подключения к агенту');
+    }, 100);
 }
 
-async function deleteAgent(id){
+async function deleteAgent(agentId){
     if(!confirm('Удалить этого агента?')) return;
     try {
-        await fetchAPI(`/ai/agents/${id}/delete`, 'DELETE');
+        await fetchAPI(`/ai/agents/${agentId}/delete`, 'DELETE');
         loadMyAgents();
     } catch(e) {
         alert('❌ Ошибка удаления');
     }
+}
+
+function saveAI(){
+    const data = {
+        name: document.getElementById('aiName').value,
+        behavior: document.getElementById('aiBehavior').value,
+        forbidden: document.getElementById('aiForbidden').value,
+        knowledge_base: document.getElementById('aiKnowledge').value,
+        is_active_web: document.getElementById('aiWebToggle').checked,
+        humanity_level: parseInt(document.getElementById('aiHumanity').value)
+    };
+    
+    const url = editingAgentId ? `/ai/agents/${editingAgentId}` : '/ai/setup';
+    const method = editingAgentId ? 'PUT' : 'POST';
+    
+    fetchAPI(url, method, data).then(result => {
+        if(result && result.ok) {
+            alert('✅ Агент сохранён!');
+            if(editingAgentId) {
+                editingAgentId = null;
+                loadMyAgents();
+            } else {
+                document.getElementById('aiName').value = '';
+                document.getElementById('aiBehavior').value = '';
+                document.getElementById('aiForbidden').value = '';
+                document.getElementById('aiKnowledge').value = '';
+                document.getElementById('aiHumanity').value = 3;
+                document.getElementById('humanityValue').textContent = '3';
+                document.getElementById('aiWebToggle').checked = false;
+                document.getElementById('pdfFileList').innerHTML = '';
+            }
+        } else {
+            alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
+        }
+    }).catch(e => {
+        console.error('Save error:', e);
+        alert('❌ Ошибка сохранения');
+    });
+}
+
+function handlePdfFiles(files){
+    if(!editingAgentId) {
+        alert('❌ Сначала сохраните агента, затем загрузите PDF');
+        return;
+    }
+    for(let f of files){
+        if(f.type !== 'application/pdf') {
+            alert('❌ Только PDF файлы');
+            return;
+        }
+        if(f.size > 10*1024*1024) {
+            alert('❌ Максимум 10МБ');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', f);
+        formData.append('agent_id', editingAgentId);
+        
+        fetch(API + '/ai/upload_pdf', {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`},
+            body: formData
+        }).then(r => r.json()).then(result => {
+            if(result.ok) {
+                alert('✅ PDF загружен!');
+                loadMyAgents();
+            } else {
+                alert('❌ Ошибка: ' + (result.error || 'Неизвестная'));
+            }
+        }).catch(e => {
+            alert('❌ Ошибка загрузки');
+        });
+    }
+}
+
+async function deletePdf(pdfId){
+    if(!confirm('Удалить этот PDF?')) return;
+    try {
+        await fetchAPI(`/ai/delete_pdf/${pdfId}`, 'DELETE');
+        loadMyAgents();
+    } catch(e) {
+        alert('❌ Ошибка удаления PDF');
+    }
+}
+
+function toggleAgent(agentId){
+    fetchAPI(`/ai/agents/${agentId}/toggle`, 'POST')
+        .then(r => { if(r.ok) loadMyAgents(); })
+        .catch(e => alert('❌ Ошибка переключения'));
 }
 
 function saveTG(){const t=document.getElementById('tgToken').value.trim(),c=document.getElementById('tgChatId').value.trim();if(!t||!c)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>alert('✅ Telegram настроен!')));}
