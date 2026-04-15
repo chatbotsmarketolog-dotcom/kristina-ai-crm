@@ -28,6 +28,17 @@ def send_telegram_notification(chat_id, text):
     except Exception as e:
         print(f"Telegram notification error: {e}")
 
+def validate_contact_method(method):
+    """Проверка разрешённых мессенджеров"""
+    allowed = ['telegram', 'vk', 'одноклассники', 'instagram', 'tenchat', 'тентенчат', 'ок']
+    blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k']
+    method_lower = method.lower().strip()
+    if method_lower in blocked:
+        return False, "❌ Мессенджер MAX/МАКС запрещён. Пожалуйста, укажите один из разрешённых: Telegram, ВК, Одноклассники, Instagram, TenChat"
+    if method_lower not in allowed:
+        return False, f"❌ '{method}' не в списке разрешённых. Доступно: Telegram, ВК, Одноклассники, Instagram, TenChat"
+    return True, None
+
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
@@ -55,6 +66,7 @@ class Chat(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    visitor_name = db.Column(db.String(100))  # ← НОВОЕ ПОЛЕ: имя клиента
     status = db.Column(db.String(20), default='waiting')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -102,6 +114,21 @@ class AIWebsite(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
+class Deal(db.Model):
+    __tablename__ = 'deal'
+    id = db.Column(db.Integer, primary_key=True)
+    chat_id = db.Column(db.Integer, db.ForeignKey('chat.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    client_name = db.Column(db.String(100))
+    sphere = db.Column(db.String(200))
+    request = db.Column(db.Text)
+    budget = db.Column(db.String(100))
+    contact_method = db.Column(db.String(50))
+    contact_nickname = db.Column(db.String(100))
+    status = db.Column(db.String(20), default='pending')
+    decline_reason = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
 def hash_pwd(p): 
     return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
 
@@ -139,14 +166,31 @@ def add_missing_columns():
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS forbidden TEXT'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS humanity_level INTEGER DEFAULT 3'))
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
             try:
                 db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
                 db.session.execute(text('CREATE TABLE IF NOT EXISTS aiwebsite (id SERIAL PRIMARY KEY, agent_id INTEGER REFERENCES aimanager(id), website_id INTEGER REFERENCES website(id), is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())'))
+                db.session.execute(text('''
+                    CREATE TABLE IF NOT EXISTS deal (
+                        id SERIAL PRIMARY KEY,
+                        chat_id INTEGER REFERENCES chat(id),
+                        user_id INTEGER REFERENCES "user"(id),
+                        client_name VARCHAR(100),
+                        sphere VARCHAR(200),
+                        request TEXT,
+                        budget VARCHAR(100),
+                        contact_method VARCHAR(50),
+                        contact_nickname VARCHAR(100),
+                        status VARCHAR(20) DEFAULT 'pending',
+                        decline_reason VARCHAR(200),
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                '''))
                 db.session.commit()
-                print("✅ Добавлена колонка user_id в таблицу chat")
+                print("✅ Добавлены колонки и таблицы")
             except:
                 db.session.rollback()
-                print("ℹ️ Колонка user_id уже существует")
+                print("ℹ️ Колонки/таблицы уже существуют")
             db.session.commit()
         except Exception as e:
             print(f"Migration error: {e}")
@@ -318,11 +362,7 @@ def get_chats():
             chats = Chat.query.order_by(Chat.created_at.desc()).all()
             result = []
             for c in chats:
-                if hasattr(c, 'user_id') and c.user_id:
-                    target = User.query.get(c.user_id)
-                    chat_name = target.username if target else "Пользователь"
-                else:
-                    chat_name = "Пользователь"
+                chat_name = c.visitor_name or (User.query.get(c.user_id).username if c.user_id else "Пользователь")
                 result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
             return jsonify(result)
         else:
@@ -419,12 +459,9 @@ def get_user_agents():
 def setup_ai():
     try:
         d = request.json
-        # Проверяем лимит: максимум 10 агентов
         agent_count = AIManager.query.filter_by(user_id=request.current_user.id).count()
         if agent_count >= 10:
             return jsonify({"error": "Достигнут лимит: максимум 10 агентов"}), 400
-        
-        # Всегда создаём НОВОГО агента
         ai = AIManager(
             user_id=request.current_user.id,
             name=d.get('name','AI Assistant'),
@@ -609,6 +646,121 @@ def delete_pdf(pdf_id):
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Delete PDF error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# === СДЕЛКИ ===
+
+@app.route('/api/deals', methods=['POST'])
+@token_required
+def create_deal():
+    try:
+        d = request.json
+        chat_id = d.get('chat_id')
+        is_valid, error = validate_contact_method(d.get('contact_method', ''))
+        if not is_valid:
+            return jsonify({"error": error}), 400
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return jsonify({"error": "Чат не найден"}), 404
+        deal = Deal(
+            chat_id=chat_id,
+            user_id=chat.user_id or request.current_user.id,
+            client_name=d.get('client_name'),
+            sphere=d.get('sphere'),
+            request=d.get('request'),
+            budget=d.get('budget'),
+            contact_method=d.get('contact_method'),
+            contact_nickname=d.get('contact_nickname'),
+            status='completed'
+        )
+        db.session.add(deal)
+        db.session.commit()
+        admin = User.query.filter_by(is_admin=True).first()
+        if admin and admin.telegram_chat_id:
+            send_telegram_notification(
+                admin.telegram_chat_id,
+                f"🎉 <b>Новая сделка!</b>\n\n👤 Клиент: {deal.client_name}\n💼 Сфера: {deal.sphere}\n💰 Бюджет: {deal.budget}\n📱 Контакт: {deal.contact_method} @{deal.contact_nickname}"
+            )
+        return jsonify({"ok": True, "deal_id": deal.id})
+    except Exception as e:
+        print(f"Create deal error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/deals', methods=['GET'])
+@token_required
+def get_deals():
+    try:
+        status = request.args.get('status', 'completed')
+        user = request.current_user
+        if user.is_admin:
+            deals = Deal.query.filter_by(status=status).order_by(Deal.created_at.desc()).all()
+        else:
+            deals = Deal.query.filter_by(user_id=user.id, status=status).order_by(Deal.created_at.desc()).all()
+        result = []
+        for deal in deals:
+            result.append({
+                "id": deal.id,
+                "client_name": deal.client_name,
+                "sphere": deal.sphere,
+                "request": deal.request,
+                "budget": deal.budget,
+                "contact_method": deal.contact_method,
+                "contact_nickname": deal.contact_nickname,
+                "status": deal.status,
+                "decline_reason": deal.decline_reason,
+                "chat_id": deal.chat_id,
+                "created_at": deal.created_at.isoformat()
+            })
+        return jsonify(result)
+    except Exception as e:
+        print(f"Get deals error: {e}")
+        return jsonify([]), 500
+
+@app.route('/api/deals/<int:deal_id>', methods=['PUT'])
+@token_required
+def update_deal(deal_id):
+    try:
+        deal = Deal.query.get(deal_id)
+        if not deal:
+            return jsonify({"error": "Сделка не найдена"}), 404
+        d = request.json
+        deal.status = d.get('status', deal.status)
+        deal.decline_reason = d.get('decline_reason', deal.decline_reason)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Update deal error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/deals/<int:deal_id>', methods=['DELETE'])
+@token_required
+def delete_deal(deal_id):
+    try:
+        deal = Deal.query.get(deal_id)
+        if not deal:
+            return jsonify({"error": "Сделка не найдена"}), 404
+        db.session.delete(deal)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Delete deal error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/chat/<int:chat_id>/set_client_name', methods=['POST'])
+@token_required
+def set_client_name(chat_id):
+    try:
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return jsonify({"error": "Чат не найден"}), 404
+        name = request.json.get('name', '').strip()
+        if not name:
+            return jsonify({"error": "Имя обязательно"}), 400
+        chat.visitor_name = name
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Set client name error: {e}")
         return jsonify({"error": str(e)}), 500
 
 # === TELEGRAM ===
