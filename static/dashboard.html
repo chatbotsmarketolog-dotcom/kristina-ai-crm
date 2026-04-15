@@ -284,9 +284,6 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
                 <option value="Instagram">Instagram</option>
                 <option value="TenChat">TenChat</option>
             </select>
-            <small style="opacity:0.7;display:block;margin-top:4px;color:var(--danger)">
-                ⚠️ MAX/МАКС запрещён. Пожалуйста, выберите из списка выше.
-            </small>
         </div>
         <div class="form-group">
             <label>6. Никнейм для связи *</label>
@@ -302,7 +299,7 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 
 <script>
 const API=location.origin+'/api',token=localStorage.getItem('token'),isAdmin=localStorage.getItem('isAdmin')==='true';
-let activeChatId=null, pollInterval=null, editingAgentId=null, dealFormShown=false;
+let activeChatId=null, pollInterval=null, editingAgentId=null, shownDealForms={};
 if(!token)window.location.href='/index.html';
 if(isAdmin)document.getElementById('adminBtn').style.display='inline-block';
 
@@ -380,7 +377,6 @@ function showChatWindow(){document.getElementById('chatListPanel').classList.add
 
 async function openChat(id, site){
     activeChatId = id;
-    dealFormShown = false;  // ← сброс флага при смене чата
     
     document.getElementById('chatTitle').textContent = site;
     document.getElementById('msgInput').disabled = false;
@@ -389,7 +385,6 @@ async function openChat(id, site){
     const dealBtn = document.getElementById('dealBtn');
     if(isAdmin) {
         dealBtn.style.display = 'inline-block';
-        // Кнопка для админа: отправить форму клиенту
         dealBtn.onclick = () => {
             fetchAPI(`/chat/${activeChatId}/request_form`, 'POST')
                 .then(r => {
@@ -434,10 +429,10 @@ async function loadMessages(){
     
     document.getElementById('chatMessages').scrollTop = 9999;
     
-    // Если форма запрошена и это не админ → показать форму
-    if(formRequested && !isAdmin && !dealFormShown) {
+    // Если форма запрошена, это не админ, и форма ещё не показывалась для этого чата
+    if(formRequested && !isAdmin && !shownDealForms[activeChatId]) {
         openDealModal();
-        dealFormShown = true;
+        shownDealForms[activeChatId] = true;
     }
 }
 
@@ -450,10 +445,9 @@ async function sendMessage(){
         loadMessages();
         loadChats();
         
-        // Если сервер вернул form_requested=true → показать форму
-        if(result.form_requested && !isAdmin && !dealFormShown) {
+        if(result.form_requested && !isAdmin && !shownDealForms[activeChatId]) {
             openDealModal();
-            dealFormShown = true;
+            shownDealForms[activeChatId] = true;
         }
     } catch(e) {
         alert('❌ Ошибка отправки');
@@ -852,9 +846,10 @@ async function submitDeal(){
         return alert('❌ Заполните все обязательные поля');
     }
     
+    // Валидация мессенджера (техническая, без визуального предупреждения)
     const blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k'];
     if(blocked.includes(data.contact_method.toLowerCase())) {
-        return alert('❌ Мессенджер MAX/МАКС запрещён. Пожалуйста, выберите из списка: Telegram, ВК, Одноклассники, Instagram, TenChat');
+        return alert('❌ Укажите Telegram, VK, Одноклассники, Instagram или TenChat');
     }
     
     try {
@@ -863,6 +858,7 @@ async function submitDeal(){
             alert('✅ Заявка отправлена!');
             closeDealModal();
             document.getElementById('dealBtn').style.display = 'none';
+            shownDealForms[activeChatId] = true;
         } else {
             alert('❌ Ошибка: ' + (result.error || 'Неизвестная'));
         }
