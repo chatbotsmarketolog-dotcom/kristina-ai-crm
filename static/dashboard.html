@@ -525,19 +525,24 @@ function saveAI(){
     fetchAPI(url, method, data).then(result => {
         if(result && result.ok) {
             alert('✅ Агент сохранён!');
-            if(editingAgentId) {
-                editingAgentId = null;
+            
+            // Всегда очищаем форму и сбрасываем режим редактирования
+            editingAgentId = null;
+            document.getElementById('aiName').value = '';
+            document.getElementById('aiBehavior').value = '';
+            document.getElementById('aiForbidden').value = '';
+            document.getElementById('aiKnowledge').value = '';
+            document.getElementById('aiHumanity').value = 3;
+            document.getElementById('humanityValue').textContent = '3';
+            document.getElementById('aiWebToggle').checked = false;
+            document.getElementById('pdfFileList').innerHTML = '';
+            
+            // Обновляем список агентов если мы на вкладке "Мои"
+            const myTab = document.querySelector('#ai .tab:nth-child(2)');
+            if(myTab && myTab.classList.contains('active')) {
                 loadMyAgents();
-            } else {
-                document.getElementById('aiName').value = '';
-                document.getElementById('aiBehavior').value = '';
-                document.getElementById('aiForbidden').value = '';
-                document.getElementById('aiKnowledge').value = '';
-                document.getElementById('aiHumanity').value = 3;
-                document.getElementById('humanityValue').textContent = '3';
-                document.getElementById('aiWebToggle').checked = false;
-                document.getElementById('pdfFileList').innerHTML = '';
             }
+            // Если мы на вкладке "Создать" — форма уже чистая и готова к новому агенту
         } else {
             alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
         }
