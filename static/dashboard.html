@@ -302,7 +302,7 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 
 <script>
 const API=location.origin+'/api',token=localStorage.getItem('token'),isAdmin=localStorage.getItem('isAdmin')==='true';
-let activeChatId=null,pollInterval=null,editingAgentId=null;
+let activeChatId=null, pollInterval=null, editingAgentId=null, dealFormShown=false;
 if(!token)window.location.href='/index.html';
 if(isAdmin)document.getElementById('adminBtn').style.display='inline-block';
 
@@ -380,6 +380,8 @@ function showChatWindow(){document.getElementById('chatListPanel').classList.add
 
 async function openChat(id, site){
     activeChatId = id;
+    dealFormShown = false;  // ← сброс флага при смене чата
+    
     document.getElementById('chatTitle').textContent = site;
     document.getElementById('msgInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
@@ -387,6 +389,18 @@ async function openChat(id, site){
     const dealBtn = document.getElementById('dealBtn');
     if(isAdmin) {
         dealBtn.style.display = 'inline-block';
+        // Кнопка для админа: отправить форму клиенту
+        dealBtn.onclick = () => {
+            fetchAPI(`/chat/${activeChatId}/request_form`, 'POST')
+                .then(r => {
+                    if(r.ok) {
+                        alert('✅ Форма заявки отправлена клиенту!');
+                        dealBtn.style.display = 'none';
+                    } else {
+                        alert('❌ Ошибка: ' + (r.error || 'Неизвестная'));
+                    }
+                });
+        };
     } else {
         dealBtn.style.display = 'none';
         handleFirstMessage();
@@ -400,8 +414,11 @@ async function openChat(id, site){
 
 async function loadMessages(){
     if(!activeChatId) return;
-    const m = await fetchAPI(`/messages/${activeChatId}`);
-    if(!m) return;
+    const response = await fetchAPI(`/messages/${activeChatId}`);
+    if(!response) return;
+    
+    const m = response.messages || [];
+    const formRequested = response.form_requested;
     
     const chatTitle = document.getElementById('chatTitle').textContent;
     
@@ -409,7 +426,6 @@ async function loadMessages(){
         const isFromAdmin = x.sender === 'admin';
         const senderName = isFromAdmin ? 'Админ' : (isAdmin ? chatTitle : 'Я');
         const msgClass = isFromAdmin ? 'msg-admin' : 'msg-user';
-        
         return `<div class="msg ${msgClass}">
             <div class="msg-header">${senderName}</div>
             <div class="msg-text">${x.text}</div>
@@ -417,16 +433,28 @@ async function loadMessages(){
     }).join('');
     
     document.getElementById('chatMessages').scrollTop = 9999;
+    
+    // Если форма запрошена и это не админ → показать форму
+    if(formRequested && !isAdmin && !dealFormShown) {
+        openDealModal();
+        dealFormShown = true;
+    }
 }
 
 async function sendMessage(){
     const t = document.getElementById('msgInput').value.trim();
     if(!t || !activeChatId) return;
     try {
-        await fetchAPI('/send', 'POST', {chat_id: activeChatId, text: t});
+        const result = await fetchAPI('/send', 'POST', {chat_id: activeChatId, text: t});
         document.getElementById('msgInput').value = '';
         loadMessages();
         loadChats();
+        
+        // Если сервер вернул form_requested=true → показать форму
+        if(result.form_requested && !isAdmin && !dealFormShown) {
+            openDealModal();
+            dealFormShown = true;
+        }
     } catch(e) {
         alert('❌ Ошибка отправки');
     }
