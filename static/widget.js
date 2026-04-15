@@ -614,20 +614,20 @@
             return;
         }
 
-        // API функции - ИСПРАВЛЕНА: добавляем api_key в query params
+        // ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ fetchAPI - передаём API ключ в заголовке!
         async function fetchAPI(url, method = 'GET', body = null, useFormData = false) {
             const options = {
                 method,
-                headers: {}
+                headers: {
+                    'X-API-Key': API_KEY  // ← Передаём в заголовке!
+                }
             };
             
             if (!useFormData) {
                 options.headers['Content-Type'] = 'application/json';
             }
             
-            // Добавляем API ключ в query параметры для виджета
-            const separator = url.includes('?') ? '&' : '?';
-            const fullUrl = API_URL + url + separator + 'api_key=' + API_KEY;
+            const fullUrl = API_URL + url;  // ← БЕЗ api_key в URL!
             
             if (body) {
                 options.body = body;
@@ -742,7 +742,7 @@
                     
                     response = await fetchAPI('/api/widget/send_with_files', 'POST', formData, true);
                 } else {
-                    // Отправка только текста - ИСПРАВЛЕНО: используем widget endpoint
+                    // Отправка только текста
                     response = await fetchAPI('/api/widget/send', 'POST', {
                         chat_id: chatId,
                         text: text
@@ -767,7 +767,7 @@
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Инициализация чата - ИСПРАВЛЕНО: используем widget endpoints
+        // Инициализация чата
         async function initChat() {
             try {
                 console.log('🔄 Initializing chat...');
@@ -814,7 +814,7 @@
             }
         }
 
-        // Обработчик кнопки "Представиться" - ИСПРАВЛЕНО: используем widget endpoint
+        // Обработчик кнопки "Представиться"
         if (nameSubmit) {
             nameSubmit.addEventListener('click', async () => {
                 const name = userNameInput ? userNameInput.value.trim() : '';
@@ -854,7 +854,7 @@
             });
         }
 
-        // Загрузка сообщений - ИСПРАВЛЕНО: используем widget endpoint
+        // Загрузка сообщений
         async function loadMessages() {
             if (!chatId) return;
             
@@ -944,7 +944,7 @@
             });
         }
 
-        // Отправка заявки - ИСПРАВЛЕНО: используем widget endpoint
+        // Отправка заявки
         if (formSubmit) {
             formSubmit.addEventListener('click', async () => {
                 const data = {
