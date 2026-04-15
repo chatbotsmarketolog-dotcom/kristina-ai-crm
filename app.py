@@ -964,6 +964,238 @@ def admin_send_to_user():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+# === ВИДЖЕТ (публичные эндпоинты с API ключом) ===
+
+@app.route('/api/widget/chats', methods=['GET'])
+def widget_get_chats():
+    """Получение чатов для виджета (по API ключу сайта)"""
+    try:
+        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({"error": "API key required"}), 401
+        
+        # Находим сайт по API ключу
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website:
+            return jsonify({"error": "Invalid API key"}), 401
+        
+        # Получаем все чаты этого сайта
+        chats = Chat.query.filter_by(website_id=website.id).order_by(Chat.created_at.desc()).all()
+        
+        result = []
+        for c in chats:
+            chat_name = c.visitor_name or f"Посетитель #{c.id}"
+            result.append({
+                "id": c.id,
+                "site": chat_name,
+                "status": c.status,
+                "time": c.created_at.isoformat()
+            })
+        
+        return jsonify(result)
+    except Exception as e:
+        print(f"Widget get chats error: {e}")
+        return jsonify([]), 500
+
+@app.route('/api/widget/chats', methods=['POST'])
+def widget_create_chat():
+    """Создание нового чата для виджета"""
+    try:
+        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({"error": "API key required"}), 401
+        
+        # Находим сайт по API ключу
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website:
+            return jsonify({"error": "Invalid API key"}), 401
+        
+        # Создаём новый чат
+        chat = Chat(website_id=website.id, status='waiting')
+        db.session.add(chat)
+        db.session.commit()
+        
+        # Уведомляем админа
+        admin = User.query.filter_by(is_admin=True).first()
+        if admin and admin.telegram_chat_id:
+            send_telegram_notification(
+                admin.telegram_chat_id,
+                f"🔔 <b>Новый посетитель на сайте!</b>\n\n🔗 {website.url}\n\nЗайдите в CRM чтобы ответить."
+            )
+        
+        return jsonify({"id": chat.id, "status": "waiting"})
+    except Exception as e:
+        print(f"Widget create chat error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/widget/messages/<int:chat_id>', methods=['GET'])
+def widget_get_messages(chat_id):
+    """Получение сообщений для виджета"""
+    try:
+        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({"error": "API key required"}), 401
+        
+        # Проверяем что чат принадлежит сайту с этим API ключом
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return jsonify({"error": "Chat not found"}), 404
+        
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website or chat.website_id != website.id:
+            return jsonify({"error": "Invalid API key"}), 401
+        
+        # Получаем сообщения
+        msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
+        
+        return jsonify({
+            "messages": [
+                {
+                    "sender": m.sender,
+                    "text": m.text,
+                    "time": m.timestamp.isoformat()
+                } for m in msgs
+            ],
+            "form_requested": chat.form_requested if hasattr(chat, 'form_requested') else False
+        })
+    except Exception as e:
+        print(f"Widget get messages error: {e}")
+        return jsonify({"messages": [], "form_requested": False}), 500
+
+@app.route('/api/widget/send', methods=['POST'])
+def widget_send_message():
+    """Отправка сообщения через виджет"""
+    try:
+        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({"error": "API key required"}), 401
+        
+        data = request.json
+        chat_id = data.get('chat_id')
+        text = data.get('text', '')
+        
+        if not chat_id:
+            return jsonify({"error": "chat_id required"}), 400
+        
+        # Проверяем чат
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return jsonify({"error": "Chat not found"}), 404
+        
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website or chat.website_id != website.id:
+            return jsonify({"error": "Invalid API key"}), 401
+        
+        # Создаём сообщение
+        msg = Message(chat_id=chat_id, sender='user', text=text)
+        db.session.add(msg)
+        db.session.commit()
+        
+        # Уведомляем админа
+        admin = User.query.filter_by(is_admin=True).first()
+        if admin and admin.telegram_chat_id:
+            send_telegram_notification(
+                admin.telegram_chat_id,
+                f"💬 <b>Новое сообщение от посетителя!</b>\n\n{text[:100]}..." if len(text) > 100 else text
+            )
+        
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Widget send message error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/widget/chat/<int:chat_id>/set_client_name', methods=['POST'])
+def widget_set_client_name(chat_id):
+    """Установка имени клиента из виджета"""
+    try:
+        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({"error": "API key required"}), 401
+        
+        data = request.json
+        name = data.get('name', '').strip()
+        
+        if not name:
+            return jsonify({"error": "Name required"}), 400
+        
+        # Проверяем чат
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return jsonify({"error": "Chat not found"}), 404
+        
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website or chat.website_id != website.id:
+            return jsonify({"error": "Invalid API key"}), 401
+        
+        # Сохраняем имя
+        chat.visitor_name = name
+        db.session.commit()
+        
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Widget set client name error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/widget/deals', methods=['POST'])
+def widget_create_deal():
+    """Создание заявки из виджета"""
+    try:
+        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({"error": "API key required"}), 401
+        
+        data = request.json
+        chat_id = data.get('chat_id')
+        
+        if not chat_id:
+            return jsonify({"error": "chat_id required"}), 400
+        
+        # Проверяем чат
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return jsonify({"error": "Chat not found"}), 404
+        
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website or chat.website_id != website.id:
+            return jsonify({"error": "Invalid API key"}), 401
+        
+        # Валидация мессенджера
+        is_valid, error = validate_contact_method(data.get('contact_method', ''))
+        if not is_valid:
+            return jsonify({"error": error}), 400
+        
+        # Создаём сделку
+        deal = Deal(
+            chat_id=chat_id,
+            user_id=website.owner_id,
+            client_name=data.get('client_name'),
+            sphere=data.get('sphere'),
+            request=data.get('request'),
+            budget=data.get('budget'),
+            contact_method=data.get('contact_method'),
+            contact_nickname=data.get('contact_nickname'),
+            status='completed'
+        )
+        db.session.add(deal)
+        db.session.commit()
+        
+        # Уведомляем админа
+        admin = User.query.filter_by(is_admin=True).first()
+        if admin and admin.telegram_chat_id:
+            send_telegram_notification(
+                admin.telegram_chat_id,
+                f"🎉 <b>Новая заявка с сайта!</b>\n\n"
+                f"👤 Клиент: {deal.client_name}\n"
+                f"💼 Сфера: {deal.sphere}\n"
+                f"💰 Бюджет: {deal.budget}\n"
+                f"📱 Контакт: {deal.contact_method} @{deal.contact_nickname}"
+            )
+        
+        return jsonify({"ok": True, "deal_id": deal.id})
+    except Exception as e:
+        print(f"Widget create deal error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 with app.app_context():
     db.create_all()
     add_missing_columns()
