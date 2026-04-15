@@ -67,7 +67,7 @@ class Chat(db.Model):
     website_id = db.Column(db.Integer, db.ForeignKey('website.id'), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     visitor_name = db.Column(db.String(100))
-    form_requested = db.Column(db.Boolean, default=False)  # ← НОВОЕ: была ли отправлена форма заявки
+    form_requested = db.Column(db.Boolean, default=False)
     status = db.Column(db.String(20), default='waiting')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
@@ -394,7 +394,13 @@ def get_chats():
             chats = Chat.query.order_by(Chat.created_at.desc()).all()
             result = []
             for c in chats:
-                chat_name = c.visitor_name or (User.query.get(c.user_id).username if c.user_id else "Пользователь")
+                # Безопасное получение имени
+                chat_name = c.visitor_name
+                if not chat_name and c.user_id:
+                    user = User.query.get(c.user_id)
+                    chat_name = user.username if user else "Пользователь"
+                if not chat_name:
+                    chat_name = "Пользователь"
                 result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
             return jsonify(result)
         else:
