@@ -3,7 +3,7 @@
     'use strict';
     
     // Конфигурация
-    const API_URL = window.KRISTINA_API_URL || window.location.origin;
+    const API_URL = window.KRISTINA_API_URL || 'https://kristina-crm-api.onrender.com';
     const API_KEY = window.KRISTINA_API_KEY;
     
     if (!API_KEY) {
@@ -295,6 +295,27 @@
                 display: flex !important;
             }
             
+            /* Форма имени */
+            .kristina-name-form {
+                position: fixed !important;
+                bottom: 100px !important;
+                right: 30px !important;
+                width: 450px !important;
+                max-width: calc(100vw - 60px) !important;
+                background: #0b132b !important;
+                border-radius: 20px !important;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
+                z-index: 999998 !important;
+                display: none !important;
+                flex-direction: column !important;
+                overflow: hidden !important;
+                border: 1px solid rgba(59, 130, 246, 0.3) !important;
+            }
+            
+            .kristina-name-form.active {
+                display: flex !important;
+            }
+            
             .kristina-form-header {
                 background: linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%) !important;
                 padding: 20px !important;
@@ -394,7 +415,8 @@
                 }
                 
                 .kristina-chat-window,
-                .kristina-deal-form {
+                .kristina-deal-form,
+                .kristina-name-form {
                     bottom: 90px !important;
                     right: 15px !important;
                     left: 15px !important;
@@ -543,6 +565,22 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Форма для ввода имени -->
+        <div class="kristina-name-form" id="kristinaNameForm">
+            <div class="kristina-form-header">
+                <h3>👋 Добро пожаловать!</h3>
+            </div>
+            <div class="kristina-form-content">
+                <div class="kristina-form-group">
+                    <label>Как к вам обращаться? *</label>
+                    <input type="text" id="userNameInput" placeholder="Введите ваше имя" required>
+                </div>
+                <div class="kristina-form-buttons">
+                    <button class="kristina-btn kristina-btn-submit" id="kristinaNameSubmit">✅ Представиться</button>
+                </div>
+            </div>
+        </div>
     `;
 
     try {
@@ -566,6 +604,9 @@
         const formClose = document.getElementById('kristinaFormClose');
         const formCancel = document.getElementById('kristinaFormCancel');
         const formSubmit = document.getElementById('kristinaFormSubmit');
+        const nameForm = document.getElementById('kristinaNameForm');
+        const nameSubmit = document.getElementById('kristinaNameSubmit');
+        const userNameInput = document.getElementById('userNameInput');
 
         // Проверка элементов
         if (!widgetBtn || !chatWindow) {
@@ -747,19 +788,68 @@
                 
                 loadMessages();
                 
-                // Спрашиваем имя если нет
+                // Показываем форму имени если нет
                 if (!userName) {
-                    const name = prompt('👋 Привет! Как к вам обращаться?', '');
-                    if (name && name.trim()) {
-                        userName = name.trim();
-                        localStorage.setItem('kristina_user_name', userName);
-                        await fetchAPI(`/api/chat/${chatId}/set_client_name`, 'POST', { name: userName });
-                    }
+                    showNameForm();
                 }
             } catch (e) {
                 console.error('❌ Ошибка инициализации:', e);
                 alert('❌ Ошибка подключения к чату: ' + e.message);
             }
+        }
+
+        // Показ формы имени
+        function showNameForm() {
+            if (nameForm) {
+                nameForm.classList.add('active');
+                chatWindow.classList.remove('active');
+                dealForm.classList.remove('active');
+                
+                // Фокус на поле ввода
+                setTimeout(() => {
+                    if (userNameInput) userNameInput.focus();
+                }, 100);
+            }
+        }
+
+        // Обработчик кнопки "Представиться"
+        if (nameSubmit) {
+            nameSubmit.addEventListener('click', async () => {
+                const name = userNameInput ? userNameInput.value.trim() : '';
+                
+                if (!name) {
+                    alert('❌ Пожалуйста, введите ваше имя');
+                    return;
+                }
+                
+                try {
+                    userName = name;
+                    localStorage.setItem('kristina_user_name', userName);
+                    
+                    // Сохраняем имя в чате
+                    if (chatId) {
+                        await fetchAPI(`/api/chat/${chatId}/set_client_name`, 'POST', { name: userName });
+                    }
+                    
+                    // Закрываем форму и открываем чат
+                    if (nameForm) nameForm.classList.remove('active');
+                    if (chatWindow) chatWindow.classList.add('active');
+                    
+                    console.log('✅ Имя сохранено:', userName);
+                } catch (e) {
+                    console.error('❌ Ошибка сохранения имени:', e);
+                    alert('❌ Ошибка: ' + e.message);
+                }
+            });
+        }
+
+        // Отправка по Enter в форме имени
+        if (userNameInput && nameSubmit) {
+            userNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    nameSubmit.click();
+                }
+            });
         }
 
         // Загрузка сообщений
@@ -774,7 +864,7 @@
                 renderMessages();
                 
                 // Показываем форму если запрошена
-                if (formRequested && !dealForm.classList.contains('active') && !chatWindow.classList.contains('active')) {
+                if (formRequested && !dealForm.classList.contains('active') && !chatWindow.classList.contains('active') && (!nameForm || !nameForm.classList.contains('active'))) {
                     showDealForm();
                 }
             } catch (e) {
@@ -829,59 +919,65 @@
 
         // Форма заявки
         function showDealForm() {
-            chatWindow.classList.remove('active');
-            dealForm.classList.add('active');
+            if (chatWindow) chatWindow.classList.remove('active');
+            if (dealForm) dealForm.classList.add('active');
             
             // Автозаполнение имени
-            if (userName) {
+            if (userName && document.getElementById('dealClientName')) {
                 document.getElementById('dealClientName').value = userName;
             }
         }
 
-        formClose.addEventListener('click', () => {
-            dealForm.classList.remove('active');
-            chatWindow.classList.add('active');
-        });
+        if (formClose) {
+            formClose.addEventListener('click', () => {
+                if (dealForm) dealForm.classList.remove('active');
+                if (chatWindow) chatWindow.classList.add('active');
+            });
+        }
 
-        formCancel.addEventListener('click', () => {
-            dealForm.classList.remove('active');
-            chatWindow.classList.add('active');
-        });
+        if (formCancel) {
+            formCancel.addEventListener('click', () => {
+                if (dealForm) dealForm.classList.remove('active');
+                if (chatWindow) chatWindow.classList.add('active');
+            });
+        }
 
-        formSubmit.addEventListener('click', async () => {
-            const data = {
-                chat_id: chatId,
-                client_name: document.getElementById('dealClientName').value.trim(),
-                sphere: document.getElementById('dealSphere').value.trim(),
-                request: document.getElementById('dealRequest').value.trim(),
-                budget: document.getElementById('dealBudget').value.trim(),
-                contact_method: document.getElementById('dealContactMethod').value,
-                contact_nickname: document.getElementById('dealContactNickname').value.trim()
-            };
-            
-            // Валидация
-            if (!data.client_name || !data.sphere || !data.request || !data.budget || !data.contact_method || !data.contact_nickname) {
-                alert('❌ Заполните все обязательные поля');
-                return;
-            }
-            
-            // Валидация мессенджера
-            const blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k'];
-            if (blocked.includes(data.contact_method.toLowerCase())) {
-                alert('❌ Укажите Telegram, VK, Одноклассники, Instagram или TenChat');
-                return;
-            }
-            
-            try {
-                await fetchAPI('/api/deals', 'POST', data);
-                alert('✅ Заявка отправлена! Мы свяжемся с вами soon.');
-                dealForm.classList.remove('active');
-                widgetBtn.style.display = 'flex';
-                isOpen = false;
-            } catch (e) {
-                alert('❌ Ошибка отправки: ' + e.message);
-            }
-        });
+        if (formSubmit) {
+            formSubmit.addEventListener('click', async () => {
+                const data = {
+                    chat_id: chatId,
+                    client_name: document.getElementById('dealClientName').value.trim(),
+                    sphere: document.getElementById('dealSphere').value.trim(),
+                    request: document.getElementById('dealRequest').value.trim(),
+                    budget: document.getElementById('dealBudget').value.trim(),
+                    contact_method: document.getElementById('dealContactMethod').value,
+                    contact_nickname: document.getElementById('dealContactNickname').value.trim()
+                };
+                
+                // Валидация
+                if (!data.client_name || !data.sphere || !data.request || !data.budget || !data.contact_method || !data.contact_nickname) {
+                    alert('❌ Заполните все обязательные поля');
+                    return;
+                }
+                
+                // Валидация мессенджера
+                const blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k'];
+                if (blocked.includes(data.contact_method.toLowerCase())) {
+                    alert('❌ Укажите Telegram, VK, Одноклассники, Instagram или TenChat');
+                    return;
+                }
+                
+                try {
+                    await fetchAPI('/api/deals', 'POST', data);
+                    alert('✅ Заявка отправлена! Мы свяжемся с вами soon.');
+                    if (dealForm) dealForm.classList.remove('active');
+                    if (widgetBtn) widgetBtn.style.display = 'flex';
+                    isOpen = false;
+                } catch (e) {
+                    alert('❌ Ошибка отправки: ' + e.message);
+                }
+            });
+        }
 
         // Автообновление сообщений
         setInterval(loadMessages, 3000);
