@@ -18,7 +18,6 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 BOT_TOKEN = "8694190622:AAEVveNpF60fGx8wMl5ViJWawsdWAOqk9Yk"
 
 def send_telegram_notification(chat_id, text):
-    """Отправка уведомления в Telegram"""
     if not chat_id:
         return
     try:
@@ -95,6 +94,14 @@ class AIPDF(db.Model):
     file_path = db.Column(db.String(500))
     uploaded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
+class AIWebsite(db.Model):
+    __tablename__ = 'aiwebsite'
+    id = db.Column(db.Integer, primary_key=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey('aimanager.id'))
+    website_id = db.Column(db.Integer, db.ForeignKey('website.id'))
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
 def hash_pwd(p): 
     return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
 
@@ -134,6 +141,7 @@ def add_missing_columns():
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS humanity_level INTEGER DEFAULT 3'))
             try:
                 db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
+                db.session.execute(text('CREATE TABLE IF NOT EXISTS aiwebsite (id SERIAL PRIMARY KEY, agent_id INTEGER REFERENCES aimanager(id), website_id INTEGER REFERENCES website(id), is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())'))
                 db.session.commit()
                 print("✅ Добавлена колонка user_id в таблицу chat")
             except:
@@ -147,7 +155,6 @@ def add_missing_columns():
 @app.route('/api/admin/clear_deleted_sites', methods=['POST'])
 @admin_required
 def clear_deleted_sites():
-    """Полностью удалить все удалённые сайты"""
     try:
         deleted_count = Website.query.filter_by(is_deleted=True).delete()
         db.session.commit()
@@ -158,7 +165,6 @@ def clear_deleted_sites():
 @app.route('/api/admin/migrate_ai_columns', methods=['POST'])
 @admin_required
 def migrate_ai_columns():
-    """Добавить новые колонки в таблицу aimanager"""
     try:
         with app.app_context():
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS forbidden TEXT'))
@@ -199,6 +205,8 @@ def register():
         print(f"Register error: {e}")
         return jsonify({"error": "Ошибка сервера"}), 500
 
+# === САЙТЫ ===
+
 @app.route('/api/sites', methods=['GET'])
 @token_required
 def get_sites():
@@ -216,29 +224,19 @@ def add_site():
     try:
         url = request.json.get('url')
         if not url: return jsonify({"error": "URL обязателен"}), 400
-        
         existing_site = Website.query.filter_by(url=url).first()
         if existing_site:
             if existing_site.owner_id == request.current_user.id:
                 return jsonify({"error": "Этот сайт уже добавлен", "id": existing_site.id}), 400
             else:
                 return jsonify({"error": "Этот сайт уже добавлен другим пользователем"}), 400
-        
         key = f"site_{uuid.uuid4().hex[:8]}"
         site = Website(url=url, api_key=key, owner_id=request.current_user.id, status='pending')
         db.session.add(site)
         db.session.commit()
-        
         admin = User.query.filter_by(is_admin=True).first()
         if admin and admin.telegram_chat_id:
-            send_telegram_notification(
-                admin.telegram_chat_id,
-                f"🔔 <b>Новый сайт на модерации!</b>\n\n"
-                f"👤 Владелец: {request.current_user.username}\n"
-                f"🔗 Сайт: {url}\n\n"
-                f"Зайдите в админ-панель для одобрения."
-            )
-        
+            send_telegram_notification(admin.telegram_chat_id, f"🔔 <b>Новый сайт на модерации!</b>\n\n👤 Владелец: {request.current_user.username}\n🔗 Сайт: {url}\n\nЗайдите в админ-панель для одобрения.")
         return jsonify({"ok": True, "id": site.id})
     except Exception as e:
         print(f"Add site error: {e}")
@@ -254,14 +252,7 @@ def get_pending_sites():
         result = []
         for site in sites:
             owner = User.query.get(site.owner_id)
-            result.append({
-                "id": site.id,
-                "url": site.url,
-                "api_key": site.api_key,
-                "owner": owner.username if owner else "Unknown",
-                "owner_id": site.owner_id,
-                "created_at": site.created_at.isoformat()
-            })
+            result.append({"id": site.id, "url": site.url, "api_key": site.api_key, "owner": owner.username if owner else "Unknown", "owner_id": site.owner_id, "created_at": site.created_at.isoformat()})
         return jsonify(result)
     except Exception as e:
         print(f"Get pending sites error: {e}")
@@ -272,28 +263,15 @@ def get_pending_sites():
 def approve_site_endpoint(site_id):
     try:
         site = Website.query.get(site_id)
-        if not site:
-            return jsonify({"error": "Сайт не найден"}), 404
-        
+        if not site: return jsonify({"error": "Сайт не найден"}), 404
         site.status = 'active'
         db.session.commit()
-        
         owner = User.query.get(site.owner_id)
         if owner and owner.telegram_chat_id:
-            send_telegram_notification(
-                owner.telegram_chat_id,
-                f"✅ <b>Ваш сайт одобрен!</b>\n\n"
-                f"🔗 {site.url}\n\n"
-                f"Теперь вы можете использовать виджет КРИСТИНА.AI CRM"
-            )
-        
+            send_telegram_notification(owner.telegram_chat_id, f"✅ <b>Ваш сайт одобрен!</b>\n\n🔗 {site.url}\n\nТеперь вы можете использовать виджет КРИСТИНА.AI CRM")
         admin = User.query.filter_by(is_admin=True).first()
         if admin and admin.telegram_chat_id:
-            send_telegram_notification(
-                admin.telegram_chat_id,
-                f"✅ Сайт одобрен: {site.url}\nВладелец: {owner.username if owner else 'Unknown'}"
-            )
-        
+            send_telegram_notification(admin.telegram_chat_id, f"✅ Сайт одобрен: {site.url}\nВладелец: {owner.username if owner else 'Unknown'}")
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Approve error: {e}")
@@ -304,9 +282,7 @@ def approve_site_endpoint(site_id):
 def reject_site(site_id):
     try:
         site = Website.query.get(site_id)
-        if not site:
-            return jsonify({"error": "Сайт не найден"}), 404
-        
+        if not site: return jsonify({"error": "Сайт не найден"}), 404
         db.session.delete(site)
         db.session.commit()
         return jsonify({"ok": True})
@@ -330,6 +306,8 @@ def delete_site(site_id):
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+# === ЧАТЫ ===
 
 @app.route('/api/chats', methods=['GET'])
 @token_required
@@ -361,8 +339,7 @@ def get_chats():
 def delete_chat(chat_id):
     try:
         chat = Chat.query.get(chat_id)
-        if not chat:
-            return jsonify({"error": "Чат не найден"}), 404
+        if not chat: return jsonify({"error": "Чат не найден"}), 404
         Message.query.filter_by(chat_id=chat_id).delete()
         db.session.delete(chat)
         db.session.commit()
@@ -389,27 +366,17 @@ def send_message():
         sender = 'admin' if request.current_user.is_admin else 'user'
         db.session.add(Message(chat_id=d['chat_id'], sender=sender, text=d['text']))
         db.session.commit()
-        
         chat = Chat.query.get(d['chat_id'])
         if chat and chat.user_id:
             if sender == 'admin':
                 user = User.query.get(chat.user_id)
                 if user and user.telegram_chat_id:
-                    send_telegram_notification(
-                        user.telegram_chat_id,
-                        f"💬 <b>Новое сообщение от админа!</b>\n\n"
-                        f"{d['text'][:100]}..." if len(d['text']) > 100 else d['text']
-                    )
+                    send_telegram_notification(user.telegram_chat_id, f"💬 <b>Новое сообщение от админа!</b>\n\n{d['text'][:100]}..." if len(d['text']) > 100 else d['text'])
             else:
                 admin = User.query.filter_by(is_admin=True).first()
                 if admin and admin.telegram_chat_id:
                     user = User.query.get(chat.user_id)
-                    send_telegram_notification(
-                        admin.telegram_chat_id,
-                        f"💬 <b>Ответ от {user.username if user else 'Пользователя'}</b>\n\n"
-                        f"{d['text'][:100]}..." if len(d['text']) > 100 else d['text']
-                    )
-        
+                    send_telegram_notification(admin.telegram_chat_id, f"💬 <b>Ответ от {user.username if user else 'Пользователя'}</b>\n\n{d['text'][:100]}..." if len(d['text']) > 100 else d['text'])
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Send error: {e}")
@@ -417,7 +384,7 @@ def send_message():
         traceback.print_exc()
         return jsonify({"error": "Ошибка"}), 500
 
-# === УПРАВЛЕНИЕ АГЕНТАМИ ===
+# === АГЕНТЫ ===
 
 @app.route('/api/ai/agents', methods=['GET'])
 @token_required
@@ -427,6 +394,8 @@ def get_user_agents():
         result = []
         for a in agents:
             pdfs = AIPDF.query.filter_by(agent_id=a.id).all()
+            link = AIWebsite.query.filter_by(agent_id=a.id).first()
+            website = Website.query.get(link.website_id) if link else None
             result.append({
                 "id": a.id,
                 "name": a.name,
@@ -437,6 +406,7 @@ def get_user_agents():
                 "is_active_telegram": a.is_active_telegram,
                 "humanity_level": a.humanity_level,
                 "pdfs": [{"id": p.id, "filename": p.filename} for p in pdfs],
+                "linked_website": {"id": website.id, "url": website.url} if website else None,
                 "created_at": a.created_at.isoformat()
             })
         return jsonify(result)
@@ -444,32 +414,32 @@ def get_user_agents():
         print(f"Get agents error: {e}")
         return jsonify([]), 500
 
-@app.route('/api/ai/agents/<int:agent_id>/toggle', methods=['POST'])
+@app.route('/api/ai/setup', methods=['POST'])
 @token_required
-def toggle_agent(agent_id):
+def setup_ai():
     try:
-        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
-        if not agent:
-            return jsonify({"error": "Агент не найден"}), 404
-        agent.is_active_web = not agent.is_active_web
+        d = request.json
+        # Проверяем лимит: максимум 10 агентов
+        agent_count = AIManager.query.filter_by(user_id=request.current_user.id).count()
+        if agent_count >= 10:
+            return jsonify({"error": "Достигнут лимит: максимум 10 агентов"}), 400
+        
+        # Всегда создаём НОВОГО агента
+        ai = AIManager(
+            user_id=request.current_user.id,
+            name=d.get('name','AI Assistant'),
+            behavior=d.get('behavior',''),
+            forbidden=d.get('forbidden',''),
+            knowledge_base=d.get('knowledge_base',''),
+            is_active_web=d.get('is_active_web',False),
+            is_active_telegram=d.get('is_active_telegram',False),
+            humanity_level=d.get('humanity_level', 3)
+        )
+        db.session.add(ai)
         db.session.commit()
-        return jsonify({"ok": True, "is_active": agent.is_active_web})
+        return jsonify({"ok": True, "agent_id": ai.id})
     except Exception as e:
-        print(f"Toggle agent error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/ai/agents/<int:agent_id>/toggle_telegram', methods=['POST'])
-@token_required
-def toggle_agent_telegram(agent_id):
-    try:
-        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
-        if not agent:
-            return jsonify({"error": "Агент не найден"}), 404
-        agent.is_active_telegram = not agent.is_active_telegram
-        db.session.commit()
-        return jsonify({"ok": True, "is_active": agent.is_active_telegram})
-    except Exception as e:
-        print(f"Toggle agent telegram error: {e}")
+        print(f"AI setup error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/ai/agents/<int:agent_id>', methods=['PUT'])
@@ -477,8 +447,7 @@ def toggle_agent_telegram(agent_id):
 def update_agent(agent_id):
     try:
         agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
-        if not agent:
-            return jsonify({"error": "Агент не найден"}), 404
+        if not agent: return jsonify({"error": "Агент не найден"}), 404
         d = request.json
         agent.name = d.get('name', agent.name)
         agent.behavior = d.get('behavior', agent.behavior)
@@ -491,14 +460,40 @@ def update_agent(agent_id):
         print(f"Update agent error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/ai/agents/<int:agent_id>/toggle', methods=['POST'])
+@token_required
+def toggle_agent(agent_id):
+    try:
+        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
+        if not agent: return jsonify({"error": "Агент не найден"}), 404
+        agent.is_active_web = not agent.is_active_web
+        db.session.commit()
+        return jsonify({"ok": True, "is_active": agent.is_active_web})
+    except Exception as e:
+        print(f"Toggle agent error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/ai/agents/<int:agent_id>/toggle_telegram', methods=['POST'])
+@token_required
+def toggle_agent_telegram(agent_id):
+    try:
+        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
+        if not agent: return jsonify({"error": "Агент не найден"}), 404
+        agent.is_active_telegram = not agent.is_active_telegram
+        db.session.commit()
+        return jsonify({"ok": True, "is_active": agent.is_active_telegram})
+    except Exception as e:
+        print(f"Toggle agent telegram error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/ai/agents/<int:agent_id>/delete', methods=['DELETE'])
 @token_required
 def delete_agent(agent_id):
     try:
         agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
-        if not agent:
-            return jsonify({"error": "Агент не найден"}), 404
+        if not agent: return jsonify({"error": "Агент не найден"}), 404
         AIPDF.query.filter_by(agent_id=agent_id).delete()
+        AIWebsite.query.filter_by(agent_id=agent_id).delete()
         db.session.delete(agent)
         db.session.commit()
         return jsonify({"ok": True})
@@ -506,36 +501,52 @@ def delete_agent(agent_id):
         print(f"Delete agent error: {e}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/ai/setup', methods=['POST'])
+@app.route('/api/ai/agents/<int:agent_id>/link_website', methods=['POST'])
 @token_required
-def setup_ai():
+def link_agent_to_website(agent_id):
     try:
         d = request.json
-        ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
-        if ai:
-            ai.name = d.get('name', ai.name)
-            ai.behavior = d.get('behavior', ai.behavior)
-            ai.forbidden = d.get('forbidden', ai.forbidden)
-            ai.knowledge_base = d.get('knowledge_base', ai.knowledge_base)
-            ai.is_active_web = d.get('is_active_web', ai.is_active_web)
-            ai.is_active_telegram = d.get('is_active_telegram', ai.is_active_telegram)
-            ai.humanity_level = d.get('humanity_level', ai.humanity_level)
-        else:
-            ai = AIManager(
-                user_id=request.current_user.id,
-                name=d.get('name','AI Assistant'),
-                behavior=d.get('behavior',''),
-                forbidden=d.get('forbidden',''),
-                knowledge_base=d.get('knowledge_base',''),
-                is_active_web=d.get('is_active_web',False),
-                is_active_telegram=d.get('is_active_telegram',False),
-                humanity_level=d.get('humanity_level', 3)
-            )
-            db.session.add(ai)
+        website_id = d.get('website_id')
+        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
+        if not agent: return jsonify({"error": "Агент не найден"}), 404
+        website = Website.query.filter_by(id=website_id, owner_id=request.current_user.id).first()
+        if not website: return jsonify({"error": "Сайт не найден"}), 404
+        existing = AIWebsite.query.filter_by(agent_id=agent_id).first()
+        if existing:
+            return jsonify({"error": "Агент уже привязан к сайту"}), 400
+        link = AIWebsite(agent_id=agent_id, website_id=website_id)
+        db.session.add(link)
         db.session.commit()
-        return jsonify({"ok": True, "agent_id": ai.id})
+        return jsonify({"ok": True})
     except Exception as e:
-        print(f"AI setup error: {e}")
+        print(f"Link website error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/ai/agents/<int:agent_id>/unlink_website', methods=['POST'])
+@token_required
+def unlink_agent_from_website(agent_id):
+    try:
+        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
+        if not agent: return jsonify({"error": "Агент не найден"}), 404
+        AIWebsite.query.filter_by(agent_id=agent_id).delete()
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Unlink website error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/ai/agents/<int:agent_id>/linked_website', methods=['GET'])
+@token_required
+def get_linked_website(agent_id):
+    try:
+        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
+        if not agent: return jsonify({"error": "Агент не найден"}), 404
+        link = AIWebsite.query.filter_by(agent_id=agent_id).first()
+        if not link: return jsonify({"website": None})
+        website = Website.query.get(link.website_id)
+        return jsonify({"website": {"id": website.id, "url": website.url, "status": website.status} if website else None})
+    except Exception as e:
+        print(f"Get linked website error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/ai/get', methods=['GET'])
@@ -560,38 +571,25 @@ def get_ai():
         print(f"AI get error: {e}")
         return jsonify({}), 500
 
-# === ЗАГРУЗКА PDF ===
-
 @app.route('/api/ai/upload_pdf', methods=['POST'])
 @token_required
 def upload_pdf():
     try:
-        if 'file' not in request.files:
-            return jsonify({"error": "Нет файла"}), 400
+        if 'file' not in request.files: return jsonify({"error": "Нет файла"}), 400
         file = request.files['file']
-        if file.filename == '' or not file.filename.endswith('.pdf'):
-            return jsonify({"error": "Только PDF файлы"}), 400
-        
+        if file.filename == '' or not file.filename.endswith('.pdf'): return jsonify({"error": "Только PDF файлы"}), 400
         agent_id = request.form.get('agent_id')
-        if not agent_id:
-            return jsonify({"error": "Нет ID агента"}), 400
-        
+        if not agent_id: return jsonify({"error": "Нет ID агента"}), 400
         agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
-        if not agent:
-            return jsonify({"error": "Агент не найден"}), 404
-        
-        # Сохраняем файл
+        if not agent: return jsonify({"error": "Агент не найден"}), 404
         uploads_dir = os.path.join(app.static_folder, 'uploads', 'ai_pdfs')
         os.makedirs(uploads_dir, exist_ok=True)
         filename = f"{uuid.uuid4().hex}_{file.filename}"
         filepath = os.path.join(uploads_dir, filename)
         file.save(filepath)
-        
-        # Записываем в БД
         pdf = AIPDF(agent_id=agent_id, filename=file.filename, file_path=filepath)
         db.session.add(pdf)
         db.session.commit()
-        
         return jsonify({"ok": True, "pdf_id": pdf.id, "filename": file.filename})
     except Exception as e:
         print(f"Upload PDF error: {e}")
@@ -602,13 +600,10 @@ def upload_pdf():
 def delete_pdf(pdf_id):
     try:
         pdf = AIPDF.query.get(pdf_id)
-        if not pdf:
-            return jsonify({"error": "Файл не найден"}), 404
+        if not pdf: return jsonify({"error": "Файл не найден"}), 404
         agent = AIManager.query.get(pdf.agent_id)
-        if agent and agent.user_id != request.current_user.id:
-            return jsonify({"error": "Нет прав"}), 403
-        if os.path.exists(pdf.file_path):
-            os.remove(pdf.file_path)
+        if agent and agent.user_id != request.current_user.id: return jsonify({"error": "Нет прав"}), 403
+        if os.path.exists(pdf.file_path): os.remove(pdf.file_path)
         db.session.delete(pdf)
         db.session.commit()
         return jsonify({"ok": True})
@@ -695,8 +690,7 @@ def admin_send_to_user():
         d = request.json
         user_id = d.get('user_id')
         text = d.get('text')
-        if not user_id or not text:
-            return jsonify({"error": "user_id и text обязательны"}), 400
+        if not user_id or not text: return jsonify({"error": "user_id и text обязательны"}), 400
         chat = Chat(user_id=user_id, status='waiting')
         db.session.add(chat)
         db.session.commit()
@@ -704,11 +698,7 @@ def admin_send_to_user():
         db.session.commit()
         user = User.query.get(user_id)
         if user and user.telegram_chat_id:
-            send_telegram_notification(
-                user.telegram_chat_id,
-                f"💬 <b>Новое сообщение от админа!</b>\n\n"
-                f"{text[:100]}..." if len(text) > 100 else text
-            )
+            send_telegram_notification(user.telegram_chat_id, f"💬 <b>Новое сообщение от админа!</b>\n\n{text[:100]}..." if len(text) > 100 else text)
         return jsonify({"ok": True, "chat_id": chat.id})
     except Exception as e:
         print(f"Admin send error: {e}")
