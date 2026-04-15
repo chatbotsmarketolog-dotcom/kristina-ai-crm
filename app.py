@@ -73,11 +73,11 @@ class AIManager(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     name = db.Column(db.String(100), default='AI Assistant')
     behavior = db.Column(db.Text, default='Ты полезный помощник')
-    forbidden = db.Column(db.Text, default='')  # Запретные темы
+    forbidden = db.Column(db.Text, default='')
     knowledge_base = db.Column(db.Text, default='')
-    is_active_web = db.Column(db.Boolean, default=False)  # ВКЛ/ВЫКЛ для веб-чата
+    is_active_web = db.Column(db.Boolean, default=False)
     is_active_telegram = db.Column(db.Boolean, default=False)
-    humanity_level = db.Column(db.Integer, default=3)  # 1-5 уровень человечности
+    humanity_level = db.Column(db.Integer, default=3)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 class TelegramBot(db.Model):
@@ -86,6 +86,14 @@ class TelegramBot(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     bot_token = db.Column(db.String(200), unique=True)
     is_active = db.Column(db.Boolean, default=False)
+
+class AIPDF(db.Model):
+    __tablename__ = 'aipdf'
+    id = db.Column(db.Integer, primary_key=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey('aimanager.id'))
+    filename = db.Column(db.String(200))
+    file_path = db.Column(db.String(500))
+    uploaded_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 def hash_pwd(p): 
     return hashlib.sha256((p + "kristina_salt_2026").encode()).hexdigest()
@@ -144,6 +152,19 @@ def clear_deleted_sites():
         deleted_count = Website.query.filter_by(is_deleted=True).delete()
         db.session.commit()
         return jsonify({"ok": True, "deleted": deleted_count})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/migrate_ai_columns', methods=['POST'])
+@admin_required
+def migrate_ai_columns():
+    """Добавить новые колонки в таблицу aimanager"""
+    try:
+        with app.app_context():
+            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS forbidden TEXT'))
+            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS humanity_level INTEGER DEFAULT 3'))
+            db.session.commit()
+        return jsonify({"ok": True, "message": "Колонки добавлены"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -396,24 +417,29 @@ def send_message():
         traceback.print_exc()
         return jsonify({"error": "Ошибка"}), 500
 
-# === НОВЫЕ ЭНДПОИНТЫ ДЛЯ УПРАВЛЕНИЯ АГЕНТАМИ ===
+# === УПРАВЛЕНИЕ АГЕНТАМИ ===
 
 @app.route('/api/ai/agents', methods=['GET'])
 @token_required
 def get_user_agents():
-    """Получить список агентов текущего пользователя"""
     try:
         agents = AIManager.query.filter_by(user_id=request.current_user.id).all()
-        return jsonify([{
-            "id": a.id,
-            "name": a.name,
-            "behavior": a.behavior,
-            "forbidden": a.forbidden,
-            "knowledge_base": a.knowledge_base,
-            "is_active_web": a.is_active_web,
-            "humanity_level": a.humanity_level,
-            "created_at": a.created_at.isoformat()
-        } for a in agents])
+        result = []
+        for a in agents:
+            pdfs = AIPDF.query.filter_by(agent_id=a.id).all()
+            result.append({
+                "id": a.id,
+                "name": a.name,
+                "behavior": a.behavior,
+                "forbidden": a.forbidden,
+                "knowledge_base": a.knowledge_base,
+                "is_active_web": a.is_active_web,
+                "is_active_telegram": a.is_active_telegram,
+                "humanity_level": a.humanity_level,
+                "pdfs": [{"id": p.id, "filename": p.filename} for p in pdfs],
+                "created_at": a.created_at.isoformat()
+            })
+        return jsonify(result)
     except Exception as e:
         print(f"Get agents error: {e}")
         return jsonify([]), 500
@@ -421,7 +447,6 @@ def get_user_agents():
 @app.route('/api/ai/agents/<int:agent_id>/toggle', methods=['POST'])
 @token_required
 def toggle_agent(agent_id):
-    """Включить/выключить агента"""
     try:
         agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
         if not agent:
@@ -433,10 +458,23 @@ def toggle_agent(agent_id):
         print(f"Toggle agent error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/ai/agents/<int:agent_id>/toggle_telegram', methods=['POST'])
+@token_required
+def toggle_agent_telegram(agent_id):
+    try:
+        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
+        if not agent:
+            return jsonify({"error": "Агент не найден"}), 404
+        agent.is_active_telegram = not agent.is_active_telegram
+        db.session.commit()
+        return jsonify({"ok": True, "is_active": agent.is_active_telegram})
+    except Exception as e:
+        print(f"Toggle agent telegram error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/ai/agents/<int:agent_id>', methods=['PUT'])
 @token_required
 def update_agent(agent_id):
-    """Обновить настройки агента"""
     try:
         agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
         if not agent:
@@ -456,11 +494,11 @@ def update_agent(agent_id):
 @app.route('/api/ai/agents/<int:agent_id>/delete', methods=['DELETE'])
 @token_required
 def delete_agent(agent_id):
-    """Удалить агента"""
     try:
         agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
         if not agent:
             return jsonify({"error": "Агент не найден"}), 404
+        AIPDF.query.filter_by(agent_id=agent_id).delete()
         db.session.delete(agent)
         db.session.commit()
         return jsonify({"ok": True})
@@ -506,6 +544,7 @@ def get_ai():
     try:
         ai = AIManager.query.filter_by(user_id=request.current_user.id).first()
         if ai:
+            pdfs = AIPDF.query.filter_by(agent_id=ai.id).all()
             return jsonify({
                 "name": ai.name,
                 "behavior": ai.behavior,
@@ -513,12 +552,115 @@ def get_ai():
                 "knowledge_base": ai.knowledge_base,
                 "is_active_web": ai.is_active_web,
                 "is_active_telegram": ai.is_active_telegram,
-                "humanity_level": ai.humanity_level
+                "humanity_level": ai.humanity_level,
+                "pdfs": [{"id": p.id, "filename": p.filename} for p in pdfs]
             })
         return jsonify({})
     except Exception as e:
         print(f"AI get error: {e}")
         return jsonify({}), 500
+
+# === ЗАГРУЗКА PDF ===
+
+@app.route('/api/ai/upload_pdf', methods=['POST'])
+@token_required
+def upload_pdf():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "Нет файла"}), 400
+        file = request.files['file']
+        if file.filename == '' or not file.filename.endswith('.pdf'):
+            return jsonify({"error": "Только PDF файлы"}), 400
+        
+        agent_id = request.form.get('agent_id')
+        if not agent_id:
+            return jsonify({"error": "Нет ID агента"}), 400
+        
+        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
+        if not agent:
+            return jsonify({"error": "Агент не найден"}), 404
+        
+        # Сохраняем файл
+        uploads_dir = os.path.join(app.static_folder, 'uploads', 'ai_pdfs')
+        os.makedirs(uploads_dir, exist_ok=True)
+        filename = f"{uuid.uuid4().hex}_{file.filename}"
+        filepath = os.path.join(uploads_dir, filename)
+        file.save(filepath)
+        
+        # Записываем в БД
+        pdf = AIPDF(agent_id=agent_id, filename=file.filename, file_path=filepath)
+        db.session.add(pdf)
+        db.session.commit()
+        
+        return jsonify({"ok": True, "pdf_id": pdf.id, "filename": file.filename})
+    except Exception as e:
+        print(f"Upload PDF error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/ai/delete_pdf/<int:pdf_id>', methods=['DELETE'])
+@token_required
+def delete_pdf(pdf_id):
+    try:
+        pdf = AIPDF.query.get(pdf_id)
+        if not pdf:
+            return jsonify({"error": "Файл не найден"}), 404
+        agent = AIManager.query.get(pdf.agent_id)
+        if agent and agent.user_id != request.current_user.id:
+            return jsonify({"error": "Нет прав"}), 403
+        if os.path.exists(pdf.file_path):
+            os.remove(pdf.file_path)
+        db.session.delete(pdf)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Delete PDF error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# === TELEGRAM ===
+
+@app.route('/api/telegram/setup', methods=['POST'])
+@token_required
+def setup_tg():
+    try:
+        d = request.json
+        tb = TelegramBot.query.filter_by(user_id=request.current_user.id).first()
+        if tb: 
+            tb.bot_token = d.get('token')
+            tb.is_active = d.get('active', False)
+        else: 
+            tb = TelegramBot(user_id=request.current_user.id, bot_token=d.get('token'), is_active=d.get('active', False))
+            db.session.add(tb)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Telegram error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/save_chat_id', methods=['POST'])
+@admin_required
+def save_chat_id():
+    try:
+        user = request.current_user
+        user.telegram_chat_id = request.json.get('chat_id')
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Save chat ID error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/change_password', methods=['POST'])
+@token_required
+def change_password():
+    try:
+        user = request.current_user
+        p = request.json.get('password')
+        if not p or len(p) < 4: return jsonify({"error": "Минимум 4 символа"}), 400
+        user.password_hash = hash_pwd(p)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"Password error: {e}")
+        return jsonify({"error": "Ошибка"}), 500
 
 @app.route('/api/admin/users', methods=['GET'])
 @admin_required
@@ -573,50 +715,6 @@ def admin_send_to_user():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-@app.route('/api/telegram/setup', methods=['POST'])
-@token_required
-def setup_tg():
-    try:
-        d = request.json
-        tb = TelegramBot.query.filter_by(user_id=request.current_user.id).first()
-        if tb: 
-            tb.bot_token = d.get('token')
-            tb.is_active = d.get('active', False)
-        else: 
-            tb = TelegramBot(user_id=request.current_user.id, bot_token=d.get('token'), is_active=d.get('active', False))
-            db.session.add(tb)
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Telegram error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/admin/save_chat_id', methods=['POST'])
-@admin_required
-def save_chat_id():
-    try:
-        user = request.current_user
-        user.telegram_chat_id = request.json.get('chat_id')
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Save chat ID error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/change_password', methods=['POST'])
-@token_required
-def change_password():
-    try:
-        user = request.current_user
-        p = request.json.get('password')
-        if not p or len(p) < 4: return jsonify({"error": "Минимум 4 символа"}), 400
-        user.password_hash = hash_pwd(p)
-        db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e:
-        print(f"Password error: {e}")
-        return jsonify({"error": "Ошибка"}), 500
 
 with app.app_context():
     db.create_all()
