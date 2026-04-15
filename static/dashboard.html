@@ -138,13 +138,34 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 
   <div id="ai" class="section">
     <div class="tabs">
-        <div class="tab active" onclick="switchAiTab('create')">⚙️ Создать агента</div>
-        <div class="tab" onclick="switchAiTab('my')">🤖 Мои веб-агенты</div>
+        <div class="tab active" onclick="switchAiTab('my')">🤖 Мои веб-агенты</div>
+        <div class="tab" onclick="switchAiTab('create')">➕ Создать агента</div>
+    </div>
+    
+    <!-- Вкладка моих агентов (по умолчанию) -->
+    <div id="ai-my" class="tab-content active">
+        <div class="card" id="myAgentsList">
+            <p style="opacity:0.6">Загрузка...</p>
+        </div>
     </div>
     
     <!-- Вкладка создания агента -->
-    <div id="ai-create" class="tab-content active">
+    <div id="ai-create" class="tab-content">
         <div class="card">
+            <div style="background:rgba(59,130,246,0.1);border-left:4px solid var(--acc);padding:16px;border-radius:8px;margin-bottom:20px">
+                <h3 style="margin-bottom:12px">📖 Как создать веб-агента:</h3>
+                <ol style="margin-left:20px;line-height:2">
+                    <li>Придумайте <b>имя</b> для вашего агента</li>
+                    <li>Опишите <b>характер</b> и стиль общения</li>
+                    <li>Укажите <b>запретные темы</b> (что агент НЕ должен обсуждать)</li>
+                    <li>Добавьте <b>базу знаний</b> (информацию о вашем бизнесе)</li>
+                    <li>Загрузите <b>PDF файлы</b> для обучения (опционально)</li>
+                    <li>Настройте <b>уровень человечности</b> (1-5)</li>
+                    <li>Включите <b>активацию в веб-чате</b></li>
+                    <li>Нажмите <b>"💾 Сохранить агента"</b></li>
+                </ol>
+            </div>
+            
             <div class="form-group">
                 <label>Имя агента</label>
                 <input type="text" id="aiName" placeholder="Например: Кристина-помощник">
@@ -183,13 +204,6 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
                 <label class="switch"><input type="checkbox" id="aiWebToggle"><span class="slider"></span></label>
             </div>
             <button class="btn btn-green" onclick="saveAI()" style="width:100%">💾 Сохранить агента</button>
-        </div>
-    </div>
-    
-    <!-- Вкладка моих агентов -->
-    <div id="ai-my" class="tab-content">
-        <div class="card" id="myAgentsList">
-            <p style="opacity:0.6">Загрузка...</p>
         </div>
     </div>
   </div>
@@ -244,6 +258,17 @@ function switchAiTab(tab){
     event.target.classList.add('active');
     document.getElementById('ai-'+tab).classList.add('active');
     if(tab==='my') loadMyAgents();
+    if(tab==='create') {
+        editingAgentId = null;
+        document.getElementById('aiName').value = '';
+        document.getElementById('aiBehavior').value = '';
+        document.getElementById('aiForbidden').value = '';
+        document.getElementById('aiKnowledge').value = '';
+        document.getElementById('aiHumanity').value = 3;
+        document.getElementById('humanityValue').textContent = '3';
+        document.getElementById('aiWebToggle').checked = false;
+        document.getElementById('pdfFileList').innerHTML = '';
+    }
 }
 
 async function fetchAPI(url,method='GET',body=null){
@@ -423,7 +448,7 @@ async function loadMyAgents(){
         const agents = await fetchAPI('/ai/agents');
         const el = document.getElementById('myAgentsList');
         if(!agents || agents.length === 0) {
-            el.innerHTML = '<p style="opacity:0.6;text-align:center;padding:20px">У вас пока нет веб-агентов.<br>Создайте первого на вкладке "Создать агента" 👆</p>';
+            el.innerHTML = '<p style="opacity:0.6;text-align:center;padding:20px">У вас пока нет веб-агентов.<br>Создайте первого на вкладке "➕ Создать агента" 👆</p>';
             return;
         }
         el.innerHTML = agents.map(a => `
@@ -462,7 +487,8 @@ function editAgent(agentId){
         const agent = agents.find(a => a.id === agentId);
         if(!agent) return alert('❌ Агент не найден');
         
-        document.querySelectorAll('#ai .tab')[0].click();
+        // Переключаем на вкладку создания
+        document.querySelectorAll('#ai .tab')[1].click();
         
         document.getElementById('aiName').value = agent.name || '';
         document.getElementById('aiBehavior').value = agent.behavior || '';
@@ -526,7 +552,7 @@ function saveAI(){
         if(result && result.ok) {
             alert('✅ Агент сохранён!');
             
-            // Всегда очищаем форму и сбрасываем режим редактирования
+            // Всегда очищаем форму
             editingAgentId = null;
             document.getElementById('aiName').value = '';
             document.getElementById('aiBehavior').value = '';
@@ -537,12 +563,9 @@ function saveAI(){
             document.getElementById('aiWebToggle').checked = false;
             document.getElementById('pdfFileList').innerHTML = '';
             
-            // Обновляем список агентов если мы на вкладке "Мои"
-            const myTab = document.querySelector('#ai .tab:nth-child(2)');
-            if(myTab && myTab.classList.contains('active')) {
-                loadMyAgents();
-            }
-            // Если мы на вкладке "Создать" — форма уже чистая и готова к новому агенту
+            // Переключаемся на вкладку "Мои агенты"
+            document.querySelectorAll('#ai .tab')[0].click();
+            loadMyAgents();
         } else {
             alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
         }
