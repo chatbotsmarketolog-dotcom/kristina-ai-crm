@@ -614,7 +614,7 @@
             return;
         }
 
-        // API функции
+        // API функции - ИСПРАВЛЕНА: добавляем api_key в query params
         async function fetchAPI(url, method = 'GET', body = null, useFormData = false) {
             const options = {
                 method,
@@ -624,13 +624,15 @@
             if (!useFormData) {
                 options.headers['Content-Type'] = 'application/json';
             }
-            options.headers['X-API-Key'] = API_KEY;
+            
+            // Добавляем API ключ в query параметры для виджета
+            const separator = url.includes('?') ? '&' : '?';
+            const fullUrl = API_URL + url + separator + 'api_key=' + API_KEY;
             
             if (body) {
                 options.body = body;
             }
             
-            const fullUrl = API_URL + url;
             console.log('📡 API Request:', method, fullUrl);
             
             const response = await fetch(fullUrl, options);
@@ -738,10 +740,10 @@
                         formData.append('files', file);
                     });
                     
-                    response = await fetchAPI('/api/send_with_files', 'POST', formData, true);
+                    response = await fetchAPI('/api/widget/send_with_files', 'POST', formData, true);
                 } else {
-                    // Отправка только текста
-                    response = await fetchAPI('/api/send', 'POST', {
+                    // Отправка только текста - ИСПРАВЛЕНО: используем widget endpoint
+                    response = await fetchAPI('/api/widget/send', 'POST', {
                         chat_id: chatId,
                         text: text
                     });
@@ -765,13 +767,13 @@
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Инициализация чата
+        // Инициализация чата - ИСПРАВЛЕНО: используем widget endpoints
         async function initChat() {
             try {
                 console.log('🔄 Initializing chat...');
                 
                 // Проверяем есть ли активный чат
-                const chats = await fetchAPI('/api/chats');
+                const chats = await fetchAPI('/api/widget/chats');
                 console.log('📋 Chats:', chats);
                 
                 const activeChat = chats.find(c => c.status === 'active' || c.status === 'waiting');
@@ -781,7 +783,7 @@
                     console.log('✅ Using existing chat:', chatId);
                 } else {
                     // Создаём новый чат
-                    const newChat = await fetchAPI('/api/chats', 'POST', {});
+                    const newChat = await fetchAPI('/api/widget/chats', 'POST', {});
                     chatId = newChat.id;
                     console.log('✅ Created new chat:', chatId);
                 }
@@ -812,7 +814,7 @@
             }
         }
 
-        // Обработчик кнопки "Представиться"
+        // Обработчик кнопки "Представиться" - ИСПРАВЛЕНО: используем widget endpoint
         if (nameSubmit) {
             nameSubmit.addEventListener('click', async () => {
                 const name = userNameInput ? userNameInput.value.trim() : '';
@@ -828,7 +830,7 @@
                     
                     // Сохраняем имя в чате
                     if (chatId) {
-                        await fetchAPI(`/api/chat/${chatId}/set_client_name`, 'POST', { name: userName });
+                        await fetchAPI(`/api/widget/chat/${chatId}/set_client_name`, 'POST', { name: userName });
                     }
                     
                     // Закрываем форму и открываем чат
@@ -852,12 +854,12 @@
             });
         }
 
-        // Загрузка сообщений
+        // Загрузка сообщений - ИСПРАВЛЕНО: используем widget endpoint
         async function loadMessages() {
             if (!chatId) return;
             
             try {
-                const response = await fetchAPI(`/api/messages/${chatId}`);
+                const response = await fetchAPI(`/api/widget/messages/${chatId}`);
                 messages = response.messages || [];
                 formRequested = response.form_requested || false;
                 
@@ -942,6 +944,7 @@
             });
         }
 
+        // Отправка заявки - ИСПРАВЛЕНО: используем widget endpoint
         if (formSubmit) {
             formSubmit.addEventListener('click', async () => {
                 const data = {
@@ -968,7 +971,7 @@
                 }
                 
                 try {
-                    await fetchAPI('/api/deals', 'POST', data);
+                    await fetchAPI('/api/widget/deals', 'POST', data);
                     alert('✅ Заявка отправлена! Мы свяжемся с вами soon.');
                     if (dealForm) dealForm.classList.remove('active');
                     if (widgetBtn) widgetBtn.style.display = 'flex';
