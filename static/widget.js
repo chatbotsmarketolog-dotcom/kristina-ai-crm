@@ -648,6 +648,92 @@
             return response.json();
         }
 
+        // ✅ АВТО-ТРИГГЕРЫ КЛИЕНТА (положительные/отрицательные)
+        async function checkClientTriggers(text) {
+            const lower = text.toLowerCase();
+            
+            // ❌ Отрицательные триггеры → отклонённая сделка
+            const declineTriggers = ['нет', 'подумаю', 'позже', 'не сейчас', 'отмена', 'не хочу', 'не интересно'];
+            if (declineTriggers.some(trigger => lower.includes(trigger))) {
+                try {
+                    await fetchAPI('/api/widget/deals', 'POST', {
+                        chat_id: chatId,
+                        client_name: userName || 'Аноним',
+                        sphere: 'Не указано',
+                        request: `Клиент: "${text}"`,
+                        budget: '0',
+                        contact_method: 'Отказ',
+                        contact_nickname: '-',
+                        status: 'declined',
+                        decline_reason: `Клиент: "${text}"`
+                    });
+                    console.log('✅ Сделка отправлена в "Отклонённые"');
+                } catch (e) {
+                    console.error('Ошибка создания отклонённой сделки:', e);
+                }
+            }
+            
+            // ✅ Положительные триггеры → показываем форму
+            const positiveTriggers = ['да', 'хочу', 'интересно', 'заполню', 'готова заполнить', 'давайте попробуем заполнить', 'да пришлите', 'где заполнить?'];
+            if (positiveTriggers.some(trigger => lower.includes(trigger))) {
+                setTimeout(() => {
+                    if (nameForm) nameForm.classList.remove('active');
+                    if (dealForm) dealForm.classList.add('active');
+                    if (userName && document.getElementById('dealClientName')) {
+                        document.getElementById('dealClientName').value = userName;
+                    }
+                }, 500);
+            }
+        }
+
+        // ✅ ПАРСЕР AI-КНОПОК: заменяет [ДА ПОДАТЬ]/[ОТМЕНА] на кнопки
+        function parseAIMessage(text) {
+            if (!text.includes('[ДА ПОДАТЬ]') || !text.includes('[ОТМЕНА]')) {
+                return text;
+            }
+            return text
+                .replace('[ДА ПОДАТЬ]', '<button class="kristina-btn kristina-btn-submit" style="margin:4px 4px 4px 0;padding:6px 12px;font-size:12px" onclick="window.handleDealButton(true)">✅ Да, подать заявку</button>')
+                .replace('[ОТМЕНА]', '<button class="kristina-btn kristina-btn-cancel" style="margin:4px 0;padding:6px 12px;font-size:12px" onclick="window.handleDealButton(false)">❌ Отмена</button>');
+        }
+
+        // ✅ ОБРАБОТКА КНОПОК ОТ AI
+        window.handleDealButton = async function(isAccepted) {
+            if (!chatId) return;
+            
+            try {
+                if (isAccepted) {
+                    // Клиент согласился → открываем форму
+                    if (nameForm) nameForm.classList.remove('active');
+                    if (dealForm) dealForm.classList.add('active');
+                    if (userName && document.getElementById('dealClientName')) {
+                        document.getElementById('dealClientName').value = userName;
+                    }
+                } else {
+                    // Клиент отказался → создаём отклонённую сделку
+                    await fetchAPI('/api/widget/deals', 'POST', {
+                        chat_id: chatId,
+                        client_name: userName || 'Аноним',
+                        sphere: 'Не указано',
+                        request: 'Клиент отказался от заявки через AI',
+                        budget: '0',
+                        contact_method: 'Отказ',
+                        contact_nickname: '-',
+                        status: 'declined',
+                        decline_reason: 'Нажата кнопка [ОТМЕНА]'
+                    });
+                    // Отправляем подтверждение в чат
+                    await fetchAPI('/api/widget/send', 'POST', {
+                        chat_id: chatId,
+                        text: '❌ Заявка отменена. Спасибо за ответ!'
+                    });
+                    loadMessages();
+                }
+            } catch (e) {
+                console.error('Ошибка обработки кнопки:', e);
+                alert('❌ Ошибка: ' + e.message);
+            }
+        };
+
         // Открыть/закрыть чат
         widgetBtn.addEventListener('click', () => {
             console.log('🔔 Widget button clicked');
@@ -756,6 +842,10 @@
                 
                 // Обновление сообщений
                 loadMessages();
+                
+                // ✅ ПРОВЕРКА ТРИГГЕРОВ КЛИЕНТА
+                await checkClientTriggers(text);
+                
             } catch (e) {
                 console.error('Ошибка отправки:', e);
                 alert('❌ Ошибка отправки: ' + e.message);
@@ -874,7 +964,7 @@
             }
         }
 
-        // Отображение сообщений
+        // ✅ ОБНОВЛЁННОЕ ОТОБРАЖЕНИЕ С ПАРСЕРОМ AI-КНОПОК
         function renderMessages() {
             if (messages.length === 0) {
                 chatMessages.innerHTML = `
@@ -908,9 +998,12 @@
                     }).join('');
                 }
                 
+                // ✅ ЕСЛИ СООБЩЕНИЕ ОТ AI/АДМИНА → ПРОПУСКАЕМ ЧЕРЕЗ ПАРСЕР КНОПОК
+                const displayText = msg.sender === 'admin' ? parseAIMessage(msg.text || '') : (msg.text || '');
+                
                 return `
                     <div class="kristina-message ${isUser ? 'kristina-message-user' : 'kristina-message-admin'}">
-                        ${msg.text || ''}
+                        ${displayText}
                         ${fileHtml}
                     </div>
                 `;
