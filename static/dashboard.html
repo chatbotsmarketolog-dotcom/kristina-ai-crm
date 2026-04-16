@@ -535,7 +535,7 @@ async function rejectSite(id){
     }
 }
 
-// ✅ ОБНОВЛЕННАЯ ФУНКЦИЯ ЗАГРУЗКИ САЙТОВ
+// ✅ ОБНОВЛЕННАЯ ФУНКЦИЯ ЗАГРУЗКИ САЙТОВ (ИСПРАВЛЕН СИНТАКСИС)
 async function loadSites(){
     const s = await fetchAPI('/sites');
     if(!s) return;
@@ -550,13 +550,13 @@ async function loadSites(){
     let html = `<h3>${title}</h3>`;
     
     s.forEach(x => {
-        const isDeleted = x.is_deleted;
-        if(isDeleted) return; // Не показываем удаленные в основном списке
+        if(x.is_deleted) return;
 
-        // ✅ ГЕНЕРАЦИЯ УНИКАЛЬНОГО КОДА ДЛЯ АКТИВНЫХ САЙТОВ
         let codeBlock = '';
         if(x.status === 'active') {
-            const uniqueCode = `<script>\n    window.KRISTINA_API_URL = 'https://kristina-crm-api.onrender.com';\n    window.KRISTINA_API_KEY = '${x.api_key}';\n</script>\n<script src="https://kristina-crm-api.onrender.com/static/widget.js?v=5"><\/script>`;
+            // ✅ ПРАВИЛЬНАЯ ГЕНЕРАЦИЯ КОДА - без вложенных шаблонных строк
+            const uniqueCode = '<script>\n    window.KRISTINA_API_URL = "https://kristina-crm-api.onrender.com";\n    window.KRISTINA_API_KEY = "' + x.api_key + '";\n<\/script>\n<script src="https://kristina-crm-api.onrender.com/static/widget.js"><\/script>';
+            
             codeBlock = `
                 <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1)">
                     <div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">📋 Код для вставки на сайт:</div>
