@@ -72,13 +72,14 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 input:checked+.slider{background:var(--success)}
 input:checked+.slider:before{transform:translateX(20px)}
 
-.site-item{padding:16px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.site-item{padding:16px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.site-item-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;width:100%}
 .status{padding:4px 10px;border-radius:6px;font-size:0.8rem}
 .status-active{background:rgba(16,185,129,0.2);color:var(--success)}
 .status-pending{background:rgba(251,191,36,0.2);color:#fbbf24}
 .instruction{background:rgba(59,130,246,0.05);border-left:4px solid var(--acc);padding:16px;border-radius:6px;margin:16px 0}
 .instruction ol{margin-left:20px;line-height:1.8}
-.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:6px;padding:10px;font-family:monospace;font-size:0.75rem;overflow-x:auto}
+.code-box{background:rgba(0,0,0,0.4);border:1px solid var(--acc);border-radius:6px;padding:10px;font-family:monospace;font-size:0.75rem;overflow-x:auto;color:#a5f3fc;margin-top:8px;white-space:pre-wrap;word-break:break-all}
 .copy-btn{padding:4px 10px;background:var(--acc);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:0.75rem;margin-top:8px}
 
 .tabs{display:flex;gap:4px;margin-bottom:20px;background:rgba(0,0,0,0.2);padding:4px;border-radius:8px}
@@ -133,7 +134,7 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 
   <div id="sites" class="section">
     <div class="card"><h3>🌐 Добавить сайт</h3><div style="display:flex;gap:10px"><input type="text" id="siteUrl" placeholder="https://site.com" style="flex:1;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)"><button class="btn" onclick="addSite()">➕ Добавить</button></div></div>
-    <div class="card"><h3>📋 Инструкция</h3><div class="instruction"><ol><li>Добавьте сайт</li><li>Дождитесь одобрения</li><li>Скопируйте код</li><li>Вставьте перед &lt;/body&gt;</li></ol></div><div class="code-box" id="widgetCode">&lt;!-- После одобрения --&gt;</div><button class="copy-btn" onclick="copyCode()">📋 Копировать</button></div>
+    <div class="card"><h3>📋 Инструкция</h3><div class="instruction"><ol><li>Добавьте сайт</li><li>Дождитесь одобрения админом</li><li>Скопируйте код из карточки сайта</li><li>Вставьте перед &lt;/body&gt; на вашем сайте</li></ol></div></div>
     <div class="card" id="siteList"><h3>Мои сайты</h3><p style="opacity:0.6">Загрузка...</p></div>
   </div>
 
@@ -534,50 +535,89 @@ async function rejectSite(id){
     }
 }
 
+// ✅ ОБНОВЛЕННАЯ ФУНКЦИЯ ЗАГРУЗКИ САЙТОВ
 async function loadSites(){
-    const s=await fetchAPI('/sites');
-    if(!s)return;
-    const el=document.getElementById('siteList');
+    const s = await fetchAPI('/sites');
+    if(!s) return;
+    const el = document.getElementById('siteList');
     if(!s.length){
         const title = isAdmin ? '📂 Сайты клиентов' : '🌐 Мои сайты';
         el.innerHTML=`<h3>${title}</h3><p style="opacity:0.6">Пусто</p>`;
         return;
     }
-    let html='', approved=null;
+    
     const title = isAdmin ? '📂 Сайты клиентов' : '🌐 Мои сайты';
-    html += `<h3>${title}</h3>`;
-    s.forEach(x=>{
-        if(x.status=='active'&&!approved)approved=x;
-        html+=`<div class="site-item"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API:${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅':'⏳'} ${x.status=='active'?'Активен':'Ожидает'}</span></div><button class="btn btn-red" onclick="deleteSite(${x.id})">🗑️</button></div>`;
+    let html = `<h3>${title}</h3>`;
+    
+    s.forEach(x => {
+        const isDeleted = x.is_deleted;
+        if(isDeleted) return; // Не показываем удаленные в основном списке
+
+        // ✅ ГЕНЕРАЦИЯ УНИКАЛЬНОГО КОДА ДЛЯ АКТИВНЫХ САЙТОВ
+        let codeBlock = '';
+        if(x.status === 'active') {
+            const uniqueCode = `<script>\n    window.KRISTINA_API_URL = 'https://kristina-crm-api.onrender.com';\n    window.KRISTINA_API_KEY = '${x.api_key}';\n</script>\n<script src="https://kristina-crm-api.onrender.com/static/widget.js?v=5"><\/script>`;
+            codeBlock = `
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1)">
+                    <div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">📋 Код для вставки на сайт:</div>
+                    <div class="code-box" id="code-${x.id}">${escapeHtml(uniqueCode)}</div>
+                    <button class="copy-btn" onclick="copySiteCode('code-${x.id}')">📋 Копировать код</button>
+                </div>`;
+        } else {
+            codeBlock = `<div style="margin-top:8px;font-size:0.8rem;color:#fbbf24">⏳ Ожидает одобрения админом...</div>`;
+        }
+
+        html += `<div class="site-item">
+            <div class="site-item-header">
+                <div>
+                    <div style="font-weight:600">${x.url}</div>
+                    <div style="font-size:0.8rem;opacity:0.6">API: ${x.api_key}</div>
+                    <span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅ Активен':'⏳ Ожидает'}</span>
+                </div>
+                <button class="btn btn-red btn-sm" onclick="deleteSite(${x.id})">🗑️ Удалить</button>
+            </div>
+            ${codeBlock}
+        </div>`;
     });
-    el.innerHTML=html;
-    if(approved)document.getElementById('widgetCode').textContent=`<script>window.KRISTINA_API_KEY='${approved.api_key}';var s=document.createElement('script');s.src='${location.origin}/widget.js';document.body.appendChild(s);<\/script>`;
+    el.innerHTML = html;
 }
 
-function addSite(){const u=document.getElementById('siteUrl').value.trim();if(!u)return;fetchAPI('/sites','POST',{url:u}).then(()=>{document.getElementById('siteUrl').value='';loadSites();alert('✅ Добавлен!');});}
+function addSite(){
+    const u = document.getElementById('siteUrl').value.trim();
+    if(!u) return;
+    fetchAPI('/sites','POST',{url:u}).then(()=>{
+        document.getElementById('siteUrl').value='';
+        loadSites();
+        alert('✅ Добавлен! Ждите одобрения.');
+    });
+}
 
 async function deleteSite(id){
-    if(!confirm('Удалить сайт?'))return;
+    if(!confirm('Удалить сайт?')) return;
     try{
-        const r=await fetch(API+`/sites/${id}/delete`,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});
-        const data=await r.json().catch(()=>({error:'Ошибка'}));
-        if(r.ok){loadSites(); if(isAdmin) loadDeletedSites(); alert('✅ Удален!');}
-        else{alert('❌ '+(data.error||'Ошибка'));}
-    }catch(e){alert('❌ Ошибка соединения');}
+        const r = await fetch(API+`/sites/${id}/delete`, {method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});
+        const data = await r.json().catch(()=>({error:'Ошибка'}));
+        if(r.ok){ loadSites(); if(isAdmin) loadDeletedSites(); alert('✅ Удален!'); }
+        else{ alert('❌ '+(data.error||'Ошибка')); }
+    }catch(e){ alert('❌ Ошибка соединения'); }
 }
 
-function copyCode(){const c=document.getElementById('widgetCode').textContent;if(c.includes('После'))return alert('ℹ️ После одобрения');navigator.clipboard.writeText(c).then(()=>alert('✅ Скопировано'));}
+// ✅ ФУНКЦИЯ КОПИРОВАНИЯ КОНКРЕТНОГО КОДА
+function copySiteCode(elementId){
+    const code = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(code).then(() => alert('✅ Код скопирован! Вставьте его перед </body> на вашем сайте.'));
+}
 
 async function loadAI(){
-    const ai=await fetchAPI('/ai/get');
-    if(!ai)return;
-    document.getElementById('aiName').value=ai.name||'';
-    document.getElementById('aiBehavior').value=ai.behavior||'';
-    document.getElementById('aiForbidden').value=ai.forbidden||'';
-    document.getElementById('aiKnowledge').value=ai.knowledge_base||'';
-    document.getElementById('aiWebToggle').checked=ai.is_active_web||false;
-    document.getElementById('aiHumanity').value=ai.humanity_level||3;
-    document.getElementById('humanityValue').textContent=ai.humanity_level||3;
+    const ai = await fetchAPI('/ai/get');
+    if(!ai) return;
+    document.getElementById('aiName').value = ai.name||'';
+    document.getElementById('aiBehavior').value = ai.behavior||'';
+    document.getElementById('aiForbidden').value = ai.forbidden||'';
+    document.getElementById('aiKnowledge').value = ai.knowledge_base||'';
+    document.getElementById('aiWebToggle').checked = ai.is_active_web||false;
+    document.getElementById('aiHumanity').value = ai.humanity_level||3;
+    document.getElementById('humanityValue').textContent = ai.humanity_level||3;
 }
 
 function escapeHtml(text) {
