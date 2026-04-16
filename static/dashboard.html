@@ -260,10 +260,46 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
 </div>
 
 <script>
-const API=location.origin+'/api',token=localStorage.getItem('token'),isAdmin=localStorage.getItem('isAdmin')==='true';
-let activeChatId=null, pollInterval=null, editingAgentId=null;
-if(!token)window.location.href='/index.html';
-if(isAdmin)document.getElementById('adminBtn').style.display='inline-block';
+// ✅ ИСПРАВЛЕНО: Добавлены переменные и правильная функция fetchAPI
+const API = location.origin + '/api';
+const API_URL = location.origin;
+const token = localStorage.getItem('token');
+const isAdmin = localStorage.getItem('isAdmin') === 'true';
+let activeChatId = null, pollInterval = null, editingAgentId = null;
+
+if (!token) window.location.href = '/index.html';
+if (isAdmin) document.getElementById('adminBtn').style.display = 'inline-block';
+
+// ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ fetchAPI для CRM (использует Bearer токен)
+async function fetchAPI(url, method = 'GET', body = null, useFormData = false) {
+    const options = {
+        method,
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    };
+    
+    if (!useFormData) {
+        options.headers['Content-Type'] = 'application/json';
+    }
+    
+    const fullUrl = API + url;
+    
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+    
+    const response = await fetch(fullUrl, options);
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+    
+    if (response.status === 204) return null;
+    
+    return response.json();
+}
 
 function showSection(id){
     document.querySelectorAll('.section').forEach(e=>e.classList.remove('active'));
@@ -308,21 +344,6 @@ function switchDealTab(tab){
     event.target.classList.add('active');
     document.getElementById('deals-'+tab).classList.add('active');
     loadDeals(tab);
-}
-
-async function fetchAPI(url, method = 'GET', body = null, useFormData = false) {
-    const options = { method, headers: {} };
-    if (!useFormData) options.headers['Content-Type'] = 'application/json';
-    const separator = url.includes('?') ? '&' : '?';
-    const fullUrl = API_URL + url + separator + 'api_key=' + API_KEY;
-    if (body) options.body = body;
-    const response = await fetch(fullUrl, options);
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-    if (response.status === 204) return null;
-    return response.json();
 }
 
 async function loadChats(){
@@ -462,7 +483,7 @@ async function loadDeletedSites(){
 async function restoreSite(siteId, siteUrl){
     if(!confirm(`♻️ Восстановить сайт "${siteUrl}"?`)) return;
     try {
-        const result = await fetchAPI('/api/admin/restore_site', 'POST', {site_id: siteId});
+        const result = await fetchAPI('/admin/restore_site', 'POST', {site_id: siteId});
         if(result.ok) {
             alert('✅ Сайт восстановлен!\n🔑 API ключ: ' + result.api_key);
             loadDeletedSites();
@@ -478,7 +499,7 @@ async function restoreSite(siteId, siteUrl){
 async function clearAllDeletedSites(){
     if(!confirm('🗑️ НАВСЕГДА удалить все сайты из корзины?\n\nЭто действие нельзя отменить!')) return;
     try {
-        const result = await fetchAPI('/api/admin/clear_deleted_sites', 'POST');
+        const result = await fetchAPI('/admin/clear_deleted_sites', 'POST');
         if(result.ok) {
             alert('🗑️ Удалено: ' + result.deleted + ' сайт(ов)');
             loadDeletedSites();
