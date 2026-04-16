@@ -6,7 +6,8 @@ from sqlalchemy import text
 from openai import OpenAI
 
 app = Flask(__name__, static_folder='static', static_url_path='')
-CORS(app, supports_credentials=True, origins=["*"])
+# ✅ ИСПРАВЛЕНО: добавлен X-API-Key в разрешённые заголовки
+CORS(app, supports_credentials=True, origins=["*"], allow_headers=["Content-Type", "Authorization", "X-API-Key"])
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -970,13 +971,16 @@ def admin_send_to_user():
 def widget_get_chats():
     """Получение чатов для виджета (по API ключу сайта)"""
     try:
-        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        api_key = request.headers.get('X-API-Key')
+        print(f"🔍 Widget get_chats: api_key={api_key[:10] if api_key else None}")
+        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
         
         # Находим сайт по API ключу
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website:
+            print(f"❌ Invalid API key: {api_key[:10] if api_key else None}")
             return jsonify({"error": "Invalid API key"}), 401
         
         # Получаем все чаты этого сайта
@@ -992,16 +996,21 @@ def widget_get_chats():
                 "time": c.created_at.isoformat()
             })
         
+        print(f"✅ Found {len(result)} chats")
         return jsonify(result)
     except Exception as e:
-        print(f"Widget get chats error: {e}")
-        return jsonify([]), 500
+        print(f"❌ Widget get_chats error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/widget/chats', methods=['POST'])
 def widget_create_chat():
     """Создание нового чата для виджета"""
     try:
-        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        api_key = request.headers.get('X-API-Key')
+        print(f"🔍 Widget create_chat: api_key={api_key[:10] if api_key else None}")
+        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
         
@@ -1023,16 +1032,20 @@ def widget_create_chat():
                 f"🔔 <b>Новый посетитель на сайте!</b>\n\n🔗 {website.url}\n\nЗайдите в CRM чтобы ответить."
             )
         
+        print(f"✅ Created chat {chat.id}")
         return jsonify({"id": chat.id, "status": "waiting"})
     except Exception as e:
-        print(f"Widget create chat error: {e}")
+        print(f"❌ Widget create_chat error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/widget/messages/<int:chat_id>', methods=['GET'])
 def widget_get_messages(chat_id):
     """Получение сообщений для виджета"""
     try:
-        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        api_key = request.headers.get('X-API-Key')
+        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
         
@@ -1056,17 +1069,20 @@ def widget_get_messages(chat_id):
                     "time": m.timestamp.isoformat()
                 } for m in msgs
             ],
-            "form_requested": chat.form_requested if hasattr(chat, 'form_requested') else False
+            "form_requested": bool(chat.form_requested) if hasattr(chat, 'form_requested') else False
         })
     except Exception as e:
-        print(f"Widget get messages error: {e}")
+        print(f"❌ Widget get_messages error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"messages": [], "form_requested": False}), 500
 
 @app.route('/api/widget/send', methods=['POST'])
 def widget_send_message():
     """Отправка сообщения через виджет"""
     try:
-        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        api_key = request.headers.get('X-API-Key')
+        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
         
@@ -1101,14 +1117,18 @@ def widget_send_message():
         
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"Widget send message error: {e}")
+        print(f"❌ Widget send_message error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/widget/chat/<int:chat_id>/set_client_name', methods=['POST'])
 def widget_set_client_name(chat_id):
     """Установка имени клиента из виджета"""
     try:
-        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        api_key = request.headers.get('X-API-Key')
+        print(f"🔍 Widget set_client_name: chat_id={chat_id}, api_key={api_key[:10] if api_key else None}")
+        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
         
@@ -1121,26 +1141,32 @@ def widget_set_client_name(chat_id):
         # Проверяем чат
         chat = Chat.query.get(chat_id)
         if not chat:
+            print(f"❌ Chat {chat_id} not found")
             return jsonify({"error": "Chat not found"}), 404
         
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website or chat.website_id != website.id:
+            print(f"❌ API key mismatch: chat.website_id={chat.website_id}, website.id={website.id if website else None}")
             return jsonify({"error": "Invalid API key"}), 401
         
         # Сохраняем имя
         chat.visitor_name = name
         db.session.commit()
         
+        print(f"✅ Set name '{name}' for chat {chat_id}")
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"Widget set client name error: {e}")
+        print(f"❌ Widget set_client_name error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/widget/deals', methods=['POST'])
 def widget_create_deal():
     """Создание заявки из виджета"""
     try:
-        api_key = request.args.get('api_key') or request.headers.get('X-API-Key')
+        api_key = request.headers.get('X-API-Key')
+        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
         
@@ -1193,7 +1219,9 @@ def widget_create_deal():
         
         return jsonify({"ok": True, "deal_id": deal.id})
     except Exception as e:
-        print(f"Widget create deal error: {e}")
+        print(f"❌ Widget create_deal error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 with app.app_context():
