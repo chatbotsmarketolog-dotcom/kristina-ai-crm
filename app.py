@@ -1077,16 +1077,30 @@ def widget_get_messages(chat_id):
         traceback.print_exc()
         return jsonify({"messages": [], "form_requested": False}), 500
 
-@app.route('/api/widget/send', methods=['POST'])
+@app.route('/api/widget/send', methods=['POST', 'OPTIONS'])
 def widget_send_message():
     """Отправка сообщения через виджет"""
     try:
+        # Обработка preflight запроса
+        if request.method == 'OPTIONS':
+            return '', 204
+        
         api_key = request.headers.get('X-API-Key')
+        print(f"🔍 Widget send: api_key={api_key[:10] if api_key else None}")
+        print(f"🔍 Request data: {request.data}")
+        print(f"🔍 Request content-type: {request.content_type}")
         
         if not api_key:
             return jsonify({"error": "API key required"}), 401
         
-        data = request.json
+        # Пробуем распарсить JSON
+        try:
+            data = request.get_json(force=True)
+            print(f"🔍 Parsed data: {data}")
+        except Exception as json_err:
+            print(f"❌ JSON parse error: {json_err}")
+            return jsonify({"error": f"Invalid JSON: {str(json_err)}"}), 400
+        
         chat_id = data.get('chat_id')
         text = data.get('text', '')
         
@@ -1115,6 +1129,7 @@ def widget_send_message():
                 f"💬 <b>Новое сообщение от посетителя!</b>\n\n{text[:100]}..." if len(text) > 100 else text
             )
         
+        print(f"✅ Message sent in chat {chat_id}")
         return jsonify({"ok": True})
     except Exception as e:
         print(f"❌ Widget send_message error: {e}")
