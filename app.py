@@ -211,10 +211,42 @@ def add_missing_columns():
 @admin_required
 def clear_deleted_sites():
     try:
-        deleted_count = Website.query.filter_by(is_deleted=True).delete()
+        # ✅ FIX: synchronize_session=False решает проблему SQLAlchemy
+        deleted_count = Website.query.filter_by(is_deleted=True).delete(synchronize_session=False)
         db.session.commit()
         return jsonify({"ok": True, "deleted": deleted_count})
     except Exception as e:
+        db.session.rollback()
+        print(f"Clear deleted sites error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/restore_site', methods=['POST'])
+@admin_required
+def restore_site():
+    try:
+        site_id = request.json.get('site_id')
+        site = Website.query.get(site_id)
+        
+        if not site:
+            return jsonify({"error": "Сайт не найден"}), 404
+        
+        if not site.is_deleted:
+            return jsonify({"error": "Сайт не был удалён"}), 400
+        
+        # Восстанавливаем сайт
+        site.is_deleted = False
+        site.deleted_at = None
+        site.status = 'active'  # Сразу активируем
+        db.session.commit()
+        
+        return jsonify({
+            "ok": True, 
+            "api_key": site.api_key,
+            "message": "Сайт восстановлен"
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"Restore site error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/migrate_ai_columns', methods=['POST'])
@@ -310,8 +342,28 @@ def register():
 def get_sites():
     try:
         u = request.current_user
-        sites = Website.query.filter_by(owner_id=u.id, is_deleted=False).all() if not u.is_admin else Website.query.filter_by(is_deleted=False).all()
-        return jsonify([{"id":s.id, "url":s.url, "api_key":s.api_key, "status":s.status, "owner":s.owner_id} for s in sites])
+        show_deleted = request.args.get('show_deleted', 'false').lower() == 'true'
+        
+        if u.is_admin:
+            # Админ видит все сайты
+            query = Website.query
+            if not show_deleted:
+                query = query.filter_by(is_deleted=False)
+            sites = query.all()
+        else:
+            # Пользователь видит только свои не-удалённые
+            sites = Website.query.filter_by(owner_id=u.id, is_deleted=False).all()
+        
+        return jsonify([{
+            "id": s.id, 
+            "url": s.url, 
+            "api_key": s.api_key, 
+            "status": s.status, 
+            "owner": User.query.get(s.owner_id).username if s.owner_id else "Unknown",
+            "owner_id": s.owner_id,
+            "is_deleted": s.is_deleted,
+            "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None
+        } for s in sites])
     except Exception as e:
         print(f"Get sites error: {e}")
         return jsonify([]), 500
@@ -322,19 +374,24 @@ def add_site():
     try:
         url = request.json.get('url')
         if not url: return jsonify({"error": "URL обязателен"}), 400
-        existing_site = Website.query.filter_by(url=url).first()
+        
+        # ✅ FIX: Проверяем только АКТИВНЫЕ сайты, игнорируем удалённые
+        existing_site = Website.query.filter_by(url=url, is_deleted=False).first()
         if existing_site:
             if existing_site.owner_id == request.current_user.id:
                 return jsonify({"error": "Этот сайт уже добавлен", "id": existing_site.id}), 400
             else:
                 return jsonify({"error": "Этот сайт уже добавлен другим пользователем"}), 400
+        
         key = f"site_{uuid.uuid4().hex[:8]}"
         site = Website(url=url, api_key=key, owner_id=request.current_user.id, status='pending')
         db.session.add(site)
         db.session.commit()
+        
         admin = User.query.filter_by(is_admin=True).first()
         if admin and admin.telegram_chat_id:
             send_telegram_notification(admin.telegram_chat_id, f"🔔 <b>Новый сайт на модерации!</b>\n\n👤 Владелец: {request.current_user.username}\n🔗 Сайт: {url}\n\nЗайдите в админ-панель для одобрения.")
+        
         return jsonify({"ok": True, "id": site.id})
     except Exception as e:
         print(f"Add site error: {e}")
