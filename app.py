@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from openai import OpenAI
 
-app = Flask(__name__, static_folder='static', static_url_path='')
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 # ✅ ИСПРАВЛЕНО: добавлен X-API-Key в разрешённые заголовки
 CORS(app, supports_credentials=True, origins=["*"], allow_headers=["Content-Type", "Authorization", "X-API-Key"])
 
