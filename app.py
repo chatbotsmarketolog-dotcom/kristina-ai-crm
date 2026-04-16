@@ -40,6 +40,24 @@ def validate_contact_method(method):
         return False, f"❌ '{method}' не в списке разрешённых. Доступно: Telegram, ВК, Одноклассники, Instagram, TenChat"
     return True, None
 
+# 🤖 ШАБЛОН ПРОМПТА ДЛЯ AI (АВТО-ВШИВАЕТСЯ В ЗАПРОС)
+def build_ai_system_prompt(agent):
+    return f"""[СИСТЕМНЫЕ ИНСТРУКЦИИ CRM]
+Ты — AI-ассистент на сайте клиента.
+🎭 Стиль: {agent.behavior or 'Профессиональный и вежливый'}
+📚 Знания: {agent.knowledge_base or 'Информация предоставлена клиентом'}
+🚫 Запреты: {agent.forbidden or 'Нет ограничений'}
+
+⚠️ ПРАВИЛА:
+1. Отвечай кратко, по делу, в заданном стиле.
+2. Если клиент проявляет интерес (спрашивает цены, услуги, пишет "да/хочу/интересно/подробнее"), 
+   в конце ответа ДОБАВЬ СТРОКУ:
+   "Хотите оставить заявку на личную встречу с экспертом? Напишите [ДА ПОДАТЬ] чтобы заполнить анкету, или [ОТМЕНА] чтобы отказаться."
+3. Если клиент уже написал [ДА ПОДАТЬ] или [ОТМЕНА] → ответь только "✅ Принято, обрабатываю..."
+4. Язык: русский.
+
+[СООБЩЕНИЕ КЛИЕНТА]"""
+
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
@@ -816,10 +834,11 @@ def create_deal():
         )
         db.session.add(deal)
         db.session.commit()
-        admin = User.query.filter_by(is_admin=True).first()
-        if admin and admin.telegram_chat_id:
+        # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
+        owner = User.query.get(chat.user_id or request.current_user.id)
+        if owner and owner.telegram_chat_id:
             send_telegram_notification(
-                admin.telegram_chat_id,
+                owner.telegram_chat_id,
                 f"🎉 <b>Новая сделка!</b>\n\n👤 Клиент: {deal.client_name}\n💼 Сфера: {deal.sphere}\n💰 Бюджет: {deal.budget}\n📱 Контакт: {deal.contact_method} @{deal.contact_nickname}"
             )
         return jsonify({"ok": True, "deal_id": deal.id})
@@ -945,6 +964,19 @@ def setup_tg():
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Telegram error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ✅ НОВЫЙ ЭНДПОИНТ: Пользователь сохраняет свой Chat ID
+@app.route('/api/telegram/save_chat_id', methods=['POST'])
+@token_required
+def save_user_chat_id():
+    try:
+        user = request.current_user
+        user.telegram_chat_id = request.json.get('chat_id')
+        db.session.commit()
+        return jsonify({"ok": True, "message": "Chat ID сохранён"})
+    except Exception as e:
+        print(f"Save user chat ID error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/save_chat_id', methods=['POST'])
@@ -1081,12 +1113,12 @@ def widget_create_chat():
         db.session.add(chat)
         db.session.commit()
         
-        # Уведомляем админа
-        admin = User.query.filter_by(is_admin=True).first()
-        if admin and admin.telegram_chat_id:
+        # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
+        owner = User.query.get(website.owner_id)
+        if owner and owner.telegram_chat_id:
             send_telegram_notification(
-                admin.telegram_chat_id,
-                f"🔔 <b>Новый посетитель на сайте!</b>\n\n🔗 {website.url}\n\nЗайдите в CRM чтобы ответить."
+                owner.telegram_chat_id,
+                f"🔔 <b>Новый посетитель на {website.url}!</b>\n\nЗайдите в CRM чтобы ответить."
             )
         
         print(f"✅ Created chat {chat.id}")
@@ -1178,12 +1210,12 @@ def widget_send_message():
         db.session.add(msg)
         db.session.commit()
         
-        # Уведомляем админа
-        admin = User.query.filter_by(is_admin=True).first()
-        if admin and admin.telegram_chat_id:
+        # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
+        owner = User.query.get(website.owner_id)
+        if owner and owner.telegram_chat_id:
             send_telegram_notification(
-                admin.telegram_chat_id,
-                f"💬 <b>Новое сообщение от посетителя!</b>\n\n{text[:100]}..." if len(text) > 100 else text
+                owner.telegram_chat_id,
+                f"💬 <b>Новое сообщение на {website.url}!</b>\n\n{text[:100]}..." if len(text) > 100 else text
             )
         
         print(f"✅ Message sent in chat {chat_id}")
@@ -1277,12 +1309,12 @@ def widget_create_deal():
         db.session.add(deal)
         db.session.commit()
         
-        # Уведомляем админа
-        admin = User.query.filter_by(is_admin=True).first()
-        if admin and admin.telegram_chat_id:
+        # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
+        owner = User.query.get(website.owner_id)
+        if owner and owner.telegram_chat_id:
             send_telegram_notification(
-                admin.telegram_chat_id,
-                f"🎉 <b>Новая заявка с сайта!</b>\n\n"
+                owner.telegram_chat_id,
+                f"🎉 <b>Новая заявка с {website.url}!</b>\n\n"
                 f"👤 Клиент: {deal.client_name}\n"
                 f"💼 Сфера: {deal.sphere}\n"
                 f"💰 Бюджет: {deal.budget}\n"
