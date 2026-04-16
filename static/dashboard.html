@@ -126,6 +126,8 @@ th,td{padding:12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08
         <div class="chat-messages" id="chatMessages"><div class="empty-state">💬 Выберите чат</div></div>
         <div class="chat-input">
           <input type="text" id="msgInput" placeholder="Введите сообщение...">
+          <!-- ✅ КНОПКА ЗАЯВКИ ДЛЯ МЕНЕДЖЕРОВ -->
+          <button class="btn btn-green" id="requestFormBtn" onclick="requestDealForm()" style="display:none">📋 Заявка</button>
           <button class="btn" id="sendBtn" onclick="sendMessage()">Отправить</button>
         </div>
       </div>
@@ -369,6 +371,13 @@ async function openChat(id, site){
     document.getElementById('chatTitle').textContent = site;
     document.getElementById('msgInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
+    
+    // ✅ Показывать кнопку заявки только обычным пользователям (не админам)
+    const requestFormBtn = document.getElementById('requestFormBtn');
+    if (requestFormBtn) {
+        requestFormBtn.style.display = isAdmin ? 'none' : 'inline-block';
+    }
+    
     loadMessages();
     if(pollInterval) clearInterval(pollInterval);
     pollInterval = setInterval(loadMessages, 3000);
@@ -919,9 +928,56 @@ function sendAdminMsg(){
 
 async function loadProfile(){document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...';}
 function changePassword(){const p=document.getElementById('newPassword').value;if(p.length<4)return alert('❌ Мин. 4');fetchAPI('/change_password','POST',{password:p}).then(()=>{alert('✅ Готово');document.getElementById('newPassword').value='';});}
-function saveProfileTG(){const c=document.getElementById('profileTgChatId').value.trim(),t=document.getElementById('profileTgToken').value.trim();if(!c||!t)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>{alert('✅ Сохранено!');loadProfile();}));}
+
+// ✅ ИСПРАВЛЕНО: Использует пользовательский эндпоинт для Telegram
+function saveProfileTG(){
+    const c = document.getElementById('profileTgChatId').value.trim();
+    const t = document.getElementById('profileTgToken').value.trim();
+    if(!c || !t) return alert('❌ Заполните Chat ID и Токен');
+    
+    // ✅ ИСПРАВЛЕНО: /api/telegram/save_chat_id вместо /api/admin/save_chat_id
+    fetchAPI('/api/telegram/save_chat_id', 'POST', {chat_id: c})
+        .then(()=> {
+            return fetchAPI('/telegram/setup', 'POST', {token: t, active: true});
+        })
+        .then(()=> {
+            alert('✅ Telegram подключён! Теперь вы будете получать уведомления.');
+            loadProfile();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Ошибка сохранения: ' + error.message);
+        });
+}
+
 function logout(){localStorage.clear();window.location.href='/index.html';}
 document.getElementById('msgInput').onkeypress=e=>{if(e.key==='Enter')sendMessage();};
+
+// ✅ НОВАЯ ФУНКЦИЯ: Менеджер отправляет форму заявки клиенту
+async function requestDealForm() {
+    if (!activeChatId) {
+        alert('❌ Выберите чат');
+        return;
+    }
+    
+    try {
+        await fetchAPI(`/api/chat/${activeChatId}/request_form`, 'POST', {});
+        alert('✅ Форма заявки отправлена клиенту!');
+        
+        // Показываем системное сообщение в чате
+        const chatMessages = document.getElementById('chatMessages');
+        const sysMsg = document.createElement('div');
+        sysMsg.className = 'msg msg-admin';
+        sysMsg.style.cssText = 'background:rgba(251,191,36,0.2);color:#fbbf24;text-align:center;';
+        sysMsg.innerHTML = '📋 Клиенту отправлена форма заявки';
+        chatMessages.appendChild(sysMsg);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+    } catch (e) {
+        alert('❌ Ошибка: ' + e.message);
+    }
+}
+
 loadProfile();showSection('chats');
 </script>
 </body>
