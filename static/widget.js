@@ -630,7 +630,7 @@
             const fullUrl = API_URL + url;  // ← БЕЗ api_key в URL!
             
             if (body) {
-                options.body = body;
+                options.body = JSON.stringify(body);  // ← ✅ ИСПРАВЛЕНО: добавлен JSON.stringify!
             }
             
             console.log('📡 API Request:', method, fullUrl);
