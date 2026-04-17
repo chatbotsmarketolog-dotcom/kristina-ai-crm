@@ -64,6 +64,9 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;bor
 .file-preview img{max-width:200px;border-radius:8px;margin-top:5px}
 .file-preview video{max-width:200px;border-radius:8px;margin-top:5px}
 .file-preview a{color:#60a5fa;text-decoration:none}
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:999999}
+.modal{background:var(--panel);padding:24px;border-radius:12px;max-width:400px;width:90%;border:1px solid rgba(255,255,255,0.1)}
+.hidden{display:none!important}
 </style>
 </head>
 <body>
@@ -125,14 +128,12 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;bor
         <div class="tab" onclick="switchAiTab('create')">➕ Создать агента</div>
     </div>
     
-    <!-- Вкладка моих агентов (по умолчанию) -->
     <div id="ai-my" class="tab-content active">
         <div class="card" id="myAgentsList">
             <p style="opacity:0.6">Загрузка...</p>
         </div>
     </div>
     
-    <!-- Вкладка создания агента -->
     <div id="ai-create" class="tab-content">
         <div class="card">
             <div style="background:rgba(59,130,246,0.1);border-left:4px solid var(--acc);padding:16px;border-radius:8px;margin-bottom:20px">
@@ -218,7 +219,6 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;bor
         </div>
     </div>
     
-    <!-- ✅ НОВОЕ: Удалённые сайты -->
     <div class="card">
         <h3>🗑️ Удалённые сайты</h3>
         <div id="deletedSitesList">
@@ -252,7 +252,6 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;bor
 </div>
 
 <script>
-// ✅ ИСПРАВЛЕНО: Добавлены переменные и правильная функция fetchAPI
 const API = location.origin + '/api';
 const API_URL = location.origin;
 const token = localStorage.getItem('token');
@@ -262,7 +261,6 @@ let activeChatId = null, pollInterval = null, editingAgentId = null, lastMessage
 if (!token) window.location.href = '/index.html';
 if (isAdmin) document.getElementById('adminBtn').style.display = 'inline-block';
 
-// ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ fetchAPI для CRM (использует Bearer токен)
 async function fetchAPI(url, method = 'GET', body = null, useFormData = false) {
     const options = {
         method,
@@ -302,13 +300,6 @@ function showSection(id){
     if(id==='deals')loadDeals('completed');
     if(id==='admin'){loadUsers(); loadPendingSites(); loadDeletedSites();}
     if(id==='profile'){loadProfile(); if(isAdmin) loadAdminSettings();}
-}
-
-function switchTab(t){
-  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
-  if(window.event && window.event.target){window.event.target.classList.add('active');}
-  document.getElementById('tab-'+t).classList.add('active');
 }
 
 function switchAiTab(tab){
@@ -385,7 +376,6 @@ async function openChat(id, site){
     document.getElementById('msgInput').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     
-    // ✅ Показывать кнопку заявки только обычным пользователям (не админам)
     const requestFormBtn = document.getElementById('requestFormBtn');
     if (requestFormBtn) {
         requestFormBtn.style.display = isAdmin ? 'none' : 'inline-block';
@@ -411,16 +401,24 @@ async function loadMessages(){
                 const isFromAdmin = x.sender === 'admin';
                 const senderName = isFromAdmin ? 'Админ' : (isAdmin ? chatTitle : 'Я');
                 const msgClass = isFromAdmin ? 'msg-admin' : 'msg-user';
-                let content = x.text;
+                let content = x.text || '';
+                
+                // ✅ ОБРАБОТКА ФАЙЛОВ
                 if (x.file_url) {
                     const isImage = x.file_url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
                     const isVideo = x.file_url.match(/\.(mp4|mov|avi)$/i);
-                    if (isImage) content += `<div class="file-preview"><img src="${x.file_url}" alt="img"></div>`;
-                    else if (isVideo) content += `<div class="file-preview"><video controls src="${x.file_url}"></video></div>`;
-                    else content += `<div class="file-preview"><a href="${x.file_url}" target="_blank">📄 Скачать файл</a></div>`;
+                    if (isImage) {
+                        content += `<div class="file-preview"><img src="${x.file_url}" alt="img"></div>`;
+                    } else if (isVideo) {
+                        content += `<div class="file-preview"><video controls src="${x.file_url}"></video></div>`;
+                    } else {
+                        content += `<div class="file-preview"><a href="${x.file_url}" target="_blank">📄 Скачать файл</a></div>`;
+                    }
                 }
+                
                 let statusText = '';
                 if (isFromAdmin) statusText = x.is_read ? '✅ Прочитано' : '🕒 Отправлено';
+                
                 return `<div class="msg ${msgClass}">
                     <div class="msg-header">${senderName}</div>
                     <div class="msg-text">${content}</div>
@@ -429,7 +427,9 @@ async function loadMessages(){
             }).join('');
             document.getElementById('chatMessages').scrollTop = 9999;
         }
-    } catch(e) {}
+    } catch(e) {
+        console.error('Load messages error:', e);
+    }
 }
 
 async function sendMessage(){
@@ -441,7 +441,7 @@ async function sendMessage(){
         loadMessages();
         loadChats();
     } catch(e) {
-        alert('❌ Ошибка отправки');
+        alert('❌ Ошибка отправки: ' + e.message);
     }
 }
 
@@ -458,7 +458,7 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
                 await fetchAPI('/send', 'POST', {chat_id: activeChatId, text: '', file_url: data.url});
                 loadMessages(); loadChats();
             }
-        } catch(err) { alert('Ошибка загрузки'); }
+        } catch(err) { alert('Ошибка загрузки: ' + err.message); }
     }
     e.target.value = '';
 });
@@ -475,7 +475,7 @@ async function archiveCurrentChat(){
         alert('✅ В архиве');
         showSection('chats');
         activeChatId = null;
-    } catch(e){ alert('❌'); } 
+    } catch(e){ alert('❌ Ошибка: ' + e.message); } 
 }
 
 async function deleteCurrentChat(){ 
@@ -485,7 +485,7 @@ async function deleteCurrentChat(){
         showChatList();
         activeChatId=null;
         loadChats();
-    } catch(e){ alert('❌'); } 
+    } catch(e){ alert('❌ Ошибка: ' + e.message); } 
 }
 
 async function deleteChat(id){
@@ -499,7 +499,7 @@ async function deleteChat(id){
             activeChatId = null;
         }
     } catch(e) {
-        alert('❌ Ошибка удаления');
+        alert('❌ Ошибка удаления: ' + e.message);
     }
 }
 
@@ -530,7 +530,6 @@ async function loadPendingSites(){
     }
 }
 
-// ✅ НОВЫЕ ФУНКЦИИ ДЛЯ УДАЛЁННЫХ САЙТОВ
 async function loadDeletedSites(){
     if(!isAdmin) return;
     try {
@@ -602,7 +601,7 @@ async function approveSite(id){
         loadPendingSites();
         loadSites();
     } catch(e) {
-        alert('❌ Ошибка одобрения');
+        alert('❌ Ошибка одобрения: ' + e.message);
     }
 }
 
@@ -613,11 +612,10 @@ async function rejectSite(id){
         alert('❌ Сайт отклонён');
         loadPendingSites();
     } catch(e) {
-        alert('❌ Ошибка отклонения');
+        alert('❌ Ошибка отклонения: ' + e.message);
     }
 }
 
-// ✅ ОБНОВЛЕННАЯ ФУНКЦИЯ ЗАГРУЗКИ САЙТОВ (ИСПРАВЛЕН СИНТАКСИС)
 async function loadSites(){
     const s = await fetchAPI('/sites');
     if(!s) return;
@@ -636,7 +634,6 @@ async function loadSites(){
 
         let codeBlock = '';
         if(x.status === 'active') {
-            // ✅ ПРАВИЛЬНАЯ ГЕНЕРАЦИЯ КОДА - без вложенных шаблонных строк
             const uniqueCode = '<script>\n    window.KRISTINA_API_URL = "https://kristina-crm-api.onrender.com";\n    window.KRISTINA_API_KEY = "' + x.api_key + '";\n<\/script>\n<script src="https://kristina-crm-api.onrender.com/static/widget.js"><\/script>';
             
             codeBlock = `
@@ -671,7 +668,7 @@ function addSite(){
         document.getElementById('siteUrl').value='';
         loadSites();
         alert('✅ Добавлен! Ждите одобрения.');
-    });
+    }).catch(e => alert('❌ Ошибка: ' + e.message));
 }
 
 async function deleteSite(id){
@@ -681,10 +678,9 @@ async function deleteSite(id){
         const data = await r.json().catch(()=>({error:'Ошибка'}));
         if(r.ok){ loadSites(); if(isAdmin) loadDeletedSites(); alert('✅ Удален!'); }
         else{ alert('❌ '+(data.error||'Ошибка')); }
-    }catch(e){ alert('❌ Ошибка соединения'); }
+    }catch(e){ alert('❌ Ошибка соединения: ' + e.message); }
 }
 
-// ✅ ФУНКЦИЯ КОПИРОВАНИЯ КОНКРЕТНОГО КОДА
 function copySiteCode(elementId){
     const code = document.getElementById(elementId).innerText;
     navigator.clipboard.writeText(code).then(() => alert('✅ Код скопирован! Вставьте его перед </body> на вашем сайте.'));
@@ -822,7 +818,7 @@ async function confirmLinkWebsite(agentId){
             alert('❌ Ошибка: ' + (result.error || 'Неизвестная'));
         }
     } catch(e) {
-        alert('❌ Ошибка привязки');
+        alert('❌ Ошибка привязки: ' + e.message);
     }
 }
 
@@ -832,7 +828,7 @@ async function deleteAgent(agentId){
         await fetchAPI(`/ai/agents/${agentId}/delete`, 'DELETE');
         loadMyAgents();
     } catch(e) {
-        alert('❌ Ошибка удаления');
+        alert('❌ Ошибка удаления: ' + e.message);
     }
 }
 
@@ -866,7 +862,7 @@ function saveAI(){
         }
     }).catch(e => {
         console.error('Save error:', e);
-        alert('❌ Ошибка сохранения');
+        alert('❌ Ошибка сохранения: ' + e.message);
     });
 }
 
@@ -888,7 +884,7 @@ function handlePdfFiles(files){
         }).then(r => r.json()).then(result => {
             if(result.ok) { alert('✅ PDF загружен!'); loadMyAgents(); }
             else { alert('❌ Ошибка: ' + (result.error || 'Неизвестная')); }
-        }).catch(e => { alert('❌ Ошибка загрузки'); });
+        }).catch(e => { alert('❌ Ошибка загрузки: ' + e.message); });
     }
 }
 
@@ -897,11 +893,11 @@ async function deletePdf(pdfId){
     try {
         await fetchAPI(`/ai/delete_pdf/${pdfId}`, 'DELETE');
         loadMyAgents();
-    } catch(e) { alert('❌ Ошибка удаления PDF'); }
+    } catch(e) { alert('❌ Ошибка удаления PDF: ' + e.message); }
 }
 
 function toggleAgent(agentId){
-    fetchAPI(`/ai/agents/${agentId}/toggle`, 'POST').then(r => { if(r.ok) loadMyAgents(); }).catch(e => alert('❌ Ошибка переключения'));
+    fetchAPI(`/ai/agents/${agentId}/toggle`, 'POST').then(r => { if(r.ok) loadMyAgents(); }).catch(e => alert('❌ Ошибка переключения: ' + e.message));
 }
 
 async function loadDeals(status){
@@ -953,7 +949,7 @@ async function deleteDeal(dealId){
         await fetchAPI(`/deals/${dealId}`, 'DELETE');
         const activeTab = document.querySelector('#deals .tab.active').onclick.toString().match(/'(\w+)'/)?.[1];
         loadDeals(activeTab);
-    } catch(e) { alert('❌ Ошибка удаления'); }
+    } catch(e) { alert('❌ Ошибка удаления: ' + e.message); }
 }
 
 function openChatFromDeal(chatId){ openChat(chatId, 'Клиент'); showSection('chats'); }
@@ -975,11 +971,6 @@ async function handleFirstMessage(){
     if(name && name.trim()) setClientName(name.trim());
 }
 
-function saveTG(){const t=document.getElementById('tgToken').value.trim(),c=document.getElementById('tgChatId').value.trim();if(!t||!c)return alert('❌ Заполните');fetchAPI('/admin/save_chat_id','POST',{chat_id:c}).then(()=>fetchAPI('/telegram/setup','POST',{token:t,active:true}).then(()=>alert('✅ Telegram настроен!')));}
-function handleFiles(files){for(let f of files){if(f.type!=='application/pdf')return alert('❌ Только PDF');if(f.size>10*1024*1024)return alert('❌ Макс 10МБ');if(uploadedFiles.length>=10)return alert('❌ Макс 10 файлов');uploadedFiles.push(f);uploadedFileNames.push(f.name);}renderFileList();}
-function renderFileList(){const el=document.getElementById('fileList');if(!el)return;el.innerHTML=uploadedFileNames.map((n,i)=>`<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin:6px 0;font-size:0.85rem"><span>${n}</span><span onclick="removeFile(${i})" style="color:var(--danger);cursor:pointer">×</span></div>`).join('');}
-function removeFile(i){uploadedFiles.splice(i,1);uploadedFileNames.splice(i,1);renderFileList();}
-
 async function loadUsers(){
     const u=await fetchAPI('/admin/users');
     if(!u)return;
@@ -987,7 +978,7 @@ async function loadUsers(){
     document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':''}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join('');
 }
 
-function toggleUser(id){fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers);}
+function toggleUser(id){fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers).catch(e=>alert('❌ '+e.message));}
 
 function sendAdminMsg(){
     const u=document.getElementById('targetUser').value;
@@ -996,20 +987,25 @@ function sendAdminMsg(){
     fetchAPI('/admin/send_to_user','POST',{user_id:parseInt(u),text:t}).then(result=>{
         if(result&&result.ok){alert('✅ Сообщение отправлено!');document.getElementById('adminMsg').value='';loadChats();}
         else{alert('❌ Ошибка: '+(result?result.error:'Неизвестная'));}
-    }).catch(error=>{console.error('Error:',error);alert('❌ Ошибка отправки');});
+    }).catch(error=>{console.error('Error:',error);alert('❌ Ошибка отправки: '+error.message);});
 }
 
 async function loadProfile(){document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...';}
-function changePassword(){const p=document.getElementById('newPassword').value;if(p.length<4)return alert('❌ Мин. 4');fetchAPI('/change_password','POST',{password:p}).then(()=>{alert('✅ Готово');document.getElementById('newPassword').value='';});}
 
-// ✅ ИСПРАВЛЕНО: Использует пользовательский эндпоинт для Telegram
+function changePassword(){
+    const p=document.getElementById('newPassword').value;
+    if(p.length<4)return alert('❌ Мин. 4 символа');
+    fetchAPI('/change_password','POST',{password:p}).then(()=>{
+        alert('✅ Готово');
+        document.getElementById('newPassword').value='';
+    }).catch(e=>alert('❌ '+e.message));
+}
+
 function saveProfileTG(){
     const c = document.getElementById('profileTgChatId').value.trim();
     const t = document.getElementById('profileTgToken').value.trim();
     if(!c || !t) return alert('❌ Заполните Chat ID и Токен');
     
-    // ✅ ИСПРАВЛЕНО: /telegram/save_chat_id вместо /api/telegram/save_chat_id
-    // fetchAPI уже добавляет /api/ в начало, поэтому путь должен быть без /api/
     fetchAPI('/telegram/save_chat_id', 'POST', {chat_id: c})
         .then(()=> {
             return fetchAPI('/telegram/setup', 'POST', {token: t, active: true});
@@ -1029,7 +1025,9 @@ async function loadAdminSettings() {
         const settings = await fetchAPI('/admin/get_settings');
         document.getElementById('showClientChatsToggle').checked = settings.show_client_chats !== false;
         document.getElementById('adminSettings').style.display = 'block';
-    } catch(e) {}
+    } catch(e) {
+        console.error('Load admin settings error:', e);
+    }
 }
 
 async function toggleShowClientChats() {
@@ -1037,13 +1035,15 @@ async function toggleShowClientChats() {
     try {
         await fetchAPI('/admin/update_settings', 'POST', { show_client_chats: value });
         loadChats();
-    } catch(e) { alert('❌ Ошибка сохранения настройки'); }
+        alert('✅ Настройка сохранена!');
+    } catch(e) { 
+        alert('❌ Ошибка сохранения настройки: ' + e.message); 
+    }
 }
 
 function logout(){localStorage.clear();window.location.href='/index.html';}
 document.getElementById('msgInput').onkeypress=e=>{if(e.key==='Enter')sendMessage();};
 
-// ✅ НОВАЯ ФУНКЦИЯ: Менеджер отправляет форму заявки клиенту
 async function requestDealForm() {
     if (!activeChatId) {
         alert('❌ Выберите чат');
@@ -1054,7 +1054,6 @@ async function requestDealForm() {
         await fetchAPI(`/chat/${activeChatId}/request_form`, 'POST', {});
         alert('✅ Форма заявки отправлена клиенту!');
         
-        // Показываем системное сообщение в чате
         const chatMessages = document.getElementById('chatMessages');
         const sysMsg = document.createElement('div');
         sysMsg.className = 'msg msg-admin';
@@ -1072,3 +1071,4 @@ loadProfile();showSection('chats');
 </script>
 </body>
 </html>
+
