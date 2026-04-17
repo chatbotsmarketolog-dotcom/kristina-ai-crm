@@ -13,8 +13,8 @@
 
     console.log('🚀 Widget initializing...', { API_URL, API_KEY: API_KEY.substring(0, 10) + '...' });
 
-    // Состояние
-    let chatId = null;
+    // Состояние (с сохранением chatId в localStorage)
+    let chatId = localStorage.getItem('kristina_chat_id') || null;
     let messages = [];
     let formRequested = false;
     let userName = localStorage.getItem('kristina_user_name') || '';
@@ -22,7 +22,7 @@
     let selectedFiles = [];
     let isOpen = false;
 
-    // Стили
+    // Стили (добавлены стили для превью файлов)
     const styles = `
         <style>
             /* Плавающая кнопка */
@@ -157,6 +157,13 @@
                 padding: 10px !important;
                 border-radius: 12px !important;
                 margin-top: 8px !important;
+            }
+            
+            .kristina-message-file img,
+            .kristina-message-file video {
+                max-width: 100% !important;
+                border-radius: 8px !important;
+                margin-top: 5px !important;
             }
             
             .kristina-file-link {
@@ -863,7 +870,7 @@
             attachedFiles.innerHTML = selectedFiles.map((file, index) => `
                 <div class="kristina-file-tag">
                     📎 ${file.name}
-                    <span class="remove-file" onclick="removeFile(${index})">×</span>
+                    <span class="remove-file" onclick="window.removeFile(${index})">×</span>
                 </div>
             `).join('');
         }
@@ -928,33 +935,43 @@
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Инициализация чата
+        // ✅ ДОБАВЛЕНА ОТПРАВКА СТАТУСА "ПЕЧАТАЕТ"
+        chatInput.addEventListener('input', () => {
+            if (chatId) {
+                fetchAPI('/api/widget/typing', 'POST', { chat_id: chatId }).catch(() => {});
+            }
+        });
+
+        // Инициализация чата с проверкой сохранённого chatId
         async function initChat() {
             try {
                 console.log('🔄 Initializing chat...');
                 
-                // Проверяем есть ли активный чат
-                const chats = await fetchAPI('/api/widget/chats');
-                console.log('📋 Chats:', chats);
-                
-                const activeChat = chats.find(c => c.status === 'active' || c.status === 'waiting');
-                
-                if (activeChat) {
-                    chatId = activeChat.id;
-                    console.log('✅ Using existing chat:', chatId);
-                } else {
-                    // Создаём новый чат
-                    const newChat = await fetchAPI('/api/widget/chats', 'POST', {});
-                    chatId = newChat.id;
-                    console.log('✅ Created new chat:', chatId);
+                if (chatId) {
+                    // Проверяем, существует ли сохранённый чат
+                    const chats = await fetchAPI('/api/widget/chats');
+                    const existingChat = chats.find(c => c.id == chatId);
+                    if (existingChat) {
+                        console.log('✅ Using existing chat from localStorage:', chatId);
+                        // Чат валиден, используем его
+                        loadMessages();
+                        if (!userName) showNameForm();
+                        return;
+                    } else {
+                        console.log('⚠️ Saved chat not found, creating new...');
+                        chatId = null;
+                        localStorage.removeItem('kristina_chat_id');
+                    }
                 }
+                
+                // Создаём новый чат
+                const newChat = await fetchAPI('/api/widget/chats', 'POST', {});
+                chatId = newChat.id;
+                localStorage.setItem('kristina_chat_id', chatId);
+                console.log('✅ Created new chat:', chatId);
                 
                 loadMessages();
-                
-                // Показываем форму имени если нет
-                if (!userName) {
-                    showNameForm();
-                }
+                if (!userName) showNameForm();
             } catch (e) {
                 console.error('❌ Ошибка инициализации:', e);
                 alert('❌ Ошибка подключения к чату: ' + e.message);
@@ -1035,7 +1052,7 @@
             }
         }
 
-        // ✅ ОБНОВЛЁННОЕ ОТОБРАЖЕНИЕ С ПАРСЕРОМ AI-КНОПОК
+        // ✅ ОБНОВЛЁННОЕ ОТОБРАЖЕНИЕ С ПАРСЕРОМ AI-КНОПОК И ПРЕВЬЮ ФАЙЛОВ
         function renderMessages() {
             if (messages.length === 0) {
                 chatMessages.innerHTML = `
@@ -1048,34 +1065,35 @@
             
             chatMessages.innerHTML = messages.map(msg => {
                 const isUser = msg.sender === 'user';
-                let fileHtml = '';
+                let content = msg.text || '';
                 
-                if (msg.files && msg.files.length > 0) {
-                    fileHtml = msg.files.map(file => {
+                // Поддержка как file_url, так и files (для обратной совместимости)
+                if (msg.file_url) {
+                    const isImage = msg.file_url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                    const isVideo = msg.file_url.match(/\.(mp4|mov|avi)$/i);
+                    if (isImage) {
+                        content += `<div class="kristina-message-file"><img src="${msg.file_url}" alt="img"></div>`;
+                    } else if (isVideo) {
+                        content += `<div class="kristina-message-file"><video controls src="${msg.file_url}"></video></div>`;
+                    } else {
+                        content += `<div class="kristina-message-file"><a href="${msg.file_url}" target="_blank" class="kristina-file-link">📄 ${msg.file_url.split('/').pop()}</a></div>`;
+                    }
+                } else if (msg.files && msg.files.length) {
+                    msg.files.forEach(file => {
                         const isImage = file.url && file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
                         if (isImage) {
-                            return `<div class="kristina-message-file">
-                                <a href="${file.url}" target="_blank" class="kristina-file-link">
-                                    🖼️ ${file.name || 'Изображение'}
-                                </a>
-                            </div>`;
+                            content += `<div class="kristina-message-file"><img src="${file.url}" alt="${file.name}"></div>`;
                         } else {
-                            return `<div class="kristina-message-file">
-                                <a href="${file.url}" target="_blank" class="kristina-file-link">
-                                    📄 ${file.name || 'Файл'}
-                                </a>
-                            </div>`;
+                            content += `<div class="kristina-message-file"><a href="${file.url}" target="_blank" class="kristina-file-link">📄 ${file.name || 'Файл'}</a></div>`;
                         }
-                    }).join('');
+                    });
                 }
                 
-                // ✅ ЕСЛИ СООБЩЕНИЕ ОТ AI/АДМИНА → ПРОПУСКАЕМ ЧЕРЕЗ ПАРСЕР КНОПОК
-                const displayText = msg.sender === 'admin' ? parseAIMessage(msg.text || '') : (msg.text || '');
+                const displayText = msg.sender === 'admin' ? parseAIMessage(content) : content;
                 
                 return `
                     <div class="kristina-message ${isUser ? 'kristina-message-user' : 'kristina-message-admin'}">
                         ${displayText}
-                        ${fileHtml}
                     </div>
                 `;
             }).join('');
@@ -1182,6 +1200,9 @@
 
         // Автообновление сообщений
         setInterval(loadMessages, 3000);
+        
+        // Запускаем инициализацию чата
+        initChat();
         
         console.log('✅ Widget initialized successfully');
         
