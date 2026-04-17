@@ -935,8 +935,9 @@ function saveProfileTG(){
     const t = document.getElementById('profileTgToken').value.trim();
     if(!c || !t) return alert('❌ Заполните Chat ID и Токен');
     
-    // ✅ ИСПРАВЛЕНО: /api/telegram/save_chat_id вместо /api/admin/save_chat_id
-    fetchAPI('/api/telegram/save_chat_id', 'POST', {chat_id: c})
+    // ✅ ИСПРАВЛЕНО: /telegram/save_chat_id вместо /api/telegram/save_chat_id
+    // fetchAPI уже добавляет /api/ в начало, поэтому путь должен быть без /api/
+    fetchAPI('/telegram/save_chat_id', 'POST', {chat_id: c})
         .then(()=> {
             return fetchAPI('/telegram/setup', 'POST', {token: t, active: true});
         })
@@ -961,7 +962,7 @@ async function requestDealForm() {
     }
     
     try {
-        await fetchAPI(`/api/chat/${activeChatId}/request_form`, 'POST', {});
+        await fetchAPI(`/chat/${activeChatId}/request_form`, 'POST', {});
         alert('✅ Форма заявки отправлена клиенту!');
         
         // Показываем системное сообщение в чате
