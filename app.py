@@ -31,7 +31,7 @@ def send_telegram_notification(chat_id, text):
 
 def validate_contact_method(method):
     """Проверка разрешённых мессенджеров"""
-    allowed = ['telegram', 'vk', 'одноклассники', 'instagram', 'tenchat', 'тентенчат', 'ок']
+    allowed = ['telegram', 'vk', 'одноклассники', 'instagram', 'tenchat', 'тентенчат', 'ок', 'whatsapp', 'вайбер']
     blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k']
     method_lower = method.lower().strip()
     if method_lower in blocked:
@@ -487,21 +487,13 @@ def delete_site(site_id):
 def get_chats():
     try:
         u = request.current_user
-        if u.is_admin:
-            chats = Chat.query.order_by(Chat.created_at.desc()).all()
-            result = []
-            for c in chats:
-                chat_name = c.visitor_name
-                if not chat_name and c.user_id:
-                    user = User.query.get(c.user_id)
-                    chat_name = user.username if user else "Пользователь"
-                if not chat_name:
-                    chat_name = "Пользователь"
-                result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
-            return jsonify(result)
-        else:
-            chats = Chat.query.filter_by(user_id=u.id).order_by(Chat.created_at.desc()).all() if hasattr(Chat, 'user_id') else []
-            return jsonify([{"id": c.id, "site": "Админ", "status": c.status, "time": c.created_at.isoformat()} for c in chats])
+        # ✅ ИЗОЛЯЦИЯ: ВСЕ пользователи видят ТОЛЬКО свои чаты
+        chats = Chat.query.filter_by(user_id=u.id).order_by(Chat.created_at.desc()).all()
+        result = []
+        for c in chats:
+            chat_name = c.visitor_name or "Клиент"
+            result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
+        return jsonify(result)
     except Exception as e:
         print(f"Get chats error: {e}")
         import traceback
@@ -509,11 +501,11 @@ def get_chats():
         return jsonify([]), 500
 
 @app.route('/api/chats/<int:chat_id>/delete', methods=['POST'])
-@admin_required
+@token_required
 def delete_chat(chat_id):
     try:
         chat = Chat.query.get(chat_id)
-        if not chat: return jsonify({"error": "Чат не найден"}), 404
+        if not chat or chat.user_id != request.current_user.id: return jsonify({"error": "Чат не найден"}), 404
         Message.query.filter_by(chat_id=chat_id).delete()
         db.session.delete(chat)
         db.session.commit()
@@ -527,6 +519,7 @@ def delete_chat(chat_id):
 def get_messages(chat_id):
     try:
         chat = Chat.query.get(chat_id)
+        if not chat or chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
         msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
         # Возвращаем объект с сообщениями и флагом form_requested
         return jsonify({
@@ -545,35 +538,19 @@ def send_message():
         sender = 'admin' if request.current_user.is_admin else 'user'
         text = d.get('text', '').lower()
         
+        chat = Chat.query.get(d['chat_id'])
+        if not chat or chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
+        
         # Авто-триггер формы от агента: если пользователь написал и текст содержит согласие
         if sender == 'user' and not request.current_user.is_admin:
             consent_keywords = ['да', 'хочу', 'готов', 'согласен', 'ок', 'хорошо', 'давайте', 'пригласите', 'встреча', 'личная встреча', 'записаться']
             if any(kw in text for kw in consent_keywords):
-                chat = Chat.query.get(d['chat_id'])
                 if chat and not chat.form_requested:
                     chat.form_requested = True
                     db.session.commit()
-                    user = User.query.get(chat.user_id)
-                    if user and user.telegram_chat_id:
-                        send_telegram_notification(
-                            user.telegram_chat_id,
-                            "🤖 Агент предлагает заполнить заявку на личную встречу!\n\nЗайдите в чат чтобы заполнить форму."
-                        )
         
         db.session.add(Message(chat_id=d['chat_id'], sender=sender, text=d['text']))
         db.session.commit()
-        
-        chat = Chat.query.get(d['chat_id'])
-        if chat and chat.user_id:
-            if sender == 'admin':
-                user = User.query.get(chat.user_id)
-                if user and user.telegram_chat_id:
-                    send_telegram_notification(user.telegram_chat_id, f"💬 <b>Новое сообщение от админа!</b>\n\n{d['text'][:100]}..." if len(d['text']) > 100 else d['text'])
-            else:
-                admin = User.query.filter_by(is_admin=True).first()
-                if admin and admin.telegram_chat_id:
-                    user = User.query.get(chat.user_id)
-                    send_telegram_notification(admin.telegram_chat_id, f"💬 <b>Ответ от {user.username if user else 'Пользователя'}</b>\n\n{d['text'][:100]}..." if len(d['text']) > 100 else d['text'])
         
         # Возвращаем form_requested для фронтенда
         return jsonify({"ok": True, "form_requested": bool(chat.form_requested) if chat and hasattr(chat, 'form_requested') else False})
@@ -819,11 +796,11 @@ def create_deal():
         if not is_valid:
             return jsonify({"error": error}), 400
         chat = Chat.query.get(chat_id)
-        if not chat:
+        if not chat or chat.user_id != request.current_user.id:
             return jsonify({"error": "Чат не найден"}), 404
         deal = Deal(
             chat_id=chat_id,
-            user_id=chat.user_id or request.current_user.id,
+            user_id=chat.user_id,
             client_name=d.get('client_name'),
             sphere=d.get('sphere'),
             request=d.get('request'),
@@ -835,7 +812,7 @@ def create_deal():
         db.session.add(deal)
         db.session.commit()
         # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
-        owner = User.query.get(chat.user_id or request.current_user.id)
+        owner = User.query.get(chat.user_id)
         if owner and owner.telegram_chat_id:
             send_telegram_notification(
                 owner.telegram_chat_id,
@@ -852,10 +829,7 @@ def get_deals():
     try:
         status = request.args.get('status', 'completed')
         user = request.current_user
-        if user.is_admin:
-            deals = Deal.query.filter_by(status=status).order_by(Deal.created_at.desc()).all()
-        else:
-            deals = Deal.query.filter_by(user_id=user.id, status=status).order_by(Deal.created_at.desc()).all()
+        deals = Deal.query.filter_by(user_id=user.id, status=status).order_by(Deal.created_at.desc()).all()
         result = []
         for deal in deals:
             result.append({
@@ -881,7 +855,7 @@ def get_deals():
 def update_deal(deal_id):
     try:
         deal = Deal.query.get(deal_id)
-        if not deal:
+        if not deal or deal.user_id != request.current_user.id:
             return jsonify({"error": "Сделка не найдена"}), 404
         d = request.json
         deal.status = d.get('status', deal.status)
@@ -897,7 +871,7 @@ def update_deal(deal_id):
 def delete_deal(deal_id):
     try:
         deal = Deal.query.get(deal_id)
-        if not deal:
+        if not deal or deal.user_id != request.current_user.id:
             return jsonify({"error": "Сделка не найдена"}), 404
         db.session.delete(deal)
         db.session.commit()
@@ -911,7 +885,7 @@ def delete_deal(deal_id):
 def set_client_name(chat_id):
     try:
         chat = Chat.query.get(chat_id)
-        if not chat:
+        if not chat or chat.user_id != request.current_user.id:
             return jsonify({"error": "Чат не найден"}), 404
         name = request.json.get('name', '').strip()
         if not name:
@@ -929,18 +903,10 @@ def request_deal_form(chat_id):
     """Пометить чат что форма заявки запрошена"""
     try:
         chat = Chat.query.get(chat_id)
-        if not chat:
+        if not chat or chat.user_id != request.current_user.id:
             return jsonify({"error": "Чат не найден"}), 404
         chat.form_requested = True
         db.session.commit()
-        
-        user = User.query.get(chat.user_id)
-        if user and user.telegram_chat_id:
-            send_telegram_notification(
-                user.telegram_chat_id,
-                "📋 Вам предложено заполнить заявку на личную встречу!\n\nЗайдите в чат чтобы заполнить форму."
-            )
-        
         return jsonify({"ok": True})
     except Exception as e:
         print(f"Request form error: {e}")
@@ -1108,8 +1074,8 @@ def widget_create_chat():
         if not website:
             return jsonify({"error": "Invalid API key"}), 401
         
-        # Создаём новый чат
-        chat = Chat(website_id=website.id, status='waiting')
+        # ✅ ИСПРАВЛЕНО: создаём чат с user_id владельца сайта
+        chat = Chat(website_id=website.id, user_id=website.owner_id, status='waiting')
         db.session.add(chat)
         db.session.commit()
         
@@ -1324,6 +1290,52 @@ def widget_create_deal():
         return jsonify({"ok": True, "deal_id": deal.id})
     except Exception as e:
         print(f"❌ Widget create_deal error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# ✅ НОВЫЙ ЭНДПОИНТ: Сохранение контакта при отказе/позже (форма подарка)
+@app.route('/api/widget/capture_late_contact', methods=['POST'])
+def widget_capture_late_contact():
+    try:
+        api_key = request.headers.get('X-API-Key')
+        if not api_key:
+            return jsonify({"error": "API key required"}), 401
+        data = request.json
+        chat_id = data.get('chat_id')
+        if not chat_id:
+            return jsonify({"error": "chat_id required"}), 400
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return jsonify({"error": "Chat not found"}), 404
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website or chat.website_id != website.id:
+            return jsonify({"error": "Invalid API key"}), 401
+        
+        # Создаём сделку в "Отклонённые" с контактом для подарка
+        deal = Deal(
+            chat_id=chat_id, user_id=website.owner_id, 
+            client_name=chat.visitor_name or 'Аноним', 
+            sphere='Запрос на подарок/позже', 
+            request='Клиент проявил интерес, но попросил связаться позже', 
+            budget='0', 
+            contact_method=data.get('contact_method', ''), 
+            contact_nickname=data.get('contact_nickname', ''), 
+            status='declined', 
+            decline_reason='Интерес есть, но позже (подарок)'
+        )
+        db.session.add(deal)
+        db.session.commit()
+        
+        owner = User.query.get(website.owner_id)
+        if owner and owner.telegram_chat_id:
+            send_telegram_notification(
+                owner.telegram_chat_id,
+                f"🎁 <b>Новый контакт (подарок)!</b>\n📱 {data.get('contact_method')} @{data.get('contact_nickname')}"
+            )
+        return jsonify({"ok": True})
+    except Exception as e:
+        print(f"❌ Widget capture_late_contact error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
