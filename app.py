@@ -36,9 +36,9 @@ def validate_contact_method(method):
     blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k']
     method_lower = method.lower().strip()
     if method_lower in blocked:
-        return False, "❌ Мессенджер MAX/МАКС запрещён. Пожалуйста, укажите один из разрешённых: Telegram, ВК, Одноклассники, Instagram, TenChat"
+        return False, "❌ Мессенджер MAX/МАКС запрещён."
     if method_lower not in allowed:
-        return False, f"❌ '{method}' не в списке разрешённых. Доступно: Telegram, ВК, Одноклассники, Instagram, TenChat"
+        return False, f"❌ '{method}' не в списке разрешённых."
     return True, None
 
 # 🤖 ШАБЛОН ПРОМПТА ДЛЯ AI (АВТО-ВШИВАЕТСЯ В ЗАПРОС)
@@ -247,8 +247,13 @@ def upload_file():
         allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.pdf'}
         _, ext = os.path.splitext(file.filename.lower())
         if ext not in allowed_ext: return jsonify({"error": "Неподдерживаемый формат"}), 400
-        file.seek(0, os.SEEK_END); file_size = file.tell(); file.seek(0)
+        
+        # Проверка размера
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
         if file_size > 20 * 1024 * 1024: return jsonify({"error": "Файл больше 20МБ"}), 400
+        
         filename = f"{uuid.uuid4().hex}{ext}"
         upload_folder = os.path.join(app.static_folder, 'uploads')
         os.makedirs(upload_folder, exist_ok=True)
@@ -281,7 +286,9 @@ def archive_chat(chat_id):
     try:
         chat = Chat.query.get(chat_id)
         if not chat: return jsonify({"error": "Чат не найден"}), 404
-        if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
+        # ✅ ИСПРАВЛЕНО: Админ может архивировать любые чаты
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id: 
+            return jsonify({"error": "Доступ запрещен"}), 403
         chat.is_archived = True; db.session.commit()
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
@@ -292,31 +299,55 @@ def archive_chat(chat_id):
 def send_with_files():
     try:
         if request.method == 'OPTIONS': return '', 204
-        chat_id = request.form.get('chat_id'); text = request.form.get('text', ''); files = request.files.getlist('files')
+        chat_id = request.form.get('chat_id')
+        text = request.form.get('text', '')
+        files = request.files.getlist('files')
+        
         chat = Chat.query.get(chat_id)
         if not chat: return jsonify({"error": "Чат не найден"}), 404
-        if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id: 
+            return jsonify({"error": "Доступ запрещен"}), 403
+            
         sender = 'admin' if request.current_user.is_admin else 'user'
-        uploads_dir = os.path.join(app.static_folder, 'uploads'); os.makedirs(uploads_dir, exist_ok=True)
+        uploads_dir = os.path.join(app.static_folder, 'uploads')
+        os.makedirs(uploads_dir, exist_ok=True)
+        
         for file in files:
             if file.filename:
                 allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.pdf'}
                 _, ext = os.path.splitext(file.filename.lower())
                 if ext not in allowed_ext: return jsonify({"error": "Неподдерживаемый формат"}), 400
-                file.seek(0, os.SEEK_END); file_size = file.tell(); file.seek(0)
+                
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                file.seek(0)
                 if file_size > 20 * 1024 * 1024: return jsonify({"error": "Файл больше 20МБ"}), 400
-                filename = f"{uuid.uuid4().hex}{ext}"; filepath = os.path.join(uploads_dir, filename); file.save(filepath); file_url = f"/static/uploads/{filename}"
-                msg = Message(chat_id=chat_id, sender=sender, text=text, file_url=file_url); db.session.add(msg)
-        db.session.commit(); return jsonify({"ok": True})
-    except Exception as e: print(f"Send files error: {e}"); return jsonify({"error": str(e)}), 500
+                
+                filename = f"{uuid.uuid4().hex}{ext}"
+                filepath = os.path.join(uploads_dir, filename)
+                file.save(filepath)
+                file_url = f"/static/uploads/{filename}"
+                
+                # ✅ СОЗДАЕМ СООБЩЕНИЕ С URL ФАЙЛА
+                msg = Message(chat_id=chat_id, sender=sender, text=text, file_url=file_url)
+                db.session.add(msg)
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e: 
+        print(f"Send files error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # --- ИНДИКАТОР "ПЕЧАТАЕТ" ---
 @app.route('/api/typing', methods=['POST'])
 @token_required
 def update_typing():
     try:
-        chat_id = request.json.get('chat_id'); chat = Chat.query.get(chat_id)
-        if chat: chat.is_typing = True; chat.typing_updated = datetime.datetime.utcnow(); db.session.commit()
+        chat_id = request.json.get('chat_id')
+        chat = Chat.query.get(chat_id)
+        if chat: 
+            chat.is_typing = True
+            chat.typing_updated = datetime.datetime.utcnow()
+            db.session.commit()
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
@@ -332,8 +363,9 @@ def get_admin_settings():
 def update_admin_settings():
     try:
         data = request.json
-        if 'show_client_chats' in data:
-            request.current_user.show_client_chats = data['show_client_chats']; db.session.commit()
+        if 'show_client_chats' in 
+            request.current_user.show_client_chats = data['show_client_chats']
+            db.session.commit()
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
@@ -579,11 +611,16 @@ def get_chats():
     try:
         u = request.current_user
         query = Chat.query.filter_by(is_archived=False)
+        
+        # ✅ ИСПРАВЛЕННАЯ ЛОГИКА ВИДИМОСТИ ЧАТОВ
         if u.is_admin:
             if not u.show_client_chats:
+                # Если выключено, скрываем чаты пользователей с их клиентами
+                # Показываем только чаты, где user_id == None (личные чаты с админом)
                 query = query.filter(Chat.user_id == None)
         else:
             query = query.filter_by(user_id=u.id)
+            
         chats = query.order_by(Chat.created_at.desc()).all()
         result = []
         for c in chats:
@@ -605,7 +642,10 @@ def get_chats():
 def delete_chat(chat_id):
     try:
         chat = Chat.query.get(chat_id)
-        if not chat or chat.user_id != request.current_user.id: return jsonify({"error": "Чат не найден"}), 404
+        if not chat: return jsonify({"error": "Чат не найден"}), 404
+        # ✅ ИСПРАВЛЕНО: Админ может удалять любые чаты
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id:
+            return jsonify({"error": "Доступ запрещен"}), 403
         Message.query.filter_by(chat_id=chat_id).delete()
         db.session.delete(chat)
         db.session.commit()
@@ -619,8 +659,16 @@ def delete_chat(chat_id):
 def get_messages(chat_id):
     try:
         chat = Chat.query.get(chat_id)
-        if not chat or chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
-        Message.query.filter_by(chat_id=chat_id).update({Message.is_read: True}); db.session.commit()
+        if not chat: return jsonify({"error": "Чат не найден"}), 404
+        
+        # ✅ ИСПРАВЛЕНО: Админ может видеть сообщения всех чатов
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id:
+            return jsonify({"error": "Доступ запрещен"}), 403
+        
+        # Отмечаем как прочитанное
+        Message.query.filter_by(chat_id=chat_id).update({Message.is_read: True}) 
+        db.session.commit()
+        
         msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
         return jsonify({
             "messages": [{"id": m.id, "sender":m.sender, "text":m.text, "file_url":m.file_url, "is_read":m.is_read, "time":m.timestamp.isoformat()} for m in msgs],
@@ -635,11 +683,21 @@ def send_message():
         d = request.json; sender = 'admin' if request.current_user.is_admin else 'user'; text = d.get('text', ''); chat_id = d.get('chat_id')
         chat = Chat.query.get(chat_id)
         if not chat: return jsonify({"error": "Чат не найден"}), 404
-        if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
+        # ✅ ПРОВЕРКА ПРАВ
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id: 
+            return jsonify({"error": "Доступ запрещен"}), 403
+            
         msg = Message(chat_id=chat_id, sender=sender, text=text, is_read=False); db.session.add(msg); db.session.commit()
+        
+        # Уведомления
         if sender == 'admin':
             user = User.query.get(chat.user_id)
             if user and user.telegram_chat_id: send_telegram_notification(user.telegram_chat_id, f"💬 <b>Новое сообщение!</b>\n\n{text[:100]}")
+        else:
+            # Если пользователь пишет админу
+            admin = User.query.filter_by(is_admin=True).first()
+            if admin and admin.telegram_chat_id: send_telegram_notification(admin.telegram_chat_id, f"💬 <b>Ответ от {user.username if user else 'Пользователя'}</b>\n\n{text[:100]}")
+            
         return jsonify({"ok": True, "msg_id": msg.id})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
@@ -1349,6 +1407,28 @@ def widget_capture_late_contact():
         print(f"❌ Widget capture_late_contact error: {e}")
         import traceback
         traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# ✅ ДОБАВЛЕННЫЙ ЭНДПОИНТ ДЛЯ ИНДИКАТОРА "ПЕЧАТАЕТ" В ВИДЖЕТЕ
+@app.route('/api/widget/typing', methods=['POST', 'OPTIONS'])
+def widget_typing():
+    try:
+        if request.method == 'OPTIONS': return '', 204
+        api_key = request.headers.get('X-API-Key')
+        if not api_key: return jsonify({"error": "API key required"}), 401
+        chat_id = request.json.get('chat_id')
+        
+        chat = Chat.query.get(chat_id)
+        if not chat: return jsonify({"error": "Chat not found"}), 404
+        
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website or chat.website_id != website.id: return jsonify({"error": "Invalid API key"}), 401
+        
+        chat.is_typing = True
+        chat.typing_updated = datetime.datetime.utcnow()
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 with app.app_context():
