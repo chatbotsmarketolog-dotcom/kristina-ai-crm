@@ -6,7 +6,8 @@ from sqlalchemy import text
 from openai import OpenAI
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
-# ✅ ИСПРАВЛЕНО: добавлен X-API-Key в разрешённые заголовки
+# ✅ Лимит загрузки файлов 20 МБ
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 CORS(app, supports_credentials=True, origins=["*"], allow_headers=["Content-Type", "Authorization", "X-API-Key"])
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
@@ -68,6 +69,8 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     api_token = db.Column(db.String(100), unique=True, default=lambda: secrets.token_urlsafe(32))
     telegram_chat_id = db.Column(db.String(100))
+    # ✅ НОВОЕ ПОЛЕ: показывать ли клиентские чаты админу
+    show_client_chats = db.Column(db.Boolean, default=True)
 
 class Website(db.Model):
     __tablename__ = 'website'
@@ -89,6 +92,10 @@ class Chat(db.Model):
     form_requested = db.Column(db.Boolean, default=False)
     status = db.Column(db.String(20), default='waiting')
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    # ✅ НОВЫЕ ПОЛЯ
+    is_archived = db.Column(db.Boolean, default=False)
+    is_typing = db.Column(db.Boolean, default=False)
+    typing_updated = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 class Message(db.Model):
     __tablename__ = 'message'
@@ -97,6 +104,9 @@ class Message(db.Model):
     sender = db.Column(db.String(20))
     text = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    # ✅ НОВЫЕ ПОЛЯ
+    file_url = db.Column(db.String(500))
+    is_read = db.Column(db.Boolean, default=False)
 
 class AIManager(db.Model):
     __tablename__ = 'aimanager'
@@ -178,24 +188,17 @@ def admin_required(f):
 def add_missing_columns():
     with app.app_context():
         try:
-            # Миграции для user
+            # Существующие миграции
             db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)'))
-            
-            # Миграции для website
             db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP'))
-            
-            # Миграции для aimanager
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_web BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS forbidden TEXT'))
             db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS humanity_level INTEGER DEFAULT 3'))
-            
-            # Миграции для chat
             db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
             db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
-            
             try:
                 db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
                 db.session.execute(text('CREATE TABLE IF NOT EXISTS aiwebsite (id SERIAL PRIMARY KEY, agent_id INTEGER REFERENCES aimanager(id), website_id INTEGER REFERENCES website(id), is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())'))
@@ -215,21 +218,131 @@ def add_missing_columns():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 '''))
-                db.session.commit()
-                print("✅ Все миграции выполнены")
             except Exception as e:
                 db.session.rollback()
                 print(f"ℹ️ Некоторые таблицы уже существуют: {e}")
+            # ✅ НОВЫЕ МИГРАЦИИ
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS show_client_chats BOOLEAN DEFAULT TRUE'))
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE'))
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS is_typing BOOLEAN DEFAULT FALSE'))
+            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS typing_updated TIMESTAMP'))
+            db.session.execute(text('ALTER TABLE message ADD COLUMN IF NOT EXISTS file_url VARCHAR(500)'))
+            db.session.execute(text('ALTER TABLE message ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE'))
             db.session.commit()
+            print("✅ Все миграции выполнены")
         except Exception as e:
             print(f"Migration error: {e}")
             db.session.rollback()
+
+# ========== НОВЫЕ ЭНДПОИНТЫ ==========
+
+# --- ЗАГРУЗКА ФАЙЛОВ ---
+@app.route('/api/upload', methods=['POST'])
+@token_required
+def upload_file():
+    try:
+        if 'file' not in request.files: return jsonify({"error": "Нет файла"}), 400
+        file = request.files['file']
+        if file.filename == '': return jsonify({"error": "Файл не выбран"}), 400
+        allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.pdf'}
+        _, ext = os.path.splitext(file.filename.lower())
+        if ext not in allowed_ext: return jsonify({"error": "Неподдерживаемый формат"}), 400
+        file.seek(0, os.SEEK_END); file_size = file.tell(); file.seek(0)
+        if file_size > 20 * 1024 * 1024: return jsonify({"error": "Файл больше 20МБ"}), 400
+        filename = f"{uuid.uuid4().hex}{ext}"
+        upload_folder = os.path.join(app.static_folder, 'uploads')
+        os.makedirs(upload_folder, exist_ok=True)
+        file_path = os.path.join(upload_folder, filename)
+        file.save(file_path)
+        return jsonify({"url": f"/static/uploads/{filename}"})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+# --- АРХИВ ЧАТОВ ---
+@app.route('/api/chats/archived', methods=['GET'])
+@token_required
+def get_archived_chats():
+    try:
+        u = request.current_user
+        if u.is_admin: chats = Chat.query.filter_by(is_archived=True).order_by(Chat.created_at.desc()).all()
+        else: chats = Chat.query.filter_by(user_id=u.id, is_archived=True).order_by(Chat.created_at.desc()).all()
+        result = []
+        for c in chats:
+            deal_status = ''; deal = Deal.query.filter_by(chat_id=c.id).first()
+            if deal:
+                if deal.status == 'completed': deal_status = '✅ Сделка'
+                elif deal.status == 'declined': deal_status = '❌ Отказ'
+            result.append({"id": c.id, "site": c.visitor_name or "Клиент", "status": c.status, "time": c.created_at.isoformat(), "deal_status": deal_status})
+        return jsonify(result)
+    except Exception as e: return jsonify([]), 500
+
+@app.route('/api/chats/<int:chat_id>/archive', methods=['POST'])
+@token_required
+def archive_chat(chat_id):
+    try:
+        chat = Chat.query.get(chat_id)
+        if not chat: return jsonify({"error": "Чат не найден"}), 404
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
+        chat.is_archived = True; db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+# --- ОТПРАВКА С ФАЙЛАМИ (для CRM) ---
+@app.route('/api/send_with_files', methods=['POST', 'OPTIONS'])
+@token_required
+def send_with_files():
+    try:
+        if request.method == 'OPTIONS': return '', 204
+        chat_id = request.form.get('chat_id'); text = request.form.get('text', ''); files = request.files.getlist('files')
+        chat = Chat.query.get(chat_id)
+        if not chat: return jsonify({"error": "Чат не найден"}), 404
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
+        sender = 'admin' if request.current_user.is_admin else 'user'
+        uploads_dir = os.path.join(app.static_folder, 'uploads'); os.makedirs(uploads_dir, exist_ok=True)
+        for file in files:
+            if file.filename:
+                allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.pdf'}
+                _, ext = os.path.splitext(file.filename.lower())
+                if ext not in allowed_ext: return jsonify({"error": "Неподдерживаемый формат"}), 400
+                file.seek(0, os.SEEK_END); file_size = file.tell(); file.seek(0)
+                if file_size > 20 * 1024 * 1024: return jsonify({"error": "Файл больше 20МБ"}), 400
+                filename = f"{uuid.uuid4().hex}{ext}"; filepath = os.path.join(uploads_dir, filename); file.save(filepath); file_url = f"/static/uploads/{filename}"
+                msg = Message(chat_id=chat_id, sender=sender, text=text, file_url=file_url); db.session.add(msg)
+        db.session.commit(); return jsonify({"ok": True})
+    except Exception as e: print(f"Send files error: {e}"); return jsonify({"error": str(e)}), 500
+
+# --- ИНДИКАТОР "ПЕЧАТАЕТ" ---
+@app.route('/api/typing', methods=['POST'])
+@token_required
+def update_typing():
+    try:
+        chat_id = request.json.get('chat_id'); chat = Chat.query.get(chat_id)
+        if chat: chat.is_typing = True; chat.typing_updated = datetime.datetime.utcnow(); db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+# --- НАСТРОЙКИ АДМИНА ---
+@app.route('/api/admin/get_settings', methods=['GET'])
+@admin_required
+def get_admin_settings():
+    try: return jsonify({"show_client_chats": request.current_user.show_client_chats})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/update_settings', methods=['POST'])
+@admin_required
+def update_admin_settings():
+    try:
+        data = request.json
+        if 'show_client_chats' in data:
+            request.current_user.show_client_chats = data['show_client_chats']; db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+# ========== КОНЕЦ НОВЫХ ЭНДПОИНТОВ ==========
 
 @app.route('/api/admin/clear_deleted_sites', methods=['POST'])
 @admin_required
 def clear_deleted_sites():
     try:
-        # ✅ FIX: synchronize_session=False решает проблему SQLAlchemy
         deleted_count = Website.query.filter_by(is_deleted=True).delete(synchronize_session=False)
         db.session.commit()
         return jsonify({"ok": True, "deleted": deleted_count})
@@ -244,24 +357,13 @@ def restore_site():
     try:
         site_id = request.json.get('site_id')
         site = Website.query.get(site_id)
-        
-        if not site:
-            return jsonify({"error": "Сайт не найден"}), 404
-        
-        if not site.is_deleted:
-            return jsonify({"error": "Сайт не был удалён"}), 400
-        
-        # Восстанавливаем сайт
+        if not site: return jsonify({"error": "Сайт не найден"}), 404
+        if not site.is_deleted: return jsonify({"error": "Сайт не был удалён"}), 400
         site.is_deleted = False
         site.deleted_at = None
-        site.status = 'active'  # Сразу активируем
+        site.status = 'active'
         db.session.commit()
-        
-        return jsonify({
-            "ok": True, 
-            "api_key": site.api_key,
-            "message": "Сайт восстановлен"
-        })
+        return jsonify({"ok": True, "api_key": site.api_key, "message": "Сайт восстановлен"})
     except Exception as e:
         db.session.rollback()
         print(f"Restore site error: {e}")
@@ -282,7 +384,6 @@ def migrate_ai_columns():
 @app.route('/api/admin/migrate_deals_table', methods=['POST'])
 @admin_required
 def migrate_deals_table():
-    """Добавить колонку visitor_name и таблицу deal"""
     try:
         with app.app_context():
             db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
@@ -312,7 +413,6 @@ def migrate_deals_table():
 @app.route('/api/admin/migrate_form_requested', methods=['POST'])
 @admin_required
 def migrate_form_requested():
-    """Добавить колонку form_requested в таблицу chat"""
     try:
         with app.app_context():
             db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
@@ -361,17 +461,13 @@ def get_sites():
     try:
         u = request.current_user
         show_deleted = request.args.get('show_deleted', 'false').lower() == 'true'
-        
         if u.is_admin:
-            # Админ видит все сайты
             query = Website.query
             if not show_deleted:
                 query = query.filter_by(is_deleted=False)
             sites = query.all()
         else:
-            # Пользователь видит только свои не-удалённые
             sites = Website.query.filter_by(owner_id=u.id, is_deleted=False).all()
-        
         return jsonify([{
             "id": s.id, 
             "url": s.url, 
@@ -392,24 +488,19 @@ def add_site():
     try:
         url = request.json.get('url')
         if not url: return jsonify({"error": "URL обязателен"}), 400
-        
-        # ✅ FIX: Проверяем только АКТИВНЫЕ сайты, игнорируем удалённые
         existing_site = Website.query.filter_by(url=url, is_deleted=False).first()
         if existing_site:
             if existing_site.owner_id == request.current_user.id:
                 return jsonify({"error": "Этот сайт уже добавлен", "id": existing_site.id}), 400
             else:
                 return jsonify({"error": "Этот сайт уже добавлен другим пользователем"}), 400
-        
         key = f"site_{uuid.uuid4().hex[:8]}"
         site = Website(url=url, api_key=key, owner_id=request.current_user.id, status='pending')
         db.session.add(site)
         db.session.commit()
-        
         admin = User.query.filter_by(is_admin=True).first()
         if admin and admin.telegram_chat_id:
             send_telegram_notification(admin.telegram_chat_id, f"🔔 <b>Новый сайт на модерации!</b>\n\n👤 Владелец: {request.current_user.username}\n🔗 Сайт: {url}\n\nЗайдите в админ-панель для одобрения.")
-        
         return jsonify({"ok": True, "id": site.id})
     except Exception as e:
         print(f"Add site error: {e}")
@@ -487,18 +578,27 @@ def delete_site(site_id):
 def get_chats():
     try:
         u = request.current_user
-        # ✅ ИЗОЛЯЦИЯ: ВСЕ пользователи видят ТОЛЬКО свои чаты
-        chats = Chat.query.filter_by(user_id=u.id).order_by(Chat.created_at.desc()).all()
+        query = Chat.query.filter_by(is_archived=False)
+        if u.is_admin:
+            if not u.show_client_chats:
+                query = query.filter(Chat.user_id == None)
+        else:
+            query = query.filter_by(user_id=u.id)
+        chats = query.order_by(Chat.created_at.desc()).all()
         result = []
         for c in chats:
-            chat_name = c.visitor_name or "Клиент"
-            result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
+            deal_status = ''; deal = Deal.query.filter_by(chat_id=c.id).first()
+            if deal:
+                if deal.status == 'completed': deal_status = '✅ Сделка'
+                elif deal.status == 'declined': deal_status = '❌ Отказ'
+            is_typing = False
+            if c.is_typing and c.typing_updated:
+                diff = (datetime.datetime.utcnow() - c.typing_updated).total_seconds()
+                if diff < 3: is_typing = True
+            chat_name = c.visitor_name or ("💬 Администратор" if not u.is_admin else "Клиент")
+            result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat(), "deal_status": deal_status, "is_typing": is_typing})
         return jsonify(result)
-    except Exception as e:
-        print(f"Get chats error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify([]), 500
+    except Exception as e: return jsonify([]), 500
 
 @app.route('/api/chats/<int:chat_id>/delete', methods=['POST'])
 @token_required
@@ -520,45 +620,28 @@ def get_messages(chat_id):
     try:
         chat = Chat.query.get(chat_id)
         if not chat or chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
+        Message.query.filter_by(chat_id=chat_id).update({Message.is_read: True}); db.session.commit()
         msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
-        # Возвращаем объект с сообщениями и флагом form_requested
         return jsonify({
-            "messages": [{"sender":m.sender, "text":m.text, "time":m.timestamp.isoformat()} for m in msgs],
-            "form_requested": bool(chat.form_requested) if chat and hasattr(chat, 'form_requested') else False
+            "messages": [{"id": m.id, "sender":m.sender, "text":m.text, "file_url":m.file_url, "is_read":m.is_read, "time":m.timestamp.isoformat()} for m in msgs],
+            "form_requested": bool(chat.form_requested)
         })
-    except Exception as e:
-        print(f"Get messages error: {e}")
-        return jsonify({"messages": [], "form_requested": False}), 500
+    except Exception as e: return jsonify({"messages": [], "form_requested": False}), 500
 
 @app.route('/api/send', methods=['POST'])
 @token_required
 def send_message():
     try:
-        d = request.json
-        sender = 'admin' if request.current_user.is_admin else 'user'
-        text = d.get('text', '').lower()
-        
-        chat = Chat.query.get(d['chat_id'])
-        if not chat or chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
-        
-        # Авто-триггер формы от агента: если пользователь написал и текст содержит согласие
-        if sender == 'user' and not request.current_user.is_admin:
-            consent_keywords = ['да', 'хочу', 'готов', 'согласен', 'ок', 'хорошо', 'давайте', 'пригласите', 'встреча', 'личная встреча', 'записаться']
-            if any(kw in text for kw in consent_keywords):
-                if chat and not chat.form_requested:
-                    chat.form_requested = True
-                    db.session.commit()
-        
-        db.session.add(Message(chat_id=d['chat_id'], sender=sender, text=d['text']))
-        db.session.commit()
-        
-        # Возвращаем form_requested для фронтенда
-        return jsonify({"ok": True, "form_requested": bool(chat.form_requested) if chat and hasattr(chat, 'form_requested') else False})
-    except Exception as e:
-        print(f"Send error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        d = request.json; sender = 'admin' if request.current_user.is_admin else 'user'; text = d.get('text', ''); chat_id = d.get('chat_id')
+        chat = Chat.query.get(chat_id)
+        if not chat: return jsonify({"error": "Чат не найден"}), 404
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
+        msg = Message(chat_id=chat_id, sender=sender, text=text, is_read=False); db.session.add(msg); db.session.commit()
+        if sender == 'admin':
+            user = User.query.get(chat.user_id)
+            if user and user.telegram_chat_id: send_telegram_notification(user.telegram_chat_id, f"💬 <b>Новое сообщение!</b>\n\n{text[:100]}")
+        return jsonify({"ok": True, "msg_id": msg.id})
+    except Exception as e: return jsonify({"error": str(e)}), 500
 
 # === АГЕНТЫ ===
 
@@ -811,7 +894,6 @@ def create_deal():
         )
         db.session.add(deal)
         db.session.commit()
-        # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
         owner = User.query.get(chat.user_id)
         if owner and owner.telegram_chat_id:
             send_telegram_notification(
@@ -900,7 +982,6 @@ def set_client_name(chat_id):
 @app.route('/api/chat/<int:chat_id>/request_form', methods=['POST'])
 @token_required
 def request_deal_form(chat_id):
-    """Пометить чат что форма заявки запрошена"""
     try:
         chat = Chat.query.get(chat_id)
         if not chat or chat.user_id != request.current_user.id:
@@ -932,7 +1013,6 @@ def setup_tg():
         print(f"Telegram error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# ✅ НОВЫЙ ЭНДПОИНТ: Пользователь сохраняет свой Chat ID
 @app.route('/api/telegram/save_chat_id', methods=['POST'])
 @token_required
 def save_user_chat_id():
@@ -1024,34 +1104,18 @@ def admin_send_to_user():
 
 @app.route('/api/widget/chats', methods=['GET'])
 def widget_get_chats():
-    """Получение чатов для виджета (по API ключу сайта)"""
     try:
         api_key = request.headers.get('X-API-Key')
-        print(f"🔍 Widget get_chats: api_key={api_key[:10] if api_key else None}")
-        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
-        
-        # Находим сайт по API ключу
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website:
-            print(f"❌ Invalid API key: {api_key[:10] if api_key else None}")
             return jsonify({"error": "Invalid API key"}), 401
-        
-        # Получаем все чаты этого сайта
         chats = Chat.query.filter_by(website_id=website.id).order_by(Chat.created_at.desc()).all()
-        
         result = []
         for c in chats:
             chat_name = c.visitor_name or f"Посетитель #{c.id}"
-            result.append({
-                "id": c.id,
-                "site": chat_name,
-                "status": c.status,
-                "time": c.created_at.isoformat()
-            })
-        
-        print(f"✅ Found {len(result)} chats")
+            result.append({"id": c.id, "site": chat_name, "status": c.status, "time": c.created_at.isoformat()})
         return jsonify(result)
     except Exception as e:
         print(f"❌ Widget get_chats error: {e}")
@@ -1061,33 +1125,22 @@ def widget_get_chats():
 
 @app.route('/api/widget/chats', methods=['POST'])
 def widget_create_chat():
-    """Создание нового чата для виджета"""
     try:
         api_key = request.headers.get('X-API-Key')
-        print(f"🔍 Widget create_chat: api_key={api_key[:10] if api_key else None}")
-        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
-        
-        # Находим сайт по API ключу
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website:
             return jsonify({"error": "Invalid API key"}), 401
-        
-        # ✅ ИСПРАВЛЕНО: создаём чат с user_id владельца сайта
         chat = Chat(website_id=website.id, user_id=website.owner_id, status='waiting')
         db.session.add(chat)
         db.session.commit()
-        
-        # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
         owner = User.query.get(website.owner_id)
         if owner and owner.telegram_chat_id:
             send_telegram_notification(
                 owner.telegram_chat_id,
                 f"🔔 <b>Новый посетитель на {website.url}!</b>\n\nЗайдите в CRM чтобы ответить."
             )
-        
-        print(f"✅ Created chat {chat.id}")
         return jsonify({"id": chat.id, "status": "waiting"})
     except Exception as e:
         print(f"❌ Widget create_chat error: {e}")
@@ -1097,34 +1150,20 @@ def widget_create_chat():
 
 @app.route('/api/widget/messages/<int:chat_id>', methods=['GET'])
 def widget_get_messages(chat_id):
-    """Получение сообщений для виджета"""
     try:
         api_key = request.headers.get('X-API-Key')
-        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
-        
-        # Проверяем что чат принадлежит сайту с этим API ключом
         chat = Chat.query.get(chat_id)
         if not chat:
             return jsonify({"error": "Chat not found"}), 404
-        
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website or chat.website_id != website.id:
             return jsonify({"error": "Invalid API key"}), 401
-        
-        # Получаем сообщения
         msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
-        
         return jsonify({
-            "messages": [
-                {
-                    "sender": m.sender,
-                    "text": m.text,
-                    "time": m.timestamp.isoformat()
-                } for m in msgs
-            ],
-            "form_requested": bool(chat.form_requested) if hasattr(chat, 'form_requested') else False
+            "messages": [{"sender": m.sender, "text": m.text, "file_url": m.file_url, "is_read": m.is_read, "time": m.timestamp.isoformat()} for m in msgs],
+            "form_requested": bool(chat.form_requested)
         })
     except Exception as e:
         print(f"❌ Widget get_messages error: {e}")
@@ -1134,57 +1173,34 @@ def widget_get_messages(chat_id):
 
 @app.route('/api/widget/send', methods=['POST', 'OPTIONS'])
 def widget_send_message():
-    """Отправка сообщения через виджет"""
     try:
-        # Обработка preflight запроса
         if request.method == 'OPTIONS':
             return '', 204
-        
         api_key = request.headers.get('X-API-Key')
-        print(f"🔍 Widget send: api_key={api_key[:10] if api_key else None}")
-        print(f"🔍 Request data: {request.data}")
-        print(f"🔍 Request content-type: {request.content_type}")
-        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
-        
-        # Пробуем распарсить JSON
         try:
             data = request.get_json(force=True)
-            print(f"🔍 Parsed data: {data}")
         except Exception as json_err:
-            print(f"❌ JSON parse error: {json_err}")
             return jsonify({"error": f"Invalid JSON: {str(json_err)}"}), 400
-        
-        chat_id = data.get('chat_id')
-        text = data.get('text', '')
-        
+        chat_id = data.get('chat_id'); text = data.get('text', '')
         if not chat_id:
             return jsonify({"error": "chat_id required"}), 400
-        
-        # Проверяем чат
         chat = Chat.query.get(chat_id)
         if not chat:
             return jsonify({"error": "Chat not found"}), 404
-        
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website or chat.website_id != website.id:
             return jsonify({"error": "Invalid API key"}), 401
-        
-        # Создаём сообщение
-        msg = Message(chat_id=chat_id, sender='user', text=text)
+        msg = Message(chat_id=chat_id, sender='user', text=text, is_read=False)
         db.session.add(msg)
         db.session.commit()
-        
-        # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
         owner = User.query.get(website.owner_id)
         if owner and owner.telegram_chat_id:
             send_telegram_notification(
                 owner.telegram_chat_id,
                 f"💬 <b>Новое сообщение на {website.url}!</b>\n\n{text[:100]}..." if len(text) > 100 else text
             )
-        
-        print(f"✅ Message sent in chat {chat_id}")
         return jsonify({"ok": True})
     except Exception as e:
         print(f"❌ Widget send_message error: {e}")
@@ -1192,38 +1208,51 @@ def widget_send_message():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/widget/send_with_files', methods=['POST', 'OPTIONS'])
+def widget_send_with_files():
+    try:
+        if request.method == 'OPTIONS': return '', 204
+        api_key = request.headers.get('X-API-Key')
+        if not api_key: return jsonify({"error": "API key required"}), 401
+        chat_id = request.form.get('chat_id'); text = request.form.get('text', ''); files = request.files.getlist('files')
+        chat = Chat.query.get(chat_id)
+        if not chat: return jsonify({"error": "Chat not found"}), 404
+        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
+        if not website or chat.website_id != website.id: return jsonify({"error": "Invalid API key"}), 401
+        uploads_dir = os.path.join(app.static_folder, 'uploads'); os.makedirs(uploads_dir, exist_ok=True)
+        for file in files:
+            if file.filename:
+                allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.pdf'}
+                _, ext = os.path.splitext(file.filename.lower())
+                if ext not in allowed_ext: return jsonify({"error": "Неподдерживаемый формат"}), 400
+                file.seek(0, os.SEEK_END); file_size = file.tell(); file.seek(0)
+                if file_size > 20 * 1024 * 1024: return jsonify({"error": "Файл больше 20МБ"}), 400
+                filename = f"{uuid.uuid4().hex}{ext}"; filepath = os.path.join(uploads_dir, filename); file.save(filepath); file_url = f"/static/uploads/{filename}"
+                msg = Message(chat_id=chat_id, sender='user', text=text, file_url=file_url); db.session.add(msg)
+        db.session.commit()
+        owner = User.query.get(website.owner_id)
+        if owner and owner.telegram_chat_id: send_telegram_notification(owner.telegram_chat_id, f"📎 <b>Новый файл на {website.url}!</b>")
+        return jsonify({"ok": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
 @app.route('/api/widget/chat/<int:chat_id>/set_client_name', methods=['POST'])
 def widget_set_client_name(chat_id):
-    """Установка имени клиента из виджета"""
     try:
         api_key = request.headers.get('X-API-Key')
-        print(f"🔍 Widget set_client_name: chat_id={chat_id}, api_key={api_key[:10] if api_key else None}")
-        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
-        
         data = request.json
         name = data.get('name', '').strip()
-        
         if not name:
             return jsonify({"error": "Name required"}), 400
-        
-        # Проверяем чат
         chat = Chat.query.get(chat_id)
         if not chat:
-            print(f"❌ Chat {chat_id} not found")
             return jsonify({"error": "Chat not found"}), 404
-        
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website or chat.website_id != website.id:
-            print(f"❌ API key mismatch: chat.website_id={chat.website_id}, website.id={website.id if website else None}")
             return jsonify({"error": "Invalid API key"}), 401
-        
-        # Сохраняем имя
         chat.visitor_name = name
         db.session.commit()
-        
-        print(f"✅ Set name '{name}' for chat {chat_id}")
         return jsonify({"ok": True})
     except Exception as e:
         print(f"❌ Widget set_client_name error: {e}")
@@ -1233,34 +1262,23 @@ def widget_set_client_name(chat_id):
 
 @app.route('/api/widget/deals', methods=['POST'])
 def widget_create_deal():
-    """Создание заявки из виджета"""
     try:
         api_key = request.headers.get('X-API-Key')
-        
         if not api_key:
             return jsonify({"error": "API key required"}), 401
-        
         data = request.json
         chat_id = data.get('chat_id')
-        
         if not chat_id:
             return jsonify({"error": "chat_id required"}), 400
-        
-        # Проверяем чат
         chat = Chat.query.get(chat_id)
         if not chat:
             return jsonify({"error": "Chat not found"}), 404
-        
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website or chat.website_id != website.id:
             return jsonify({"error": "Invalid API key"}), 401
-        
-        # Валидация мессенджера
         is_valid, error = validate_contact_method(data.get('contact_method', ''))
         if not is_valid:
             return jsonify({"error": error}), 400
-        
-        # Создаём сделку
         deal = Deal(
             chat_id=chat_id,
             user_id=website.owner_id,
@@ -1274,8 +1292,6 @@ def widget_create_deal():
         )
         db.session.add(deal)
         db.session.commit()
-        
-        # ✅ УВЕДОМЛЕНИЕ ВЛАДЕЛЬЦУ САЙТА (не админу!)
         owner = User.query.get(website.owner_id)
         if owner and owner.telegram_chat_id:
             send_telegram_notification(
@@ -1286,7 +1302,6 @@ def widget_create_deal():
                 f"💰 Бюджет: {deal.budget}\n"
                 f"📱 Контакт: {deal.contact_method} @{deal.contact_nickname}"
             )
-        
         return jsonify({"ok": True, "deal_id": deal.id})
     except Exception as e:
         print(f"❌ Widget create_deal error: {e}")
@@ -1294,7 +1309,6 @@ def widget_create_deal():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# ✅ НОВЫЙ ЭНДПОИНТ: Сохранение контакта при отказе/позже (форма подарка)
 @app.route('/api/widget/capture_late_contact', methods=['POST'])
 def widget_capture_late_contact():
     try:
@@ -1311,8 +1325,6 @@ def widget_capture_late_contact():
         website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
         if not website or chat.website_id != website.id:
             return jsonify({"error": "Invalid API key"}), 401
-        
-        # Создаём сделку в "Отклонённые" с контактом для подарка
         deal = Deal(
             chat_id=chat_id, user_id=website.owner_id, 
             client_name=chat.visitor_name or 'Аноним', 
@@ -1326,7 +1338,6 @@ def widget_capture_late_contact():
         )
         db.session.add(deal)
         db.session.commit()
-        
         owner = User.query.get(website.owner_id)
         if owner and owner.telegram_chat_id:
             send_telegram_notification(
