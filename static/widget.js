@@ -316,6 +316,27 @@
                 display: flex !important;
             }
             
+            /* ✅ НОВАЯ ФОРМА: ПОДАРОК/ПОЗЖЕ */
+            .kristina-late-form {
+                position: fixed !important;
+                bottom: 100px !important;
+                right: 30px !important;
+                width: 450px !important;
+                max-width: calc(100vw - 60px) !important;
+                background: #0b132b !important;
+                border-radius: 20px !important;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
+                z-index: 999998 !important;
+                display: none !important;
+                flex-direction: column !important;
+                overflow: hidden !important;
+                border: 1px solid rgba(16, 185, 129, 0.3) !important;
+            }
+            
+            .kristina-late-form.active {
+                display: flex !important;
+            }
+            
             .kristina-form-header {
                 background: linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%) !important;
                 padding: 20px !important;
@@ -416,7 +437,8 @@
                 
                 .kristina-chat-window,
                 .kristina-deal-form,
-                .kristina-name-form {
+                .kristina-name-form,
+                .kristina-late-form {
                     bottom: 90px !important;
                     right: 15px !important;
                     left: 15px !important;
@@ -581,6 +603,36 @@
                 </div>
             </div>
         </div>
+        
+        <!-- ✅ НОВАЯ ФОРМА: ПОДАРОК/ПОЗЖЕ -->
+        <div class="kristina-late-form" id="kristinaLateForm">
+            <div class="kristina-form-header">
+                <h3>🎁 Ваш подарок ждёт!</h3>
+            </div>
+            <div class="kristina-form-content">
+                <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:16px;line-height:1.5">
+                    Мы видим ваш интерес! Чтобы не потеряться и отправить вам полезный подарок, укажите удобный контакт:
+                </p>
+                <div class="kristina-form-group">
+                    <label>📱 Соцсеть или мессенджер *</label>
+                    <select id="lateContactMethod" required>
+                        <option value="">Выберите</option>
+                        <option value="Telegram">Telegram</option>
+                        <option value="VK">ВКонтакте</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                    </select>
+                </div>
+                <div class="kristina-form-group">
+                    <label>🔗 Ваш никнейм или ссылка *</label>
+                    <input type="text" id="lateContactNickname" placeholder="@username или ссылка на профиль" required>
+                </div>
+                <div class="kristina-form-buttons">
+                    <button class="kristina-btn kristina-btn-cancel" id="kristinaLateCancel">Не сейчас</button>
+                    <button class="kristina-btn kristina-btn-submit" id="kristinaLateSubmit">🎁 Получить подарок</button>
+                </div>
+            </div>
+        </div>
     `;
 
     try {
@@ -607,6 +659,12 @@
         const nameForm = document.getElementById('kristinaNameForm');
         const nameSubmit = document.getElementById('kristinaNameSubmit');
         const userNameInput = document.getElementById('userNameInput');
+        // ✅ Элементы новой формы
+        const lateForm = document.getElementById('kristinaLateForm');
+        const lateCancel = document.getElementById('kristinaLateCancel');
+        const lateSubmit = document.getElementById('kristinaLateSubmit');
+        const lateMethod = document.getElementById('lateContactMethod');
+        const lateNickname = document.getElementById('lateContactNickname');
 
         // Проверка элементов
         if (!widgetBtn || !chatWindow) {
@@ -648,11 +706,11 @@
             return response.json();
         }
 
-        // ✅ АВТО-ТРИГГЕРЫ КЛИЕНТА (положительные/отрицательные)
+        // ✅ АВТО-ТРИГГЕРЫ КЛИЕНТА
         async function checkClientTriggers(text) {
             const lower = text.toLowerCase();
             
-            // ❌ Отрицательные триггеры → отклонённая сделка
+            // ❌ Отрицательные триггеры → сразу в "Отклонённые" (без формы!)
             const declineTriggers = ['нет', 'подумаю', 'позже', 'не сейчас', 'отмена', 'не хочу', 'не интересно'];
             if (declineTriggers.some(trigger => lower.includes(trigger))) {
                 try {
@@ -671,9 +729,22 @@
                 } catch (e) {
                     console.error('Ошибка создания отклонённой сделки:', e);
                 }
+                return; // ✅ ВЫХОДИМ, форма не открывается
             }
             
-            // ✅ Положительные триггеры → показываем форму
+            // ⏳ Триггеры "позже" → открываем форму подарка
+            const lateTriggers = ['подумаю', 'напишите позднее', 'позже', 'не сейчас'];
+            if (lateTriggers.some(trigger => lower.includes(trigger))) {
+                setTimeout(() => {
+                    if (nameForm) nameForm.classList.remove('active');
+                    if (chatWindow) chatWindow.classList.remove('active');
+                    if (dealForm) dealForm.classList.remove('active');
+                    if (lateForm) lateForm.classList.add('active');
+                }, 500);
+                return;
+            }
+            
+            // ✅ Положительные триггеры → показываем основную форму
             const positiveTriggers = ['да', 'хочу', 'интересно', 'заполню', 'готова заполнить', 'давайте попробуем заполнить', 'да пришлите', 'где заполнить?'];
             if (positiveTriggers.some(trigger => lower.includes(trigger))) {
                 setTimeout(() => {
@@ -1071,6 +1142,40 @@
                     isOpen = false;
                 } catch (e) {
                     alert('❌ Ошибка отправки: ' + e.message);
+                }
+            });
+        }
+
+        // ✅ ЛОГИКА ФОРМЫ "ПОДАРОК/ПОЗЖЕ"
+        if (lateCancel) {
+            lateCancel.addEventListener('click', () => {
+                if (lateForm) lateForm.classList.remove('active');
+                if (chatWindow) chatWindow.classList.add('active');
+            });
+        }
+        
+        if (lateSubmit) {
+            lateSubmit.addEventListener('click', async () => {
+                const method = lateMethod.value;
+                const nickname = lateNickname.value.trim();
+                
+                if (!method || !nickname) {
+                    alert('❌ Укажите мессенджер и никнейм');
+                    return;
+                }
+                
+                try {
+                    await fetchAPI('/api/widget/capture_late_contact', 'POST', {
+                        chat_id: chatId,
+                        contact_method: method,
+                        contact_nickname: nickname
+                    });
+                    alert('🎁 Отлично! Мы свяжемся с вами для отправки подарка.');
+                    if (lateForm) lateForm.classList.remove('active');
+                    if (widgetBtn) widgetBtn.style.display = 'flex';
+                    isOpen = false;
+                } catch (e) {
+                    alert('❌ Ошибка: ' + e.message);
                 }
             });
         }
