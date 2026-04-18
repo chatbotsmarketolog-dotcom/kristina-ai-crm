@@ -1,4 +1,22 @@
-// КРИСТИНА.AI CRM Widget
+
+                        <!DOCTYPE html>
+                        <html lang="en">
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body {
+                  background-color: white; /* Ensure the iframe has a white background */
+                }
+
+                
+              </style>
+                        </head>
+                        <body>
+                            
+
+              <script>
+                              // КРИСТИНА.AI CRM Widget
 (function() {
     'use strict';
     
@@ -22,524 +40,82 @@
     let selectedFiles = [];
     let isOpen = false;
 
-    // Стили (добавлены стили для превью файлов)
+    // Стили
     const styles = `
         <style>
-            /* Плавающая кнопка */
-            .kristina-widget-btn {
-                position: fixed !important;
-                bottom: 30px !important;
-                right: 30px !important;
-                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-                color: white !important;
-                padding: 16px 24px !important;
-                border-radius: 50px !important;
-                box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4) !important;
-                cursor: pointer !important;
-                font-family: system-ui, -apple-system, sans-serif !important;
-                font-weight: 600 !important;
-                font-size: 15px !important;
-                z-index: 999999 !important;
-                transition: all 0.3s ease !important;
-                border: none !important;
-                display: flex !important;
-                align-items: center !important;
-                gap: 10px !important;
-            }
-            
-            .kristina-widget-btn:hover {
-                transform: translateY(-3px) !important;
-                box-shadow: 0 15px 40px rgba(59, 130, 246, 0.5) !important;
-            }
-            
-            .kristina-widget-btn::before {
-                content: '💬' !important;
-                font-size: 20px !important;
-            }
-            
-            /* Окно чата - АДАПТИВНОЕ */
-            .kristina-chat-window {
-                position: fixed !important;
-                bottom: 100px !important;
-                right: 30px !important;
-                width: 450px !important;
-                max-width: calc(100vw - 60px) !important;
-                height: 650px !important;
-                max-height: calc(100vh - 150px) !important;
-                background: #0b132b !important;
-                border-radius: 20px !important;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
-                z-index: 999999 !important;
-                display: none !important;
-                flex-direction: column !important;
-                overflow: hidden !important;
-                border: 1px solid rgba(59, 130, 246, 0.3) !important;
-            }
-            
-            .kristina-chat-window.active {
-                display: flex !important;
-            }
-            
-            /* Шапка */
-            .kristina-chat-header {
-                background: linear-gradient(135deg, rgba(59, 130, 246, 0.9) 0%, rgba(37, 99, 235, 0.9) 100%) !important;
-                padding: 20px !important;
-                color: white !important;
-                display: flex !important;
-                justify-content: space-between !important;
-                align-items: center !important;
-                flex-shrink: 0 !important;
-            }
-            
-            .kristina-chat-header h3 {
-                margin: 0 !important;
-                font-size: 18px !important;
-                font-weight: 600 !important;
-            }
-            
-            .kristina-chat-close {
-                background: rgba(255, 255, 255, 0.2) !important;
-                border: none !important;
-                color: white !important;
-                width: 32px !important;
-                height: 32px !important;
-                border-radius: 50% !important;
-                cursor: pointer !important;
-                font-size: 18px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
-            
-            /* Сообщения */
-            .kristina-chat-messages {
-                flex: 1 !important;
-                overflow-y: auto !important;
-                padding: 20px !important;
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 12px !important;
-                background: #0b132b !important;
-            }
-            
-            .kristina-message {
-                max-width: 80% !important;
-                padding: 12px 16px !important;
-                border-radius: 16px !important;
-                font-size: 14px !important;
-                line-height: 1.5 !important;
-                animation: fadeIn 0.3s ease !important;
-                word-wrap: break-word !important;
-            }
-            
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            
-            .kristina-message-user {
-                background: rgba(16, 185, 129, 0.2) !important;
-                color: #10b981 !important;
-                align-self: flex-end !important;
-                border-bottom-right-radius: 4px !important;
-            }
-            
-            .kristina-message-admin {
-                background: rgba(59, 130, 246, 0.15) !important;
-                color: #93c5fd !important;
-                align-self: flex-start !important;
-                border-bottom-left-radius: 4px !important;
-            }
-            
-            .kristina-message-file {
-                background: rgba(59, 130, 246, 0.1) !important;
-                border: 1px solid rgba(59, 130, 246, 0.3) !important;
-                padding: 10px !important;
-                border-radius: 12px !important;
-                margin-top: 8px !important;
-            }
-            
-            .kristina-message-file img,
-            .kristina-message-file video {
-                max-width: 100% !important;
-                border-radius: 8px !important;
-                margin-top: 5px !important;
-            }
-            
-            .kristina-file-link {
-                color: #60a5fa !important;
-                text-decoration: none !important;
-                display: inline-flex !important;
-                align-items: center !important;
-                gap: 8px !important;
-            }
-            
-            .kristina-file-link:hover {
-                text-decoration: underline !important;
-            }
-            
-            /* Поле ввода с кнопками */
-            .kristina-chat-input-wrapper {
-                padding: 16px 20px !important;
-                background: rgba(15, 23, 42, 0.9) !important;
-                border-top: 1px solid rgba(59, 130, 246, 0.2) !important;
-                flex-shrink: 0 !important;
-            }
-            
-            /* Прикреплённые файлы */
-            .kristina-attached-files {
-                display: flex !important;
-                gap: 8px !important;
-                margin-bottom: 12px !important;
-                flex-wrap: wrap !important;
-            }
-            
-            .kristina-file-tag {
-                background: rgba(59, 130, 246, 0.2) !important;
-                color: #93c5fd !important;
-                padding: 6px 12px !important;
-                border-radius: 20px !important;
-                font-size: 12px !important;
-                display: flex !important;
-                align-items: center !important;
-                gap: 8px !important;
-            }
-            
-            .kristina-file-tag .remove-file {
-                cursor: pointer !important;
-                opacity: 0.7 !important;
-                font-weight: bold !important;
-            }
-            
-            .kristina-file-tag .remove-file:hover {
-                opacity: 1 !important;
-            }
-            
-            .kristina-chat-input-row {
-                display: flex !important;
-                gap: 10px !important;
-                align-items: center !important;
-            }
-            
-            .kristina-chat-input {
-                flex: 1 !important;
-                padding: 14px 18px !important;
-                border-radius: 25px !important;
-                border: 1px solid rgba(59, 130, 246, 0.3) !important;
-                background: rgba(0, 0, 0, 0.3) !important;
-                color: #e2e8f0 !important;
-                font-family: system-ui, -apple-system, sans-serif !important;
-                font-size: 14px !important;
-                outline: none !important;
-                min-width: 0 !important;
-            }
-            
-            .kristina-chat-input::placeholder {
-                color: rgba(226, 232, 240, 0.5) !important;
-            }
-            
-            .kristina-file-btn {
-                background: rgba(59, 130, 246, 0.2) !important;
-                color: #60a5fa !important;
-                border: 1px solid rgba(59, 130, 246, 0.3) !important;
-                width: 44px !important;
-                height: 44px !important;
-                border-radius: 50% !important;
-                cursor: pointer !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                font-size: 20px !important;
-                transition: all 0.3s ease !important;
-                flex-shrink: 0 !important;
-            }
-            
-            .kristina-file-btn:hover {
-                background: rgba(59, 130, 246, 0.3) !important;
-                transform: scale(1.1) !important;
-            }
-            
-            .kristina-send-btn {
-                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-                color: white !important;
-                border: none !important;
-                padding: 14px 24px !important;
-                border-radius: 25px !important;
-                cursor: pointer !important;
-                font-weight: 600 !important;
-                transition: all 0.3s ease !important;
-                flex-shrink: 0 !important;
-            }
-            
-            .kristina-send-btn:hover {
-                transform: scale(1.05) !important;
-            }
-            
-            /* Скрытый input для файлов */
-            #kristinaFileInput {
-                display: none !important;
-            }
-            
-            /* Форма заявки */
-            .kristina-deal-form {
-                position: fixed !important;
-                bottom: 100px !important;
-                right: 30px !important;
-                width: 450px !important;
-                max-width: calc(100vw - 60px) !important;
-                max-height: calc(100vh - 150px) !important;
-                background: #0b132b !important;
-                border-radius: 20px !important;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
-                z-index: 999999 !important;
-                display: none !important;
-                flex-direction: column !important;
-                overflow: hidden !important;
-                border: 1px solid rgba(59, 130, 246, 0.3) !important;
-            }
-            
-            .kristina-deal-form.active {
-                display: flex !important;
-            }
-            
-            /* Форма имени */
-            .kristina-name-form {
-                position: fixed !important;
-                bottom: 100px !important;
-                right: 30px !important;
-                width: 450px !important;
-                max-width: calc(100vw - 60px) !important;
-                background: #0b132b !important;
-                border-radius: 20px !important;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
-                z-index: 999998 !important;
-                display: none !important;
-                flex-direction: column !important;
-                overflow: hidden !important;
-                border: 1px solid rgba(59, 130, 246, 0.3) !important;
-            }
-            
-            .kristina-name-form.active {
-                display: flex !important;
-            }
-            
-            /* ✅ НОВАЯ ФОРМА: ПОДАРОК/ПОЗЖЕ */
-            .kristina-late-form {
-                position: fixed !important;
-                bottom: 100px !important;
-                right: 30px !important;
-                width: 450px !important;
-                max-width: calc(100vw - 60px) !important;
-                background: #0b132b !important;
-                border-radius: 20px !important;
-                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important;
-                z-index: 999998 !important;
-                display: none !important;
-                flex-direction: column !important;
-                overflow: hidden !important;
-                border: 1px solid rgba(16, 185, 129, 0.3) !important;
-            }
-            
-            .kristina-late-form.active {
-                display: flex !important;
-            }
-            
-            .kristina-form-header {
-                background: linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%) !important;
-                padding: 20px !important;
-                color: white !important;
-                display: flex !important;
-                justify-content: space-between !important;
-                align-items: center !important;
-                flex-shrink: 0 !important;
-            }
-            
-            .kristina-form-header h3 {
-                margin: 0 !important;
-                font-size: 18px !important;
-            }
-            
-            .kristina-form-content {
-                padding: 20px !important;
-                overflow-y: auto !important;
-                flex: 1 !important;
-            }
-            
-            .kristina-form-group {
-                margin-bottom: 16px !important;
-            }
-            
-            .kristina-form-group label {
-                display: block !important;
-                color: #94a3b8 !important;
-                margin-bottom: 6px !important;
-                font-size: 13px !important;
-            }
-            
-            .kristina-form-group input,
-            .kristina-form-group textarea,
-            .kristina-form-group select {
-                width: 100% !important;
-                padding: 12px !important;
-                border-radius: 8px !important;
-                border: 1px solid rgba(59, 130, 246, 0.3) !important;
-                background: rgba(0, 0, 0, 0.3) !important;
-                color: #e2e8f0 !important;
-                font-family: system-ui, -apple-system, sans-serif !important;
-                font-size: 14px !important;
-                box-sizing: border-box !important;
-            }
-            
-            .kristina-form-group textarea {
-                resize: vertical !important;
-                min-height: 80px !important;
-            }
-            
-            .kristina-form-buttons {
-                display: flex !important;
-                gap: 10px !important;
-                margin-top: 20px !important;
-            }
-            
-            .kristina-btn {
-                flex: 1 !important;
-                padding: 14px !important;
-                border: none !important;
-                border-radius: 8px !important;
-                cursor: pointer !important;
-                font-weight: 600 !important;
-                font-size: 14px !important;
-            }
-            
-            .kristina-btn-cancel {
-                background: rgba(239, 68, 68, 0.2) !important;
-                color: #ef4444 !important;
-            }
-            
-            .kristina-btn-submit {
-                background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-                color: white !important;
-            }
-            
-            /* Скроллбар */
-            .kristina-chat-messages::-webkit-scrollbar,
-            .kristina-form-content::-webkit-scrollbar {
-                width: 6px !important;
-            }
-            
-            .kristina-chat-messages::-webkit-scrollbar-thumb,
-            .kristina-form-content::-webkit-scrollbar-thumb {
-                background: rgba(59, 130, 246, 0.3) !important;
-                border-radius: 3px !important;
-            }
-            
-            /* МОБИЛЬНАЯ АДАПТАЦИЯ */
+            .kristina-widget-btn { position: fixed !important; bottom: 30px !important; right: 30px !important; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; color: white !important; padding: 16px 24px !important; border-radius: 50px !important; box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4) !important; cursor: pointer !important; font-family: system-ui, -apple-system, sans-serif !important; font-weight: 600 !important; font-size: 15px !important; z-index: 999999 !important; transition: all 0.3s ease !important; border: none !important; display: flex !important; align-items: center !important; gap: 10px !important; }
+            .kristina-widget-btn:hover { transform: translateY(-3px) !important; box-shadow: 0 15px 40px rgba(59, 130, 246, 0.5) !important; }
+            .kristina-widget-btn::before { content: '💬' !important; font-size: 20px !important; }
+            .kristina-chat-window { position: fixed !important; bottom: 100px !important; right: 30px !important; width: 450px !important; max-width: calc(100vw - 60px) !important; height: 650px !important; max-height: calc(100vh - 150px) !important; background: #0b132b !important; border-radius: 20px !important; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important; z-index: 999999 !important; display: none !important; flex-direction: column !important; overflow: hidden !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; }
+            .kristina-chat-window.active { display: flex !important; }
+            .kristina-chat-header { background: linear-gradient(135deg, rgba(59, 130, 246, 0.9) 0%, rgba(37, 99, 235, 0.9) 100%) !important; padding: 20px !important; color: white !important; display: flex !important; justify-content: space-between !important; align-items: center !important; flex-shrink: 0 !important; }
+            .kristina-chat-header h3 { margin: 0 !important; font-size: 18px !important; font-weight: 600 !important; }
+            .kristina-chat-close { background: rgba(255, 255, 255, 0.2) !important; border: none !important; color: white !important; width: 32px !important; height: 32px !important; border-radius: 50% !important; cursor: pointer !important; font-size: 18px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+            .kristina-chat-messages { flex: 1 !important; overflow-y: auto !important; padding: 20px !important; display: flex !important; flex-direction: column !important; gap: 12px !important; background: #0b132b !important; }
+            .kristina-message { max-width: 80% !important; padding: 12px 16px !important; border-radius: 16px !important; font-size: 14px !important; line-height: 1.5 !important; animation: fadeIn 0.3s ease !important; word-wrap: break-word !important; }
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+            .kristina-message-user { background: rgba(16, 185, 129, 0.2) !important; color: #10b981 !important; align-self: flex-end !important; border-bottom-right-radius: 4px !important; }
+            .kristina-message-admin { background: rgba(59, 130, 246, 0.15) !important; color: #93c5fd !important; align-self: flex-start !important; border-bottom-left-radius: 4px !important; }
+            .kristina-message-file { background: rgba(59, 130, 246, 0.1) !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; padding: 10px !important; border-radius: 12px !important; margin-top: 8px !important; }
+            .kristina-message-file img, .kristina-message-file video { max-width: 100% !important; border-radius: 8px !important; margin-top: 5px !important; }
+            .kristina-file-link { color: #60a5fa !important; text-decoration: none !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; }
+            .kristina-file-link:hover { text-decoration: underline !important; }
+            .kristina-chat-input-wrapper { padding: 16px 20px !important; background: rgba(15, 23, 42, 0.9) !important; border-top: 1px solid rgba(59, 130, 246, 0.2) !important; flex-shrink: 0 !important; }
+            .kristina-attached-files { display: flex !important; gap: 8px !important; margin-bottom: 12px !important; flex-wrap: wrap !important; }
+            .kristina-file-tag { background: rgba(59, 130, 246, 0.2) !important; color: #93c5fd !important; padding: 6px 12px !important; border-radius: 20px !important; font-size: 12px !important; display: flex !important; align-items: center !important; gap: 8px !important; }
+            .kristina-file-tag .remove-file { cursor: pointer !important; opacity: 0.7 !important; font-weight: bold !important; }
+            .kristina-file-tag .remove-file:hover { opacity: 1 !important; }
+            .kristina-chat-input-row { display: flex !important; gap: 10px !important; align-items: center !important; }
+            .kristina-chat-input { flex: 1 !important; padding: 14px 18px !important; border-radius: 25px !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; background: rgba(0, 0, 0, 0.3) !important; color: #e2e8f0 !important; font-family: system-ui, -apple-system, sans-serif !important; font-size: 14px !important; outline: none !important; min-width: 0 !important; }
+            .kristina-chat-input::placeholder { color: rgba(226, 232, 240, 0.5) !important; }
+            .kristina-file-btn { background: rgba(59, 130, 246, 0.2) !important; color: #60a5fa !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; width: 44px !important; height: 44px !important; border-radius: 50% !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; font-size: 20px !important; transition: all 0.3s ease !important; flex-shrink: 0 !important; }
+            .kristina-file-btn:hover { background: rgba(59, 130, 246, 0.3) !important; transform: scale(1.1) !important; }
+            .kristina-send-btn { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; color: white !important; border: none !important; padding: 14px 24px !important; border-radius: 25px !important; cursor: pointer !important; font-weight: 600 !important; transition: all 0.3s ease !important; flex-shrink: 0 !important; }
+            .kristina-send-btn:hover { transform: scale(1.05) !important; }
+            #kristinaFileInput { display: none !important; }
+            .kristina-deal-form, .kristina-name-form, .kristina-late-form { position: fixed !important; bottom: 100px !important; right: 30px !important; width: 450px !important; max-width: calc(100vw - 60px) !important; background: #0b132b !important; border-radius: 20px !important; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4) !important; z-index: 999999 !important; display: none !important; flex-direction: column !important; overflow: hidden !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; }
+            .kristina-deal-form.active, .kristina-name-form.active, .kristina-late-form.active { display: flex !important; }
+            .kristina-form-header { background: linear-gradient(135deg, rgba(16, 185, 129, 0.9) 0%, rgba(5, 150, 105, 0.9) 100%) !important; padding: 20px !important; color: white !important; display: flex !important; justify-content: space-between !important; align-items: center !important; flex-shrink: 0 !important; }
+            .kristina-form-header h3 { margin: 0 !important; font-size: 18px !important; }
+            .kristina-form-content { padding: 20px !important; overflow-y: auto !important; flex: 1 !important; }
+            .kristina-form-group { margin-bottom: 16px !important; }
+            .kristina-form-group label { display: block !important; color: #94a3b8 !important; margin-bottom: 6px !important; font-size: 13px !important; }
+            .kristina-form-group input, .kristina-form-group textarea, .kristina-form-group select { width: 100% !important; padding: 12px !important; border-radius: 8px !important; border: 1px solid rgba(59, 130, 246, 0.3) !important; background: rgba(0, 0, 0, 0.3) !important; color: #e2e8f0 !important; font-family: system-ui, -apple-system, sans-serif !important; font-size: 14px !important; box-sizing: border-box !important; }
+            .kristina-form-group textarea { resize: vertical !important; min-height: 80px !important; }
+            .kristina-form-buttons { display: flex !important; gap: 10px !important; margin-top: 20px !important; }
+            .kristina-btn { flex: 1 !important; padding: 14px !important; border: none !important; border-radius: 8px !important; cursor: pointer !important; font-weight: 600 !important; font-size: 14px !important; }
+            .kristina-btn-cancel { background: rgba(239, 68, 68, 0.2) !important; color: #ef4444 !important; }
+            .kristina-btn-submit { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; color: white !important; }
+            .kristina-chat-messages::-webkit-scrollbar, .kristina-form-content::-webkit-scrollbar { width: 6px !important; }
+            .kristina-chat-messages::-webkit-scrollbar-thumb, .kristina-form-content::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.3) !important; border-radius: 3px !important; }
             @media (max-width: 768px) {
-                .kristina-widget-btn {
-                    bottom: 20px !important;
-                    right: 20px !important;
-                    padding: 14px 20px !important;
-                    font-size: 14px !important;
-                }
-                
-                .kristina-chat-window,
-                .kristina-deal-form,
-                .kristina-name-form,
-                .kristina-late-form {
-                    bottom: 90px !important;
-                    right: 15px !important;
-                    left: 15px !important;
-                    width: calc(100% - 30px) !important;
-                    max-width: none !important;
-                    height: calc(100vh - 120px) !important;
-                    max-height: none !important;
-                    border-radius: 16px !important;
-                }
-                
-                .kristina-chat-messages {
-                    padding: 15px !important;
-                }
-                
-                .kristina-message {
-                    max-width: 90% !important;
-                    font-size: 13px !important;
-                    padding: 10px 14px !important;
-                }
-                
-                .kristina-chat-input-wrapper {
-                    padding: 12px 15px !important;
-                }
-                
-                .kristina-chat-input-row {
-                    flex-wrap: wrap !important;
-                }
-                
-                .kristina-file-btn {
-                    width: 40px !important;
-                    height: 40px !important;
-                    order: 1 !important;
-                }
-                
-                .kristina-chat-input {
-                    flex: 1 1 calc(100% - 100px) !important;
-                    order: 2 !important;
-                    min-width: 0 !important;
-                }
-                
-                .kristina-send-btn {
-                    order: 3 !important;
-                    padding: 12px 20px !important;
-                }
-                
-                .kristina-form-content {
-                    padding: 15px !important;
-                }
+                .kristina-widget-btn { bottom: 20px !important; right: 20px !important; padding: 14px 20px !important; font-size: 14px !important; }
+                .kristina-chat-window, .kristina-deal-form, .kristina-name-form, .kristina-late-form { bottom: 90px !important; right: 15px !important; left: 15px !important; width: calc(100% - 30px) !important; max-width: none !important; height: calc(100vh - 120px) !important; max-height: none !important; border-radius: 16px !important; }
+                .kristina-chat-messages { padding: 15px !important; }
+                .kristina-message { max-width: 90% !important; font-size: 13px !important; padding: 10px 14px !important; }
+                .kristina-chat-input-wrapper { padding: 12px 15px !important; }
+                .kristina-chat-input-row { flex-wrap: wrap !important; }
+                .kristina-file-btn { width: 40px !important; height: 40px !important; order: 1 !important; }
+                .kristina-chat-input { flex: 1 1 calc(100% - 100px) !important; order: 2 !important; min-width: 0 !important; }
+                .kristina-send-btn { order: 3 !important; padding: 12px 20px !important; }
+                .kristina-form-content { padding: 15px !important; }
             }
-            
             @media (max-width: 480px) {
-                .kristina-widget-btn {
-                    padding: 12px 18px !important;
-                    font-size: 13px !important;
-                }
-                
-                .kristina-chat-header h3 {
-                    font-size: 16px !important;
-                }
-                
-                .kristina-message {
-                    font-size: 12px !important;
-                    padding: 8px 12px !important;
-                }
-                
-                .kristina-chat-input {
-                    font-size: 13px !important;
-                    padding: 12px 16px !important;
-                }
-                
-                .kristina-send-btn {
-                    font-size: 13px !important;
-                    padding: 12px 18px !important;
-                }
+                .kristina-widget-btn { padding: 12px 18px !important; font-size: 13px !important; }
+                .kristina-chat-header h3 { font-size: 16px !important; }
+                .kristina-message { font-size: 12px !important; padding: 8px 12px !important; }
+                .kristina-chat-input { font-size: 13px !important; padding: 12px 16px !important; }
+                .kristina-send-btn { font-size: 13px !important; padding: 12px 18px !important; }
             }
         </style>
     `;
 
     // HTML виджета
     const widgetHTML = `
-        <button class="kristina-widget-btn" id="kristinaWidgetBtn">
-            Онлайн менеджер
-        </button>
-        
+        <button class="kristina-widget-btn" id="kristinaWidgetBtn">Онлайн менеджер</button>
         <div class="kristina-chat-window" id="kristinaChatWindow">
-            <div class="kristina-chat-header">
-                <h3>💬 КРИСТИНА.AI CRM</h3>
-                <button class="kristina-chat-close" id="kristinaChatClose">×</button>
-            </div>
-            <div class="kristina-chat-messages" id="kristinaChatMessages">
-                <div class="empty-state" style="text-align: center; padding: 40px; opacity: 0.6; color: #94a3b8;">
-                    💬 Начните общение...
-                </div>
-            </div>
+            <div class="kristina-chat-header"><h3>💬 КРИСТИНА.AI CRM</h3><button class="kristina-chat-close" id="kristinaChatClose">×</button></div>
+            <div class="kristina-chat-messages" id="kristinaChatMessages"><div class="empty-state" style="text-align: center; padding: 40px; opacity: 0.6; color: #94a3b8;">💬 Начните общение...</div></div>
             <div class="kristina-chat-input-wrapper">
                 <div class="kristina-attached-files" id="kristinaAttachedFiles"></div>
                 <div class="kristina-chat-input-row">
@@ -550,94 +126,32 @@
                 </div>
             </div>
         </div>
-        
         <div class="kristina-deal-form" id="kristinaDealForm">
-            <div class="kristina-form-header">
-                <h3>📋 Заявка на личную встречу</h3>
-                <button class="kristina-chat-close" id="kristinaFormClose">×</button>
-            </div>
+            <div class="kristina-form-header"><h3>📋 Заявка на личную встречу</h3><button class="kristina-chat-close" id="kristinaFormClose">×</button></div>
             <div class="kristina-form-content">
-                <div class="kristina-form-group">
-                    <label>1. Имя *</label>
-                    <input type="text" id="dealClientName" required>
-                </div>
-                <div class="kristina-form-group">
-                    <label>2. Сфера деятельности *</label>
-                    <input type="text" id="dealSphere" placeholder="Например: маркетинг, дизайн" required>
-                </div>
-                <div class="kristina-form-group">
-                    <label>3. Какой запрос хочется разобрать? *</label>
-                    <textarea id="dealRequest" placeholder="Опишите, что хотите обсудить..." required></textarea>
-                </div>
-                <div class="kristina-form-group">
-                    <label>4. Бюджет *</label>
-                    <input type="text" id="dealBudget" placeholder="Например: 15 000 ₽, 50 000 ₽" required>
-                </div>
-                <div class="kristina-form-group">
-                    <label>5. Способ связи *</label>
-                    <select id="dealContactMethod" required>
-                        <option value="">Выберите мессенджер</option>
-                        <option value="Telegram">Telegram</option>
-                        <option value="VK">ВКонтакте</option>
-                        <option value="Одноклассники">Одноклассники</option>
-                        <option value="Instagram">Instagram</option>
-                        <option value="TenChat">TenChat</option>
-                    </select>
-                </div>
-                <div class="kristina-form-group">
-                    <label>6. Никнейм для связи *</label>
-                    <input type="text" id="dealContactNickname" placeholder="@username или ссылка" required>
-                </div>
-                <div class="kristina-form-buttons">
-                    <button class="kristina-btn kristina-btn-cancel" id="kristinaFormCancel">Отмена</button>
-                    <button class="kristina-btn kristina-btn-submit" id="kristinaFormSubmit">✅ Подтвердить заявку</button>
-                </div>
+                <div class="kristina-form-group"><label>1. Имя *</label><input type="text" id="dealClientName" required></div>
+                <div class="kristina-form-group"><label>2. Сфера деятельности *</label><input type="text" id="dealSphere" placeholder="Например: маркетинг, дизайн" required></div>
+                <div class="kristina-form-group"><label>3. Какой запрос хочется разобрать? *</label><textarea id="dealRequest" placeholder="Опишите, что хотите обсудить..." required></textarea></div>
+                <div class="kristina-form-group"><label>4. Бюджет *</label><input type="text" id="dealBudget" placeholder="Например: 15 000 ₽, 50 000 ₽" required></div>
+                <div class="kristina-form-group"><label>5. Способ связи *</label><select id="dealContactMethod" required><option value="">Выберите мессенджер</option><option value="Telegram">Telegram</option><option value="VK">ВКонтакте</option><option value="Одноклассники">Одноклассники</option><option value="Instagram">Instagram</option><option value="TenChat">TenChat</option></select></div>
+                <div class="kristina-form-group"><label>6. Никнейм для связи *</label><input type="text" id="dealContactNickname" placeholder="@username или ссылка" required></div>
+                <div class="kristina-form-buttons"><button class="kristina-btn kristina-btn-cancel" id="kristinaFormCancel">Отмена</button><button class="kristina-btn kristina-btn-submit" id="kristinaFormSubmit">✅ Подтвердить заявку</button></div>
             </div>
         </div>
-        
-        <!-- Форма для ввода имени -->
         <div class="kristina-name-form" id="kristinaNameForm">
-            <div class="kristina-form-header">
-                <h3>👋 Добро пожаловать!</h3>
-            </div>
+            <div class="kristina-form-header"><h3>👋 Добро пожаловать!</h3></div>
             <div class="kristina-form-content">
-                <div class="kristina-form-group">
-                    <label>Как к вам обращаться? *</label>
-                    <input type="text" id="userNameInput" placeholder="Введите ваше имя" required>
-                </div>
-                <div class="kristina-form-buttons">
-                    <button class="kristina-btn kristina-btn-submit" id="kristinaNameSubmit">✅ Представиться</button>
-                </div>
+                <div class="kristina-form-group"><label>Как к вам обращаться? *</label><input type="text" id="userNameInput" placeholder="Введите ваше имя" required></div>
+                <div class="kristina-form-buttons"><button class="kristina-btn kristina-btn-submit" id="kristinaNameSubmit">✅ Представиться</button></div>
             </div>
         </div>
-        
-        <!-- ✅ НОВАЯ ФОРМА: ПОДАРОК/ПОЗЖЕ -->
         <div class="kristina-late-form" id="kristinaLateForm">
-            <div class="kristina-form-header">
-                <h3>🎁 Ваш подарок ждёт!</h3>
-            </div>
+            <div class="kristina-form-header"><h3>🎁 Ваш подарок ждёт!</h3></div>
             <div class="kristina-form-content">
-                <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:16px;line-height:1.5">
-                    Мы видим ваш интерес! Чтобы не потеряться и отправить вам полезный подарок, укажите удобный контакт:
-                </p>
-                <div class="kristina-form-group">
-                    <label>📱 Соцсеть или мессенджер *</label>
-                    <select id="lateContactMethod" required>
-                        <option value="">Выберите</option>
-                        <option value="Telegram">Telegram</option>
-                        <option value="VK">ВКонтакте</option>
-                        <option value="Instagram">Instagram</option>
-                        <option value="WhatsApp">WhatsApp</option>
-                    </select>
-                </div>
-                <div class="kristina-form-group">
-                    <label>🔗 Ваш никнейм или ссылка *</label>
-                    <input type="text" id="lateContactNickname" placeholder="@username или ссылка на профиль" required>
-                </div>
-                <div class="kristina-form-buttons">
-                    <button class="kristina-btn kristina-btn-cancel" id="kristinaLateCancel">Не сейчас</button>
-                    <button class="kristina-btn kristina-btn-submit" id="kristinaLateSubmit">🎁 Получить подарок</button>
-                </div>
+                <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:16px;line-height:1.5">Мы видим ваш интерес! Чтобы не потеряться и отправить вам полезный подарок, укажите удобный контакт:</p>
+                <div class="kristina-form-group"><label>📱 Соцсеть или мессенджер *</label><select id="lateContactMethod" required><option value="">Выберите</option><option value="Telegram">Telegram</option><option value="VK">ВКонтакте</option><option value="Instagram">Instagram</option><option value="WhatsApp">WhatsApp</option></select></div>
+                <div class="kristina-form-group"><label>🔗 Ваш никнейм или ссылка *</label><input type="text" id="lateContactNickname" placeholder="@username или ссылка на профиль" required></div>
+                <div class="kristina-form-buttons"><button class="kristina-btn kristina-btn-cancel" id="kristinaLateCancel">Не сейчас</button><button class="kristina-btn kristina-btn-submit" id="kristinaLateSubmit">🎁 Получить подарок</button></div>
             </div>
         </div>
     `;
@@ -666,50 +180,24 @@
         const nameForm = document.getElementById('kristinaNameForm');
         const nameSubmit = document.getElementById('kristinaNameSubmit');
         const userNameInput = document.getElementById('userNameInput');
-        // ✅ Элементы новой формы
         const lateForm = document.getElementById('kristinaLateForm');
         const lateCancel = document.getElementById('kristinaLateCancel');
         const lateSubmit = document.getElementById('kristinaLateSubmit');
         const lateMethod = document.getElementById('lateContactMethod');
         const lateNickname = document.getElementById('lateContactNickname');
 
-        // Проверка элементов
-        if (!widgetBtn || !chatWindow) {
-            console.error('❌ Widget elements not found!');
-            return;
-        }
+        if (!widgetBtn || !chatWindow) { console.error('❌ Widget elements not found!'); return; }
 
-        // ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ fetchAPI - передаём API ключ в заголовке!
+        // ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ fetchAPI
         async function fetchAPI(url, method = 'GET', body = null, useFormData = false) {
-            const options = {
-                method,
-                headers: {
-                    'X-API-Key': API_KEY  // ← Передаём в заголовке!
-                }
-            };
-            
-            if (!useFormData) {
-                options.headers['Content-Type'] = 'application/json';
-            }
-            
-            const fullUrl = API_URL + url;  // ← БЕЗ api_key в URL!
-            
-            if (body) {
-                options.body = JSON.stringify(body);  // ← ✅ ИСПРАВЛЕНО: добавлен JSON.stringify!
-            }
-            
-            console.log('📡 API Request:', method, fullUrl);
+            const options = { method, headers: { 'X-API-Key': API_KEY } };
+            if (!useFormData) options.headers['Content-Type'] = 'application/json';
+            const fullUrl = API_URL + url;
+            if (body) options.body = JSON.stringify(body);
             
             const response = await fetch(fullUrl, options);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ API Error:', response.status, errorText);
-                throw new Error(`HTTP ${response.status}: ${errorText}`);
-            }
-            
+            if (!response.ok) { const errorText = await response.text(); throw new Error(`HTTP ${response.status}: ${errorText}`); }
             if (response.status === 204) return null;
-            
             return response.json();
         }
 
@@ -717,26 +205,17 @@
         async function checkClientTriggers(text) {
             const lower = text.toLowerCase();
             
-            // ❌ Отрицательные триггеры → сразу в "Отклонённые" (без формы!)
+            // ❌ Отрицательные триггеры → сразу в "Отклонённые"
             const declineTriggers = ['нет', 'подумаю', 'позже', 'не сейчас', 'отмена', 'не хочу', 'не интересно'];
             if (declineTriggers.some(trigger => lower.includes(trigger))) {
                 try {
                     await fetchAPI('/api/widget/deals', 'POST', {
-                        chat_id: chatId,
-                        client_name: userName || 'Аноним',
-                        sphere: 'Не указано',
-                        request: `Клиент: "${text}"`,
-                        budget: '0',
-                        contact_method: 'Отказ',
-                        contact_nickname: '-',
-                        status: 'declined',
-                        decline_reason: `Клиент: "${text}"`
+                        chat_id: chatId, client_name: userName || 'Аноним', sphere: 'Не указано',
+                        request: `Клиент: "${text}"`, budget: '0', contact_method: 'Отказ',
+                        contact_nickname: '-', status: 'declined', decline_reason: `Клиент: "${text}"`
                     });
-                    console.log('✅ Сделка отправлена в "Отклонённые"');
-                } catch (e) {
-                    console.error('Ошибка создания отклонённой сделки:', e);
-                }
-                return; // ✅ ВЫХОДИМ, форма не открывается
+                } catch (e) { console.error('Ошибка создания отклонённой сделки:', e); }
+                return;
             }
             
             // ⏳ Триггеры "позже" → открываем форму подарка
@@ -757,457 +236,182 @@
                 setTimeout(() => {
                     if (nameForm) nameForm.classList.remove('active');
                     if (dealForm) dealForm.classList.add('active');
-                    if (userName && document.getElementById('dealClientName')) {
-                        document.getElementById('dealClientName').value = userName;
-                    }
+                    if (userName && document.getElementById('dealClientName')) document.getElementById('dealClientName').value = userName;
                 }, 500);
             }
         }
 
-        // ✅ ПАРСЕР AI-КНОПОК: заменяет [ДА ПОДАТЬ]/[ОТМЕНА] на кнопки
+        // ✅ ПАРСЕР AI-КНОПОК
         function parseAIMessage(text) {
-            if (!text.includes('[ДА ПОДАТЬ]') || !text.includes('[ОТМЕНА]')) {
-                return text;
-            }
-            return text
-                .replace('[ДА ПОДАТЬ]', '<button class="kristina-btn kristina-btn-submit" style="margin:4px 4px 4px 0;padding:6px 12px;font-size:12px" onclick="window.handleDealButton(true)">✅ Да, подать заявку</button>')
-                .replace('[ОТМЕНА]', '<button class="kristina-btn kristina-btn-cancel" style="margin:4px 0;padding:6px 12px;font-size:12px" onclick="window.handleDealButton(false)">❌ Отмена</button>');
+            if (!text.includes('[ДА ПОДАТЬ]') || !text.includes('[ОТМЕНА]')) return text;
+            return text.replace('[ДА ПОДАТЬ]', '<button class="kristina-btn kristina-btn-submit" style="margin:4px 4px 4px 0;padding:6px 12px;font-size:12px" onclick="window.handleDealButton(true)">✅ Да, подать заявку</button>').replace('[ОТМЕНА]', '<button class="kristina-btn kristina-btn-cancel" style="margin:4px 0;padding:6px 12px;font-size:12px" onclick="window.handleDealButton(false)">❌ Отмена</button>');
         }
 
         // ✅ ОБРАБОТКА КНОПОК ОТ AI
         window.handleDealButton = async function(isAccepted) {
             if (!chatId) return;
-            
             try {
                 if (isAccepted) {
-                    // Клиент согласился → открываем форму
                     if (nameForm) nameForm.classList.remove('active');
                     if (dealForm) dealForm.classList.add('active');
-                    if (userName && document.getElementById('dealClientName')) {
-                        document.getElementById('dealClientName').value = userName;
-                    }
+                    if (userName && document.getElementById('dealClientName')) document.getElementById('dealClientName').value = userName;
                 } else {
-                    // Клиент отказался → создаём отклонённую сделку
                     await fetchAPI('/api/widget/deals', 'POST', {
-                        chat_id: chatId,
-                        client_name: userName || 'Аноним',
-                        sphere: 'Не указано',
-                        request: 'Клиент отказался от заявки через AI',
-                        budget: '0',
-                        contact_method: 'Отказ',
-                        contact_nickname: '-',
-                        status: 'declined',
+                        chat_id: chatId, client_name: userName || 'Аноним', sphere: 'Не указано',
+                        request: 'Клиент отказался от заявки через AI', budget: '0',
+                        contact_method: 'Отказ', contact_nickname: '-', status: 'declined',
                         decline_reason: 'Нажата кнопка [ОТМЕНА]'
                     });
-                    // Отправляем подтверждение в чат
-                    await fetchAPI('/api/widget/send', 'POST', {
-                        chat_id: chatId,
-                        text: '❌ Заявка отменена. Спасибо за ответ!'
-                    });
+                    await fetchAPI('/api/widget/send', 'POST', { chat_id: chatId, text: '❌ Заявка отменена. Спасибо за ответ!' });
                     loadMessages();
                 }
-            } catch (e) {
-                console.error('Ошибка обработки кнопки:', e);
-                alert('❌ Ошибка: ' + e.message);
-            }
+            } catch (e) { alert('❌ Ошибка: ' + e.message); }
         };
 
         // Открыть/закрыть чат
         widgetBtn.addEventListener('click', () => {
-            console.log('🔔 Widget button clicked');
             isOpen = !isOpen;
-            
-            if (isOpen) {
-                chatWindow.classList.add('active');
-                widgetBtn.style.display = 'none';
-                if (!chatId) {
-                    initChat();
-                }
-            } else {
-                chatWindow.classList.remove('active');
-                widgetBtn.style.display = 'flex';
-            }
+            if (isOpen) { chatWindow.classList.add('active'); widgetBtn.style.display = 'none'; if (!chatId) initChat(); }
+            else { chatWindow.classList.remove('active'); widgetBtn.style.display = 'flex'; }
         });
-
-        chatClose.addEventListener('click', () => {
-            isOpen = false;
-            chatWindow.classList.remove('active');
-            widgetBtn.style.display = 'flex';
-        });
-
-        // Выбор файлов
-        fileBtn.addEventListener('click', () => {
-            fileInput.click();
-        });
-
+        chatClose.addEventListener('click', () => { isOpen = false; chatWindow.classList.remove('active'); widgetBtn.style.display = 'flex'; });
+        fileBtn.addEventListener('click', () => { fileInput.click(); });
+        
         fileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files);
-            
-            // Валидация файлов
-            const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-            const maxSize = 20 * 1024 * 1024; // 20MB
-            
             files.forEach(file => {
-                if (!validTypes.includes(file.type)) {
-                    alert(`❌ Файл "${file.name}" имеет неподдерживаемый формат. Разрешены: PDF, JPG, PNG, GIF, WebP`);
-                    return;
-                }
-                
-                if (file.size > maxSize) {
-                    alert(`❌ Файл "${file.name}" слишком большой. Максимум 20MB`);
-                    return;
-                }
-                
+                if (!['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) { alert(`❌ Файл "${file.name}" неверный формат`); return; }
+                if (file.size > 20 * 1024 * 1024) { alert(`❌ Файл "${file.name}" > 20MB`); return; }
                 selectedFiles.push(file);
             });
-            
-            renderAttachedFiles();
+            attachedFiles.innerHTML = selectedFiles.map((f, i) => `<div class="kristina-file-tag">📎 ${f.name}<span class="remove-file" onclick="window.removeFile(${i})">×</span></div>`).join('');
             fileInput.value = '';
         });
+        window.removeFile = function(i) { selectedFiles.splice(i, 1); attachedFiles.innerHTML = selectedFiles.map((f, j) => `<div class="kristina-file-tag">📎 ${f.name}<span class="remove-file" onclick="window.removeFile(${j})">×</span></div>`).join(''); };
 
-        // Отображение прикреплённых файлов
-        function renderAttachedFiles() {
-            attachedFiles.innerHTML = selectedFiles.map((file, index) => `
-                <div class="kristina-file-tag">
-                    📎 ${file.name}
-                    <span class="remove-file" onclick="window.removeFile(${index})">×</span>
-                </div>
-            `).join('');
-        }
-
-        // Удаление файла
-        window.removeFile = function(index) {
-            selectedFiles.splice(index, 1);
-            renderAttachedFiles();
-        };
-
-        // Отправка сообщения с файлами
+        // Отправка сообщения
         async function sendMessage() {
             const text = chatInput.value.trim();
-            
             if (!text && selectedFiles.length === 0) return;
-            if (!chatId) {
-                alert('❌ Чат не инициализирован. Попробуйте позже.');
-                return;
-            }
-            
+            if (!chatId) { alert('❌ Чат не инициализирован'); return; }
             try {
-                let response;
-                
-                if (selectedFiles.length > 0) {
-                    // Отправка с файлами
-                    const formData = new FormData();
-                    formData.append('chat_id', chatId);
-                    formData.append('text', text);
-                    
-                    selectedFiles.forEach(file => {
-                        formData.append('files', file);
-                    });
-                    
-                    response = await fetchAPI('/api/widget/send_with_files', 'POST', formData, true);
+                if (selectedFiles.length) {
+                    const formData = new FormData(); formData.append('chat_id', chatId); formData.append('text', text);
+                    selectedFiles.forEach(f => formData.append('files', f));
+                    await fetchAPI('/api/widget/send_with_files', 'POST', formData, true);
                 } else {
-                    // Отправка только текста
-                    response = await fetchAPI('/api/widget/send', 'POST', {
-                        chat_id: chatId,
-                        text: text
-                    });
+                    await fetchAPI('/api/widget/send', 'POST', { chat_id: chatId, text: text });
                 }
-                
-                // Очистка
-                chatInput.value = '';
-                selectedFiles = [];
-                renderAttachedFiles();
-                
-                // Обновление сообщений
+                chatInput.value = ''; selectedFiles = []; attachedFiles.innerHTML = '';
                 loadMessages();
-                
-                // ✅ ПРОВЕРКА ТРИГГЕРОВ КЛИЕНТА
                 await checkClientTriggers(text);
-                
-            } catch (e) {
-                console.error('Ошибка отправки:', e);
-                alert('❌ Ошибка отправки: ' + e.message);
-            }
+            } catch (e) { alert('❌ Ошибка: ' + e.message); }
         }
-
         sendBtn.addEventListener('click', sendMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
+        chatInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
 
-        // ✅ ДОБАВЛЕНА ОТПРАВКА СТАТУСА "ПЕЧАТАЕТ"
-        chatInput.addEventListener('input', () => {
-            if (chatId) {
-                fetchAPI('/api/widget/typing', 'POST', { chat_id: chatId }).catch(() => {});
-            }
-        });
+        // ✅ ПЕЧАТАЕТ...
+        chatInput.addEventListener('input', () => { if(chatId) fetchAPI('/api/widget/typing', 'POST', {chat_id: chatId}).catch(()=>{}); });
 
-        // Инициализация чата с проверкой сохранённого chatId
+        // Инициализация чата
         async function initChat() {
             try {
-                console.log('🔄 Initializing chat...');
-                
-                if (chatId) {
-                    // Проверяем, существует ли сохранённый чат
+                if(!chatId) {
+                    const newChat = await fetchAPI('/api/widget/chats', 'POST', {});
+                    chatId = newChat.id;
+                    localStorage.setItem('kristina_chat_id', chatId);
+                } else {
                     const chats = await fetchAPI('/api/widget/chats');
-                    const existingChat = chats.find(c => c.id == chatId);
-                    if (existingChat) {
-                        console.log('✅ Using existing chat from localStorage:', chatId);
-                        // Чат валиден, используем его
-                        loadMessages();
-                        if (!userName) showNameForm();
-                        return;
-                    } else {
-                        console.log('⚠️ Saved chat not found, creating new...');
-                        chatId = null;
-                        localStorage.removeItem('kristina_chat_id');
+                    const active = chats.find(c => c.id == chatId);
+                    if(!active) {
+                        const newChat = await fetchAPI('/api/widget/chats', 'POST', {});
+                        chatId = newChat.id;
+                        localStorage.setItem('kristina_chat_id', chatId);
                     }
                 }
-                
-                // Создаём новый чат
-                const newChat = await fetchAPI('/api/widget/chats', 'POST', {});
-                chatId = newChat.id;
-                localStorage.setItem('kristina_chat_id', chatId);
-                console.log('✅ Created new chat:', chatId);
-                
-                loadMessages();
-                if (!userName) showNameForm();
-            } catch (e) {
-                console.error('❌ Ошибка инициализации:', e);
-                alert('❌ Ошибка подключения к чату: ' + e.message);
-            }
+                loadMessages(); if (!userName) showNameForm();
+            } catch (e) { alert('❌ Ошибка: ' + e.message); }
         }
 
-        // Показ формы имени
-        function showNameForm() {
-            if (nameForm) {
-                nameForm.classList.add('active');
-                chatWindow.classList.remove('active');
-                dealForm.classList.remove('active');
-                
-                // Фокус на поле ввода
-                setTimeout(() => {
-                    if (userNameInput) userNameInput.focus();
-                }, 100);
-            }
-        }
-
-        // Обработчик кнопки "Представиться"
+        function showNameForm() { if (nameForm) { nameForm.classList.add('active'); chatWindow.classList.remove('active'); dealForm.classList.remove('active'); setTimeout(() => { if (userNameInput) userNameInput.focus(); }, 100); } }
         if (nameSubmit) {
             nameSubmit.addEventListener('click', async () => {
                 const name = userNameInput ? userNameInput.value.trim() : '';
-                
-                if (!name) {
-                    alert('❌ Пожалуйста, введите ваше имя');
-                    return;
-                }
-                
+                if (!name) { alert('❌ Введите имя'); return; }
                 try {
-                    userName = name;
-                    localStorage.setItem('kristina_user_name', userName);
-                    
-                    // Сохраняем имя в чате
-                    if (chatId) {
-                        await fetchAPI(`/api/widget/chat/${chatId}/set_client_name`, 'POST', { name: userName });
-                    }
-                    
-                    // Закрываем форму и открываем чат
-                    if (nameForm) nameForm.classList.remove('active');
-                    if (chatWindow) chatWindow.classList.add('active');
-                    
-                    console.log('✅ Имя сохранено:', userName);
-                } catch (e) {
-                    console.error('❌ Ошибка сохранения имени:', e);
-                    alert('❌ Ошибка: ' + e.message);
-                }
+                    userName = name; localStorage.setItem('kristina_user_name', userName);
+                    if (chatId) await fetchAPI(`/api/widget/chat/${chatId}/set_client_name`, 'POST', { name: userName });
+                    if (nameForm) nameForm.classList.remove('active'); if (chatWindow) chatWindow.classList.add('active');
+                } catch (e) { alert('❌ ' + e.message); }
             });
         }
+        if (userNameInput && nameSubmit) { userNameInput.addEventListener('keypress', e => { if (e.key === 'Enter') nameSubmit.click(); }); }
 
-        // Отправка по Enter в форме имени
-        if (userNameInput && nameSubmit) {
-            userNameInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    nameSubmit.click();
-                }
-            });
-        }
-
-        // Загрузка сообщений
         async function loadMessages() {
             if (!chatId) return;
-            
             try {
-                const response = await fetchAPI(`/api/widget/messages/${chatId}`);
-                messages = response.messages || [];
-                formRequested = response.form_requested || false;
-                
+                const res = await fetchAPI(`/api/widget/messages/${chatId}`);
+                messages = res.messages || []; formRequested = res.form_requested || false;
                 renderMessages();
-                
-                // Показываем форму если запрошена
                 if (formRequested && !dealForm.classList.contains('active') && !chatWindow.classList.contains('active') && (!nameForm || !nameForm.classList.contains('active'))) {
-                    showDealForm();
+                    if (nameForm) nameForm.classList.remove('active'); dealForm.classList.add('active');
                 }
-            } catch (e) {
-                console.error('❌ Ошибка загрузки:', e);
-            }
+            } catch (e) {}
         }
 
-        // ✅ ОБНОВЛЁННОЕ ОТОБРАЖЕНИЕ С ПАРСЕРОМ AI-КНОПОК И ПРЕВЬЮ ФАЙЛОВ
         function renderMessages() {
-            if (messages.length === 0) {
-                chatMessages.innerHTML = `
-                    <div class="empty-state" style="text-align: center; padding: 40px; opacity: 0.6; color: #94a3b8;">
-                        💬 Начните общение...
-                    </div>
-                `;
-                return;
-            }
-            
+            if (!messages.length) { chatMessages.innerHTML = '<div class="empty-state" style="text-align:center;padding:40px;opacity:0.6;color:#94a3b8">💬 Начните общение...</div>'; return; }
             chatMessages.innerHTML = messages.map(msg => {
                 const isUser = msg.sender === 'user';
                 let content = msg.text || '';
-                
-                // Поддержка как file_url, так и files (для обратной совместимости)
                 if (msg.file_url) {
                     const isImage = msg.file_url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
                     const isVideo = msg.file_url.match(/\.(mp4|mov|avi)$/i);
-                    if (isImage) {
-                        content += `<div class="kristina-message-file"><img src="${msg.file_url}" alt="img"></div>`;
-                    } else if (isVideo) {
-                        content += `<div class="kristina-message-file"><video controls src="${msg.file_url}"></video></div>`;
-                    } else {
-                        content += `<div class="kristina-message-file"><a href="${msg.file_url}" target="_blank" class="kristina-file-link">📄 ${msg.file_url.split('/').pop()}</a></div>`;
-                    }
-                } else if (msg.files && msg.files.length) {
-                    msg.files.forEach(file => {
-                        const isImage = file.url && file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-                        if (isImage) {
-                            content += `<div class="kristina-message-file"><img src="${file.url}" alt="${file.name}"></div>`;
-                        } else {
-                            content += `<div class="kristina-message-file"><a href="${file.url}" target="_blank" class="kristina-file-link">📄 ${file.name || 'Файл'}</a></div>`;
-                        }
-                    });
+                    if (isImage) content += `<div class="kristina-message-file"><img src="${msg.file_url}" alt="img"></div>`;
+                    else if (isVideo) content += `<div class="kristina-message-file"><video controls src="${msg.file_url}"></video></div>`;
+                    else content += `<div class="kristina-message-file"><a href="${msg.file_url}" target="_blank" class="kristina-file-link">📄 ${msg.file_url.split('/').pop()}</a></div>`;
                 }
-                
                 const displayText = msg.sender === 'admin' ? parseAIMessage(content) : content;
-                
-                return `
-                    <div class="kristina-message ${isUser ? 'kristina-message-user' : 'kristina-message-admin'}">
-                        ${displayText}
-                    </div>
-                `;
+                return `<div class="kristina-message ${isUser ? 'kristina-message-user' : 'kristina-message-admin'}">${displayText}</div>`;
             }).join('');
-            
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Форма заявки
-        function showDealForm() {
-            if (chatWindow) chatWindow.classList.remove('active');
-            if (dealForm) dealForm.classList.add('active');
-            
-            // Автозаполнение имени
-            if (userName && document.getElementById('dealClientName')) {
-                document.getElementById('dealClientName').value = userName;
-            }
-        }
-
-        if (formClose) {
-            formClose.addEventListener('click', () => {
-                if (dealForm) dealForm.classList.remove('active');
-                if (chatWindow) chatWindow.classList.add('active');
-            });
-        }
-
-        if (formCancel) {
-            formCancel.addEventListener('click', () => {
-                if (dealForm) dealForm.classList.remove('active');
-                if (chatWindow) chatWindow.classList.add('active');
-            });
-        }
-
-        // Отправка заявки
+        function showDealForm() { if (chatWindow) chatWindow.classList.remove('active'); if (dealForm) dealForm.classList.add('active'); if (userName && document.getElementById('dealClientName')) document.getElementById('dealClientName').value = userName; }
+        if (formClose) { formClose.addEventListener('click', () => { if (dealForm) dealForm.classList.remove('active'); if (chatWindow) chatWindow.classList.add('active'); }); }
+        if (formCancel) { formCancel.addEventListener('click', () => { if (dealForm) dealForm.classList.remove('active'); if (chatWindow) chatWindow.classList.add('active'); }); }
         if (formSubmit) {
             formSubmit.addEventListener('click', async () => {
-                const data = {
-                    chat_id: chatId,
-                    client_name: document.getElementById('dealClientName').value.trim(),
-                    sphere: document.getElementById('dealSphere').value.trim(),
-                    request: document.getElementById('dealRequest').value.trim(),
-                    budget: document.getElementById('dealBudget').value.trim(),
-                    contact_method: document.getElementById('dealContactMethod').value,
-                    contact_nickname: document.getElementById('dealContactNickname').value.trim()
-                };
-                
-                // Валидация
-                if (!data.client_name || !data.sphere || !data.request || !data.budget || !data.contact_method || !data.contact_nickname) {
-                    alert('❌ Заполните все обязательные поля');
-                    return;
-                }
-                
-                // Валидация мессенджера
+                const data = { chat_id: chatId, client_name: document.getElementById('dealClientName').value.trim(), sphere: document.getElementById('dealSphere').value.trim(), request: document.getElementById('dealRequest').value.trim(), budget: document.getElementById('dealBudget').value.trim(), contact_method: document.getElementById('dealContactMethod').value, contact_nickname: document.getElementById('dealContactNickname').value.trim() };
+                if (!data.client_name || !data.sphere || !data.request || !data.budget || !data.contact_method || !data.contact_nickname) { alert('❌ Заполните все поля'); return; }
                 const blocked = ['max', 'макс', 'макс к', 'макс.к', 'max.k'];
-                if (blocked.includes(data.contact_method.toLowerCase())) {
-                    alert('❌ Укажите Telegram, VK, Одноклассники, Instagram или TenChat');
-                    return;
-                }
-                
-                try {
-                    await fetchAPI('/api/widget/deals', 'POST', data);
-                    alert('✅ Заявка отправлена! Мы свяжемся с вами soon.');
-                    if (dealForm) dealForm.classList.remove('active');
-                    if (widgetBtn) widgetBtn.style.display = 'flex';
-                    isOpen = false;
-                } catch (e) {
-                    alert('❌ Ошибка отправки: ' + e.message);
-                }
+                if (blocked.includes(data.contact_method.toLowerCase())) { alert('❌ Укажите разрешённый мессенджер'); return; }
+                try { await fetchAPI('/api/widget/deals', 'POST', data); alert('✅ Заявка отправлена!'); if (dealForm) dealForm.classList.remove('active'); if (widgetBtn) widgetBtn.style.display = 'flex'; isOpen = false; } catch (e) { alert('❌ ' + e.message); }
             });
         }
 
-        // ✅ ЛОГИКА ФОРМЫ "ПОДАРОК/ПОЗЖЕ"
-        if (lateCancel) {
-            lateCancel.addEventListener('click', () => {
-                if (lateForm) lateForm.classList.remove('active');
-                if (chatWindow) chatWindow.classList.add('active');
-            });
-        }
-        
+        if (lateCancel) { lateCancel.addEventListener('click', () => { if (lateForm) lateForm.classList.remove('active'); if (chatWindow) chatWindow.classList.add('active'); }); }
         if (lateSubmit) {
             lateSubmit.addEventListener('click', async () => {
-                const method = lateMethod.value;
-                const nickname = lateNickname.value.trim();
-                
-                if (!method || !nickname) {
-                    alert('❌ Укажите мессенджер и никнейм');
-                    return;
-                }
-                
+                const method = lateMethod.value; const nickname = lateNickname.value.trim();
+                if (!method || !nickname) { alert('❌ Укажите мессенджер и никнейм'); return; }
                 try {
-                    await fetchAPI('/api/widget/capture_late_contact', 'POST', {
-                        chat_id: chatId,
-                        contact_method: method,
-                        contact_nickname: nickname
-                    });
-                    alert('🎁 Отлично! Мы свяжемся с вами для отправки подарка.');
+                    await fetchAPI('/api/widget/capture_late_contact', 'POST', { chat_id: chatId, contact_method: method, contact_nickname: nickname });
+                    alert('🎁 Отлично! Мы свяжемся с вами.');
                     if (lateForm) lateForm.classList.remove('active');
                     if (widgetBtn) widgetBtn.style.display = 'flex';
                     isOpen = false;
-                } catch (e) {
-                    alert('❌ Ошибка: ' + e.message);
-                }
+                } catch (e) { alert('❌ Ошибка: ' + e.message); }
             });
         }
 
-        // Автообновление сообщений
         setInterval(loadMessages, 3000);
-        
-        // Запускаем инициализацию чата
-        initChat();
-        
         console.log('✅ Widget initialized successfully');
-        
-    } catch (error) {
-        console.error('❌ Widget initialization error:', error);
-    }
-
+    } catch (error) { console.error('❌ Widget initialization error:', error); }
 })();
+
+
+              </script>
+                        </body>
+                        </html>
+                    
