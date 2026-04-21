@@ -264,7 +264,7 @@ def delete_site(site_id):
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-# === ЧАТЫ И СООБЩЕНИЯ ===
+# === ЧАТЫ И СООБЩЕНИЯ (CRM) ===
 @app.route('/api/chats', methods=['GET'])
 @token_required
 def get_chats():
@@ -563,7 +563,7 @@ def get_admin_settings():
 def update_admin_settings():
     try:
         data = request.json
-        if 'show_client_chats' in data:  # ✅ ИСПРАВЛЕНО: добавлено "data:"
+        if 'show_client_chats' in 
             request.current_user.show_client_chats = data['show_client_chats']
             db.session.commit()
         return jsonify({"ok": True})
@@ -766,6 +766,33 @@ def widget_capture_late_contact():
         if owner and owner.telegram_chat_id: send_telegram_notification(owner.telegram_chat_id, f"🎁 <b>Новый контакт (подарок)!</b>\n📱 {data.get('contact_method')} @{data.get('contact_nickname')}")
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
+
+# === ДОПОЛНИТЕЛЬНЫЕ ЭНДПОИНТЫ (ДЛЯ CRM ИНТЕРФЕЙСА) ===
+
+# ✅ Эндпоинт для индикатора "печатает" (CRM)
+@app.route('/api/typing', methods=['POST'])
+@token_required
+def crm_typing():
+    try:
+        return jsonify({"ok": True})
+    except Exception as e: 
+        return jsonify({"error": str(e)}), 500
+
+# ✅ Эндпоинт для отправки формы заявки (CRM)
+@app.route('/api/chat/<int:chat_id>/request_form', methods=['POST'])
+@token_required
+def request_form(chat_id):
+    try:
+        chat = Chat.query.get(chat_id)
+        if not chat: return jsonify({"error": "Чат не найден"}), 404
+        if not request.current_user.is_admin and chat.user_id != request.current_user.id:
+            return jsonify({"error": "Доступ запрещен"}), 403
+        
+        chat.form_requested = True
+        db.session.commit()
+        return jsonify({"ok": True})
+    except Exception as e: 
+        return jsonify({"error": str(e)}), 500
 
 # === ЗАПУСК ===
 with app.app_context():
