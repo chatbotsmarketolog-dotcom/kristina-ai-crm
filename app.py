@@ -31,7 +31,7 @@ def validate_contact_method(method):
     if method_lower not in allowed: return False, f"❌ '{method}' не в списке разрешённых."
     return True, None
 
-# === МОДЕЛИ БАЗЫ ДАННЫХ (БЕЗ unread_count) ===
+# === МОДЕЛИ БАЗЫ ДАННЫХ ===
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
@@ -264,7 +264,7 @@ def delete_site(site_id):
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-# === ЧАТЫ И СООБЩЕНИЯ (CRM) - УБРАНО unread_count ===
+# === ЧАТЫ И СООБЩЕНИЯ ===
 @app.route('/api/chats', methods=['GET'])
 @token_required
 def get_chats():
@@ -384,7 +384,7 @@ def send_message():
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-# === AI АГЕНТЫ И TELEGRAM БОТЫ ===
+# === AI АГЕНТЫ ===
 @app.route('/api/ai/agents', methods=['GET'])
 @token_required
 def get_user_agents():
@@ -563,7 +563,7 @@ def get_admin_settings():
 def update_admin_settings():
     try:
         data = request.json
-        if 'show_client_chats' in 
+        if 'show_client_chats' in data:  # ✅ ИСПРАВЛЕНО: добавлено "data:"
             request.current_user.show_client_chats = data['show_client_chats']
             db.session.commit()
         return jsonify({"ok": True})
