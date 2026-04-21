@@ -6,7 +6,7 @@
 <title>Панель | КРИСТИНА.AI CRM</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--text:#e2e8f0;--success:#10b981;--danger:#ef4444;--typing:#fbbf24;--badge:#ef4444}
+:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--text:#e2e8f0;--success:#10b981;--danger:#ef4444;--typing:#fbbf24}
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 .header{background:var(--panel);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
@@ -17,21 +17,23 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .container{padding:16px;flex:1;overflow-y:auto}
 .section{display:none}.section.active{display:block}
 @media(max-width:768px){.header{padding:10px}.header h2{font-size:0.9rem;width:100%;order:1;margin-bottom:10px}.nav{width:100%;order:2;justify-content:space-between}.nav .btn{flex:1;margin:2px;padding:8px;font-size:0.8rem}.card{padding:12px;margin-bottom:12px}.chat-container{grid-template-columns:1fr!important;height:calc(100vh - 60px)!important}table{font-size:0.75rem}th,td{padding:6px}}
-.chat-container{display:grid;grid-template-columns:280px 1fr;gap:16px;height:calc(100vh - 100px)}
-.chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+
+/* ✅ ИСПРАВЛЕНО: Чат СПРАВА, список слева */
+.chat-container{display:grid;grid-template-columns:320px 1fr;gap:16px;height:calc(100vh - 100px)}
+.chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;order:1}
 .chat-list-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between}
 .chat-items{flex:1;overflow-y:auto}
-.chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;display:flex;justify-content:space-between;align-items:center;position:relative}
+.chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
 .chat-item:hover,.chat-item.active{background:rgba(59,130,246,0.15)}
 .chat-meta{display:flex;flex-direction:column;gap:4px;flex:1}
-.chat-title{font-size:0.85rem;font-weight:500;display:flex;align-items:center;gap:6px}
-.chat-badge{background:var(--badge);color:white;font-size:0.7rem;padding:2px 6px;border-radius:10px;font-weight:600}
+.chat-title{font-size:0.85rem;font-weight:500}
 .chat-status{font-size:0.75rem;opacity:0.7;color:var(--typing)}
-.chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column;height:100%}
+.chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column;height:100%;order:2}
 .chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between;align-items:center}
 .chat-header-left{display:flex;align-items:center;gap:10px}
-.chat-back-btn{background:none;border:none;color:var(--text);font-size:1.2rem;cursor:pointer;padding:4px 8px;border-radius:6px}
+.chat-back-btn{background:none;border:none;color:var(--text);font-size:1.2rem;cursor:pointer;padding:4px 8px;border-radius:6px;display:none}
 .chat-back-btn:hover{background:rgba(255,255,255,0.1)}
+@media(max-width:768px){.chat-back-btn{display:block}}
 .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:8px}
 .chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px;align-items:center}
 .chat-input input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
@@ -94,10 +96,13 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;bor
       <div class="tab" onclick="switchChatTab('archived')">📁 Архив</div>
     </div>
     <div class="chat-container">
+      <!-- СПИСОК ЧАТОВ СЛЕВА -->
       <div class="chat-list" id="chatListPanel">
         <div class="chat-list-header"><span>📂 Диалоги</span> <span id="chatCount" style="font-size:0.8rem;opacity:0.6">0</span></div>
         <div class="chat-items" id="chatList"><div class="empty-state">Нет диалогов</div></div>
       </div>
+      
+      <!-- ОКНО ЧАТА СПРАВА -->
       <div class="chat-window hidden" id="chatWindowPanel">
         <div class="chat-header">
           <div class="chat-header-left">
@@ -121,6 +126,7 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;bor
     </div>
   </div>
 
+  <!-- Остальные секции (sites, ai, deals, admin, profile, support) остаются без изменений -->
   <div id="sites" class="section">
     <div class="card"><h3>🌐 Добавить сайт</h3><div style="display:flex;gap:10px"><input type="text" id="siteUrl" placeholder="https://site.com" style="flex:1;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)"><button class="btn" onclick="addSite()">➕ Добавить</button></div></div>
     <div class="card"><h3>📋 Инструкция</h3><div class="instruction"><ol><li>Добавьте сайт</li><li>Дождитесь одобрения админом</li><li>Скопируйте код из карточки сайта</li><li>Вставьте перед &lt;/body&gt; на вашем сайте</li></ol></div></div>
@@ -329,10 +335,9 @@ async function loadChats(){
         ? c.map(x => {
             const statusHtml = x.is_typing ? '<span class="chat-status">✍️ печатает...</span>' : `<span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'Онлайн':'Ожидание'}</span>`;
             const dealHtml = x.deal_status ? `<div style="font-size:0.7rem;opacity:0.6">${x.deal_status}</div>` : '';
-            const badgeHtml = x.unread_count > 0 ? `<span class="chat-badge">${x.unread_count}</span>` : '';
             return `<div class="chat-item ${x.id==activeChatId?'active':''}" onclick="openChat(${x.id},'${x.site}')">
                 <div class="chat-meta">
-                    <div class="chat-title">${x.site} ${badgeHtml}</div>
+                    <div class="chat-title">${x.site}</div>
                     ${statusHtml}
                     ${dealHtml}
                 </div>
@@ -357,7 +362,6 @@ async function loadArchivedChats() {
 function showChatList(){document.getElementById('chatListPanel').classList.remove('hidden');document.getElementById('chatWindowPanel').classList.add('hidden');}
 function showChatWindow(){document.getElementById('chatListPanel').classList.add('hidden');document.getElementById('chatWindowPanel').classList.remove('hidden');}
 
-// ✅ НОВАЯ ФУНКЦИЯ: Закрыть чат и вернуться к списку
 function closeChat(){
     activeChatId = null;
     if(pollInterval) clearInterval(pollInterval);
