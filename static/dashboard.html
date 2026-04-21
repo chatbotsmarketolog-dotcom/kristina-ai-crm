@@ -6,15 +6,14 @@
 <title>Панель | КРИСТИНА.AI CRM</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--text:#e2e8f0;--success:#10b981;--danger:#ef4444;--typing:#fbbf24}
+:root{--bg:#0b132b;--panel:rgba(15,23,42,0.85);--acc:#3b82f6;--text:#e2e8f0;--success:#10b981;--danger:#ef4444;--typing:#fbbf24;--badge:#ef4444}
 *{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
 body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
 .header{background:var(--panel);padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .header h2{font-size:1rem;display:flex;align-items:center;gap:8px}
 .nav{display:flex;gap:6px;flex-wrap:wrap}
 .btn{padding:6px 12px;background:var(--acc);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem}
-.btn:hover{opacity:0.85}
-.btn-red{background:var(--danger)}.btn-green{background:var(--success)}.btn-sm{padding:4px 8px;font-size:0.75rem}
+.btn:hover{opacity:0.85}.btn-red{background:var(--danger)}.btn-green{background:var(--success)}.btn-sm{padding:4px 8px;font-size:0.75rem}
 .container{padding:16px;flex:1;overflow-y:auto}
 .section{display:none}.section.active{display:block}
 @media(max-width:768px){.header{padding:10px}.header h2{font-size:0.9rem;width:100%;order:1;margin-bottom:10px}.nav{width:100%;order:2;justify-content:space-between}.nav .btn{flex:1;margin:2px;padding:8px;font-size:0.8rem}.card{padding:12px;margin-bottom:12px}.chat-container{grid-template-columns:1fr!important;height:calc(100vh - 60px)!important}table{font-size:0.75rem}th,td{padding:6px}}
@@ -22,13 +21,17 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
 .chat-list-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between}
 .chat-items{flex:1;overflow-y:auto}
-.chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.chat-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.06);cursor:pointer;display:flex;justify-content:space-between;align-items:center;position:relative}
 .chat-item:hover,.chat-item.active{background:rgba(59,130,246,0.15)}
 .chat-meta{display:flex;flex-direction:column;gap:4px;flex:1}
-.chat-title{font-size:0.85rem;font-weight:500}
+.chat-title{font-size:0.85rem;font-weight:500;display:flex;align-items:center;gap:6px}
+.chat-badge{background:var(--badge);color:white;font-size:0.7rem;padding:2px 6px;border-radius:10px;font-weight:600}
 .chat-status{font-size:0.75rem;opacity:0.7;color:var(--typing)}
 .chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column;height:100%}
 .chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.chat-header-left{display:flex;align-items:center;gap:10px}
+.chat-back-btn{background:none;border:none;color:var(--text);font-size:1.2rem;cursor:pointer;padding:4px 8px;border-radius:6px}
+.chat-back-btn:hover{background:rgba(255,255,255,0.1)}
 .chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:8px}
 .chat-input{padding:16px;border-top:1px solid rgba(255,255,255,0.08);display:flex;gap:8px;align-items:center}
 .chat-input input{flex:1;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(0,0,0,0.3);color:var(--text)}
@@ -36,7 +39,6 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .msg-admin{background:rgba(255,255,255,0.15)}.msg-user{background:rgba(16,185,129,0.35)}
 .msg-header{font-size:0.75rem;margin-bottom:4px;font-weight:600;opacity:0.9;color:#93c5fd}
 .msg-text{line-height:1.4}
-.msg-status{font-size:0.6rem;opacity:0.6;margin-top:4px;text-align:right}
 .empty-state{text-align:center;padding:40px;opacity:0.6}
 .card{background:var(--panel);border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.08)}
 .card h3{margin-bottom:16px;color:#fff}
@@ -98,7 +100,10 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;bor
       </div>
       <div class="chat-window hidden" id="chatWindowPanel">
         <div class="chat-header">
-          <span id="chatTitle">Выберите диалог</span>
+          <div class="chat-header-left">
+            <button class="chat-back-btn" onclick="closeChat()">←</button>
+            <span id="chatTitle">Выберите диалог</span>
+          </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-sm" onclick="archiveCurrentChat()">📁 В архив</button>
             <button class="btn btn-red btn-sm" onclick="deleteCurrentChat()">🗑️</button>
@@ -262,32 +267,13 @@ if (!token) window.location.href = '/index.html';
 if (isAdmin) document.getElementById('adminBtn').style.display = 'inline-block';
 
 async function fetchAPI(url, method = 'GET', body = null, useFormData = false) {
-    const options = {
-        method,
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    };
-    
-    if (!useFormData) {
-        options.headers['Content-Type'] = 'application/json';
-    }
-    
+    const options = { method, headers: { 'Authorization': `Bearer ${token}` } };
+    if (!useFormData) options.headers['Content-Type'] = 'application/json';
     const fullUrl = API + url;
-    
-    if (body) {
-        options.body = JSON.stringify(body);
-    }
-    
+    if (body) options.body = JSON.stringify(body);
     const response = await fetch(fullUrl, options);
-    
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-    
+    if (!response.ok) { const errorText = await response.text(); throw new Error(`HTTP ${response.status}: ${errorText}`); }
     if (response.status === 204) return null;
-    
     return response.json();
 }
 
@@ -343,9 +329,10 @@ async function loadChats(){
         ? c.map(x => {
             const statusHtml = x.is_typing ? '<span class="chat-status">✍️ печатает...</span>' : `<span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'Онлайн':'Ожидание'}</span>`;
             const dealHtml = x.deal_status ? `<div style="font-size:0.7rem;opacity:0.6">${x.deal_status}</div>` : '';
+            const badgeHtml = x.unread_count > 0 ? `<span class="chat-badge">${x.unread_count}</span>` : '';
             return `<div class="chat-item ${x.id==activeChatId?'active':''}" onclick="openChat(${x.id},'${x.site}')">
                 <div class="chat-meta">
-                    <div class="chat-title">${x.site}</div>
+                    <div class="chat-title">${x.site} ${badgeHtml}</div>
                     ${statusHtml}
                     ${dealHtml}
                 </div>
@@ -369,6 +356,14 @@ async function loadArchivedChats() {
 
 function showChatList(){document.getElementById('chatListPanel').classList.remove('hidden');document.getElementById('chatWindowPanel').classList.add('hidden');}
 function showChatWindow(){document.getElementById('chatListPanel').classList.add('hidden');document.getElementById('chatWindowPanel').classList.remove('hidden');}
+
+// ✅ НОВАЯ ФУНКЦИЯ: Закрыть чат и вернуться к списку
+function closeChat(){
+    activeChatId = null;
+    if(pollInterval) clearInterval(pollInterval);
+    showChatList();
+    loadChats();
+}
 
 async function openChat(id, site){
     activeChatId = id;
@@ -403,33 +398,22 @@ async function loadMessages(){
                 const msgClass = isFromAdmin ? 'msg-admin' : 'msg-user';
                 let content = x.text || '';
                 
-                // ✅ ОБРАБОТКА ФАЙЛОВ
                 if (x.file_url) {
                     const isImage = x.file_url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
                     const isVideo = x.file_url.match(/\.(mp4|mov|avi)$/i);
-                    if (isImage) {
-                        content += `<div class="file-preview"><img src="${x.file_url}" alt="img"></div>`;
-                    } else if (isVideo) {
-                        content += `<div class="file-preview"><video controls src="${x.file_url}"></video></div>`;
-                    } else {
-                        content += `<div class="file-preview"><a href="${x.file_url}" target="_blank">📄 Скачать файл</a></div>`;
-                    }
+                    if (isImage) content += `<div class="file-preview"><img src="${x.file_url}" alt="img"></div>`;
+                    else if (isVideo) content += `<div class="file-preview"><video controls src="${x.file_url}"></video></div>`;
+                    else content += `<div class="file-preview"><a href="${x.file_url}" target="_blank">📄 Скачать файл</a></div>`;
                 }
-                
-                let statusText = '';
-                if (isFromAdmin) statusText = x.is_read ? '✅ Прочитано' : '🕒 Отправлено';
                 
                 return `<div class="msg ${msgClass}">
                     <div class="msg-header">${senderName}</div>
                     <div class="msg-text">${content}</div>
-                    ${statusText ? `<div class="msg-status">${statusText}</div>` : ''}
                 </div>`;
             }).join('');
             document.getElementById('chatMessages').scrollTop = 9999;
         }
-    } catch(e) {
-        console.error('Load messages error:', e);
-    }
+    } catch(e) { console.error('Load messages error:', e); }
 }
 
 async function sendMessage(){
@@ -440,12 +424,9 @@ async function sendMessage(){
         document.getElementById('msgInput').value = '';
         loadMessages();
         loadChats();
-    } catch(e) {
-        alert('❌ Ошибка отправки: ' + e.message);
-    }
+    } catch(e) { alert('❌ Ошибка отправки: ' + e.message); }
 }
 
-// ✅ ОТПРАВКА ФАЙЛОВ
 document.getElementById('fileInput').addEventListener('change', async (e) => {
     const files = e.target.files; if(!files.length) return;
     for(let file of files) {
@@ -463,7 +444,6 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     e.target.value = '';
 });
 
-// ✅ ИНДИКАТОР ПЕЧАТИ
 document.getElementById('msgInput').addEventListener('input', () => {
     if(activeChatId) fetchAPI('/typing', 'POST', {chat_id: activeChatId}).catch(()=>{});
 });
@@ -493,14 +473,8 @@ async function deleteChat(id){
     try {
         await fetchAPI(`/chats/${id}/delete`, 'POST');
         loadChats();
-        if(activeChatId === id) {
-            document.getElementById('chatListPanel').classList.remove('hidden');
-            document.getElementById('chatWindowPanel').classList.add('hidden');
-            activeChatId = null;
-        }
-    } catch(e) {
-        alert('❌ Ошибка удаления: ' + e.message);
-    }
+        if(activeChatId === id) closeChat();
+    } catch(e) { alert('❌ Ошибка удаления: ' + e.message); }
 }
 
 async function loadPendingSites(){
@@ -508,10 +482,7 @@ async function loadPendingSites(){
     try {
         const sites = await fetchAPI('/sites/pending');
         const el = document.getElementById('pendingSitesList');
-        if(!sites || sites.length === 0) {
-            el.innerHTML = '<p style="opacity:0.6">Нет запросов на одобрение</p>';
-            return;
-        }
+        if(!sites || sites.length === 0) { el.innerHTML = '<p style="opacity:0.6">Нет запросов на одобрение</p>'; return; }
         el.innerHTML = sites.map(site => `
             <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;margin:8px 0">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -524,10 +495,7 @@ async function loadPendingSites(){
                 </div>
             </div>
         `).join('');
-    } catch(e) {
-        console.error('Load pending sites error:', e);
-        document.getElementById('pendingSitesList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>';
-    }
+    } catch(e) { console.error('Load pending sites error:', e); document.getElementById('pendingSitesList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>'; }
 }
 
 async function loadDeletedSites(){
@@ -536,199 +504,85 @@ async function loadDeletedSites(){
         const sites = await fetchAPI('/sites?show_deleted=true');
         const deletedSites = sites.filter(s => s.is_deleted);
         const el = document.getElementById('deletedSitesList');
-        if(!deletedSites || deletedSites.length === 0) {
-            el.innerHTML = '<p style="opacity:0.6">Нет удалённых сайтов</p>';
-            return;
-        }
+        if(!deletedSites || deletedSites.length === 0) { el.innerHTML = '<p style="opacity:0.6">Нет удалённых сайтов</p>'; return; }
         el.innerHTML = deletedSites.map(site => `
             <div style="padding:12px;background:rgba(239,68,68,0.1);border-radius:8px;margin:8px 0;border-left:4px solid var(--danger)">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
                     <div>
                         <div style="font-weight:600;color:var(--danger)">🗑️ ${site.url}</div>
-                        <div style="font-size:0.75rem;opacity:0.7">
-                            Владелец: ${site.owner || 'Unknown'} | 
-                            Удалён: ${site.deleted_at ? new Date(site.deleted_at).toLocaleString('ru-RU') : '-'}
-                        </div>
+                        <div style="font-size:0.75rem;opacity:0.7">Владелец: ${site.owner || 'Unknown'} | Удалён: ${site.deleted_at ? new Date(site.deleted_at).toLocaleString('ru-RU') : '-'}</div>
                     </div>
-                    <div style="display:flex;gap:8px">
-                        <button class="btn btn-green btn-sm" onclick="restoreSite(${site.id}, '${site.url.replace(/'/g, "\\'")}')">♻️ Восстановить</button>
-                    </div>
+                    <div style="display:flex;gap:8px"><button class="btn btn-green btn-sm" onclick="restoreSite(${site.id}, '${site.url.replace(/'/g, "\\'")}')">♻️ Восстановить</button></div>
                 </div>
             </div>
         `).join('');
-    } catch(e) {
-        console.error('Load deleted sites error:', e);
-        document.getElementById('deletedSitesList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>';
-    }
+    } catch(e) { console.error('Load deleted sites error:', e); document.getElementById('deletedSitesList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>'; }
 }
 
 async function restoreSite(siteId, siteUrl){
     if(!confirm(`♻️ Восстановить сайт "${siteUrl}"?`)) return;
     try {
         const result = await fetchAPI('/admin/restore_site', 'POST', {site_id: siteId});
-        if(result.ok) {
-            alert('✅ Сайт восстановлен!\n🔑 API ключ: ' + result.api_key);
-            loadDeletedSites();
-            loadSites();
-        } else {
-            alert('❌ Ошибка: ' + (result.error || 'Неизвестная'));
-        }
-    } catch(e) {
-        alert('❌ Ошибка восстановления: ' + e.message);
-    }
+        if(result.ok) { alert('✅ Сайт восстановлен!\n🔑 API ключ: ' + result.api_key); loadDeletedSites(); loadSites(); }
+        else { alert('❌ Ошибка: ' + (result.error || 'Неизвестная')); }
+    } catch(e) { alert('❌ Ошибка восстановления: ' + e.message); }
 }
 
 async function clearAllDeletedSites(){
     if(!confirm('🗑️ НАВСЕГДА удалить все сайты из корзины?\n\nЭто действие нельзя отменить!')) return;
     try {
         const result = await fetchAPI('/admin/clear_deleted_sites', 'POST');
-        if(result.ok) {
-            alert('🗑️ Удалено: ' + result.deleted + ' сайт(ов)');
-            loadDeletedSites();
-        } else {
-            alert('❌ Ошибка: ' + (result.error || 'Неизвестная'));
-        }
-    } catch(e) {
-        alert('❌ Ошибка очистки: ' + e.message);
-    }
+        if(result.ok) { alert('🗑️ Удалено: ' + result.deleted + ' сайт(ов)'); loadDeletedSites(); }
+        else { alert('❌ Ошибка: ' + (result.error || 'Неизвестная')); }
+    } catch(e) { alert('❌ Ошибка очистки: ' + e.message); }
 }
 
-async function approveSite(id){
-    if(!confirm('Одобрить этот сайт?')) return;
-    try {
-        await fetchAPI(`/sites/${id}/approve`, 'POST');
-        alert('✅ Сайт одобрен!');
-        loadPendingSites();
-        loadSites();
-    } catch(e) {
-        alert('❌ Ошибка одобрения: ' + e.message);
-    }
-}
-
-async function rejectSite(id){
-    if(!confirm('Отклонить этот сайт?')) return;
-    try {
-        await fetchAPI(`/sites/${id}/reject`, 'POST');
-        alert('❌ Сайт отклонён');
-        loadPendingSites();
-    } catch(e) {
-        alert('❌ Ошибка отклонения: ' + e.message);
-    }
-}
+async function approveSite(id){ if(!confirm('Одобрить этот сайт?')) return; try { await fetchAPI(`/sites/${id}/approve`, 'POST'); alert('✅ Сайт одобрен!'); loadPendingSites(); loadSites(); } catch(e) { alert('❌ Ошибка одобрения: ' + e.message); } }
+async function rejectSite(id){ if(!confirm('Отклонить этот сайт?')) return; try { await fetchAPI(`/sites/${id}/reject`, 'POST'); alert('❌ Сайт отклонён'); loadPendingSites(); } catch(e) { alert('❌ Ошибка отклонения: ' + e.message); } }
 
 async function loadSites(){
     const s = await fetchAPI('/sites');
     if(!s) return;
     const el = document.getElementById('siteList');
-    if(!s.length){
-        const title = isAdmin ? '📂 Сайты клиентов' : '🌐 Мои сайты';
-        el.innerHTML=`<h3>${title}</h3><p style="opacity:0.6">Пусто</p>`;
-        return;
-    }
-    
+    if(!s.length){ const title = isAdmin ? '📂 Сайты клиентов' : '🌐 Мои сайты'; el.innerHTML=`<h3>${title}</h3><p style="opacity:0.6">Пусто</p>`; return; }
     const title = isAdmin ? '📂 Сайты клиентов' : '🌐 Мои сайты';
     let html = `<h3>${title}</h3>`;
-    
     s.forEach(x => {
         if(x.is_deleted) return;
-
         let codeBlock = '';
         if(x.status === 'active') {
             const uniqueCode = '<script>\n    window.KRISTINA_API_URL = "https://kristina-crm-api.onrender.com";\n    window.KRISTINA_API_KEY = "' + x.api_key + '";\n<\/script>\n<script src="https://kristina-crm-api.onrender.com/static/widget.js"><\/script>';
-            
-            codeBlock = `
-                <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1)">
-                    <div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">📋 Код для вставки на сайт:</div>
-                    <div class="code-box" id="code-${x.id}">${escapeHtml(uniqueCode)}</div>
-                    <button class="copy-btn" onclick="copySiteCode('code-${x.id}')">📋 Копировать код</button>
-                </div>`;
-        } else {
-            codeBlock = `<div style="margin-top:8px;font-size:0.8rem;color:#fbbf24">⏳ Ожидает одобрения админом...</div>`;
-        }
-
-        html += `<div class="site-item">
-            <div class="site-item-header">
-                <div>
-                    <div style="font-weight:600">${x.url}</div>
-                    <div style="font-size:0.8rem;opacity:0.6">API: ${x.api_key}</div>
-                    <span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅ Активен':'⏳ Ожидает'}</span>
-                </div>
-                <button class="btn btn-red btn-sm" onclick="deleteSite(${x.id})">🗑️ Удалить</button>
-            </div>
-            ${codeBlock}
-        </div>`;
+            codeBlock = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1)"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">📋 Код для вставки на сайт:</div><div class="code-box" id="code-${x.id}">${escapeHtml(uniqueCode)}</div><button class="copy-btn" onclick="copySiteCode('code-${x.id}')">📋 Копировать код</button></div>`;
+        } else { codeBlock = `<div style="margin-top:8px;font-size:0.8rem;color:#fbbf24">⏳ Ожидает одобрения админом...</div>`; }
+        html += `<div class="site-item"><div class="site-item-header"><div><div style="font-weight:600">${x.url}</div><div style="font-size:0.8rem;opacity:0.6">API: ${x.api_key}</div><span class="status ${x.status=='active'?'status-active':'status-pending'}">${x.status=='active'?'✅ Активен':'⏳ Ожидает'}</span></div><button class="btn btn-red btn-sm" onclick="deleteSite(${x.id})">🗑️ Удалить</button></div>${codeBlock}</div>`;
     });
     el.innerHTML = html;
 }
 
-function addSite(){
-    const u = document.getElementById('siteUrl').value.trim();
-    if(!u) return;
-    fetchAPI('/sites','POST',{url:u}).then(()=>{
-        document.getElementById('siteUrl').value='';
-        loadSites();
-        alert('✅ Добавлен! Ждите одобрения.');
-    }).catch(e => alert('❌ Ошибка: ' + e.message));
-}
+function addSite(){ const u = document.getElementById('siteUrl').value.trim(); if(!u) return; fetchAPI('/sites','POST',{url:u}).then(()=>{ document.getElementById('siteUrl').value=''; loadSites(); alert('✅ Добавлен! Ждите одобрения.'); }).catch(e => alert('❌ Ошибка: ' + e.message)); }
+async function deleteSite(id){ if(!confirm('Удалить сайт?')) return; try{ const r = await fetch(API+`/sites/${id}/delete`, {method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}}); const data = await r.json().catch(()=>({error:'Ошибка'})); if(r.ok){ loadSites(); if(isAdmin) loadDeletedSites(); alert('✅ Удален!'); } else{ alert('❌ '+(data.error||'Ошибка')); } }catch(e){ alert('❌ Ошибка соединения: ' + e.message); } }
+function copySiteCode(elementId){ const code = document.getElementById(elementId).innerText; navigator.clipboard.writeText(code).then(() => alert('✅ Код скопирован! Вставьте его перед </body> на вашем сайте.')); }
 
-async function deleteSite(id){
-    if(!confirm('Удалить сайт?')) return;
-    try{
-        const r = await fetch(API+`/sites/${id}/delete`, {method:'POST', headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});
-        const data = await r.json().catch(()=>({error:'Ошибка'}));
-        if(r.ok){ loadSites(); if(isAdmin) loadDeletedSites(); alert('✅ Удален!'); }
-        else{ alert('❌ '+(data.error||'Ошибка')); }
-    }catch(e){ alert('❌ Ошибка соединения: ' + e.message); }
-}
-
-function copySiteCode(elementId){
-    const code = document.getElementById(elementId).innerText;
-    navigator.clipboard.writeText(code).then(() => alert('✅ Код скопирован! Вставьте его перед </body> на вашем сайте.'));
-}
-
-async function loadAI(){
-    const ai = await fetchAPI('/ai/get');
-    if(!ai) return;
-    document.getElementById('aiName').value = ai.name||'';
-    document.getElementById('aiBehavior').value = ai.behavior||'';
-    document.getElementById('aiForbidden').value = ai.forbidden||'';
-    document.getElementById('aiKnowledge').value = ai.knowledge_base||'';
-    document.getElementById('aiWebToggle').checked = ai.is_active_web||false;
-    document.getElementById('aiHumanity').value = ai.humanity_level||3;
-    document.getElementById('humanityValue').textContent = ai.humanity_level||3;
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+async function loadAI(){ const ai = await fetchAPI('/ai/get'); if(!ai) return; document.getElementById('aiName').value = ai.name||''; document.getElementById('aiBehavior').value = ai.behavior||''; document.getElementById('aiForbidden').value = ai.forbidden||''; document.getElementById('aiKnowledge').value = ai.knowledge_base||''; document.getElementById('aiWebToggle').checked = ai.is_active_web||false; document.getElementById('aiHumanity').value = ai.humanity_level||3; document.getElementById('humanityValue').textContent = ai.humanity_level||3; }
+function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 
 async function loadMyAgents(){
     try {
         const agents = await fetchAPI('/ai/agents');
         const el = document.getElementById('myAgentsList');
-        if(!agents || agents.length === 0) {
-            el.innerHTML = '<p style="opacity:0.6;text-align:center;padding:20px">У вас пока нет веб-агентов.<br>Создайте первого на вкладке "➕ Создать агента" 👆</p>';
-            return;
-        }
+        if(!agents || agents.length === 0) { el.innerHTML = '<p style="opacity:0.6;text-align:center;padding:20px">У вас пока нет веб-агентов.<br>Создайте первого на вкладке "➕ Создать агента" 👆</p>'; return; }
         el.innerHTML = agents.map(a => `
             <div style="padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;margin:12px 0">
                 <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
                     <div>
                         <div style="font-weight:600;font-size:1.1rem">${escapeHtml(a.name)}</div>
-                        <div style="font-size:0.8rem;opacity:0.7;margin-top:4px">
-                            Человечность: ${'😊'.repeat(a.humanity_level)}${'🤖'.repeat(5-a.humanity_level)} (${a.humanity_level}/5)
-                        </div>
+                        <div style="font-size:0.8rem;opacity:0.7;margin-top:4px">Человечность: ${'😊'.repeat(a.humanity_level)}${'🤖'.repeat(5-a.humanity_level)} (${a.humanity_level}/5)</div>
                         ${a.pdfs && a.pdfs.length > 0 ? `<div style="font-size:0.75rem;opacity:0.6;margin-top:4px">📎 PDF: ${a.pdfs.length} файл(ов)</div>` : ''}
                         ${a.linked_website ? `<div style="font-size:0.75rem;opacity:0.7;margin-top:4px">🌐 Сайт: <a href="${a.linked_website.url}" target="_blank" style="color:var(--acc)">${a.linked_website.url}</a></div>` : ''}
                     </div>
                     <div style="display:flex;gap:8px;align-items:center">
                         <span style="font-size:0.75rem;opacity:0.7">${a.is_active_web?'🟢 ВКЛ':'🔴 ВЫКЛ'}</span>
-                        <label class="switch" style="transform:scale(0.9)">
-                            <input type="checkbox" ${a.is_active_web?'checked':''} onchange="toggleAgent(${a.id})">
-                            <span class="slider"></span>
-                        </label>
+                        <label class="switch" style="transform:scale(0.9)"><input type="checkbox" ${a.is_active_web?'checked':''} onchange="toggleAgent(${a.id})"><span class="slider"></span></label>
                     </div>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -739,10 +593,7 @@ async function loadMyAgents(){
                 </div>
             </div>
         `).join('');
-    } catch(e) {
-        console.error('Load agents error:', e);
-        document.getElementById('myAgentsList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>';
-    }
+    } catch(e) { console.error('Load agents error:', e); document.getElementById('myAgentsList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>'; }
 }
 
 function editAgent(agentId){
@@ -760,49 +611,21 @@ function editAgent(agentId){
         editingAgentId = agentId;
         if(agent.pdfs && agent.pdfs.length > 0) {
             const pdfList = document.getElementById('pdfFileList');
-            pdfList.innerHTML = agent.pdfs.map(pdf => `
-                <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin:6px 0;font-size:0.85rem">
-                    <span>📄 ${escapeHtml(pdf.filename)}</span>
-                    <span onclick="deletePdf(${pdf.id})" style="color:var(--danger);cursor:pointer">×</span>
-                </div>
-            `).join('');
+            pdfList.innerHTML = agent.pdfs.map(pdf => `<div style="display:flex;justify-content:space-between;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;margin:6px 0;font-size:0.85rem"><span>📄 ${escapeHtml(pdf.filename)}</span><span onclick="deletePdf(${pdf.id})" style="color:var(--danger);cursor:pointer">×</span></div>`).join('');
         }
         alert('✏️ Внесите изменения и нажмите "Сохранить"');
-    }).catch(e => {
-        console.error('Error loading agent:', e);
-        alert('❌ Ошибка загрузки данных агента');
-    });
+    }).catch(e => { console.error('Error loading agent:', e); alert('❌ Ошибка загрузки данных агента'); });
 }
 
-function connectTelegram(agentId){
-    showSection('profile');
-    setTimeout(() => {
-        document.getElementById('profileTgChatId').focus();
-        alert('🔔 Введите Chat ID и токен бота, затем нажмите "Сохранить" для подключения к агенту');
-    }, 100);
-}
+function connectTelegram(agentId){ showSection('profile'); setTimeout(() => { document.getElementById('profileTgChatId').focus(); alert('🔔 Введите Chat ID и токен бота, затем нажмите "Сохранить" для подключения к агенту'); }, 100); }
 
 async function linkWebsite(agentId){
     const sites = await fetchAPI('/sites');
-    if(!sites || sites.length === 0) {
-        alert('❌ У вас нет сайтов. Сначала добавьте сайт в разделе "Сайты"');
-        return;
-    }
+    if(!sites || sites.length === 0) { alert('❌ У вас нет сайтов. Сначала добавьте сайт в разделе "Сайты"'); return; }
     const siteOptions = sites.filter(s => s.status === 'active').map(s => `<option value="${s.id}">${s.url}</option>`).join('');
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal">
-            <h3 style="margin-bottom:16px">🔗 Выбрать сайт для агента</h3>
-            <select id="linkSiteSelect" style="width:100%;padding:10px;margin-bottom:16px;border-radius:6px;background:rgba(0,0,0,0.3);color:var(--text);border:1px solid rgba(255,255,255,0.1)">
-                ${siteOptions}
-            </select>
-            <div style="display:flex;gap:8px">
-                <button class="btn" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
-                <button class="btn btn-green" onclick="confirmLinkWebsite(${agentId})">✅ Подтвердить выбор</button>
-            </div>
-        </div>
-    `;
+    modal.innerHTML = `<div class="modal"><h3 style="margin-bottom:16px">🔗 Выбрать сайт для агента</h3><select id="linkSiteSelect" style="width:100%;padding:10px;margin-bottom:16px;border-radius:6px;background:rgba(0,0,0,0.3);color:var(--text);border:1px solid rgba(255,255,255,0.1)">${siteOptions}</select><div style="display:flex;gap:8px"><button class="btn" onclick="this.closest('.modal-overlay').remove()">Отмена</button><button class="btn btn-green" onclick="confirmLinkWebsite(${agentId})">✅ Подтвердить выбор</button></div></div>`;
     document.body.appendChild(modal);
 }
 
@@ -810,37 +633,15 @@ async function confirmLinkWebsite(agentId){
     const websiteId = document.getElementById('linkSiteSelect').value;
     try {
         const result = await fetchAPI(`/ai/agents/${agentId}/link_website`, 'POST', {website_id: parseInt(websiteId)});
-        if(result.ok) {
-            alert('✅ Агент привязан к сайту!');
-            document.querySelector('.modal-overlay')?.remove();
-            loadMyAgents();
-        } else {
-            alert('❌ Ошибка: ' + (result.error || 'Неизвестная'));
-        }
-    } catch(e) {
-        alert('❌ Ошибка привязки: ' + e.message);
-    }
+        if(result.ok) { alert('✅ Агент привязан к сайту!'); document.querySelector('.modal-overlay')?.remove(); loadMyAgents(); }
+        else { alert('❌ Ошибка: ' + (result.error || 'Неизвестная')); }
+    } catch(e) { alert('❌ Ошибка привязки: ' + e.message); }
 }
 
-async function deleteAgent(agentId){
-    if(!confirm('Удалить этого агента?')) return;
-    try {
-        await fetchAPI(`/ai/agents/${agentId}/delete`, 'DELETE');
-        loadMyAgents();
-    } catch(e) {
-        alert('❌ Ошибка удаления: ' + e.message);
-    }
-}
+async function deleteAgent(agentId){ if(!confirm('Удалить этого агента?')) return; try { await fetchAPI(`/ai/agents/${agentId}/delete`, 'DELETE'); loadMyAgents(); } catch(e) { alert('❌ Ошибка удаления: ' + e.message); } }
 
 function saveAI(){
-    const data = {
-        name: document.getElementById('aiName').value,
-        behavior: document.getElementById('aiBehavior').value,
-        forbidden: document.getElementById('aiForbidden').value,
-        knowledge_base: document.getElementById('aiKnowledge').value,
-        is_active_web: document.getElementById('aiWebToggle').checked,
-        humanity_level: parseInt(document.getElementById('aiHumanity').value)
-    };
+    const data = { name: document.getElementById('aiName').value, behavior: document.getElementById('aiBehavior').value, forbidden: document.getElementById('aiForbidden').value, knowledge_base: document.getElementById('aiKnowledge').value, is_active_web: document.getElementById('aiWebToggle').checked, humanity_level: parseInt(document.getElementById('aiHumanity').value) };
     const url = editingAgentId ? `/ai/agents/${editingAgentId}` : '/ai/setup';
     const method = editingAgentId ? 'PUT' : 'POST';
     fetchAPI(url, method, data).then(result => {
@@ -857,57 +658,32 @@ function saveAI(){
             document.getElementById('pdfFileList').innerHTML = '';
             document.querySelectorAll('#ai .tab')[0].click();
             loadMyAgents();
-        } else {
-            alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная'));
-        }
-    }).catch(e => {
-        console.error('Save error:', e);
-        alert('❌ Ошибка сохранения: ' + e.message);
-    });
+        } else { alert('❌ Ошибка: ' + (result ? result.error : 'Неизвестная')); }
+    }).catch(e => { console.error('Save error:', e); alert('❌ Ошибка сохранения: ' + e.message); });
 }
 
 function handlePdfFiles(files){
-    if(!editingAgentId) {
-        alert('❌ Сначала сохраните агента, затем загрузите PDF');
-        return;
-    }
+    if(!editingAgentId) { alert('❌ Сначала сохраните агента, затем загрузите PDF'); return; }
     for(let f of files){
         if(f.type !== 'application/pdf') { alert('❌ Только PDF файлы'); return; }
         if(f.size > 10*1024*1024) { alert('❌ Максимум 10МБ'); return; }
         const formData = new FormData();
         formData.append('file', f);
         formData.append('agent_id', editingAgentId);
-        fetch(API + '/ai/upload_pdf', {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${token}`},
-            body: formData
-        }).then(r => r.json()).then(result => {
-            if(result.ok) { alert('✅ PDF загружен!'); loadMyAgents(); }
-            else { alert('❌ Ошибка: ' + (result.error || 'Неизвестная')); }
-        }).catch(e => { alert('❌ Ошибка загрузки: ' + e.message); });
+        fetch(API + '/ai/upload_pdf', { method: 'POST', headers: {'Authorization': `Bearer ${token}`}, body: formData })
+        .then(r => r.json()).then(result => { if(result.ok) { alert('✅ PDF загружен!'); loadMyAgents(); } else { alert('❌ Ошибка: ' + (result.error || 'Неизвестная')); } })
+        .catch(e => { alert('❌ Ошибка загрузки: ' + e.message); });
     }
 }
 
-async function deletePdf(pdfId){
-    if(!confirm('Удалить этот PDF?')) return;
-    try {
-        await fetchAPI(`/ai/delete_pdf/${pdfId}`, 'DELETE');
-        loadMyAgents();
-    } catch(e) { alert('❌ Ошибка удаления PDF: ' + e.message); }
-}
-
-function toggleAgent(agentId){
-    fetchAPI(`/ai/agents/${agentId}/toggle`, 'POST').then(r => { if(r.ok) loadMyAgents(); }).catch(e => alert('❌ Ошибка переключения: ' + e.message));
-}
+async function deletePdf(pdfId){ if(!confirm('Удалить этот PDF?')) return; try { await fetchAPI(`/ai/delete_pdf/${pdfId}`, 'DELETE'); loadMyAgents(); } catch(e) { alert('❌ Ошибка удаления PDF: ' + e.message); } }
+function toggleAgent(agentId){ fetchAPI(`/ai/agents/${agentId}/toggle`, 'POST').then(r => { if(r.ok) loadMyAgents(); }).catch(e => alert('❌ Ошибка переключения: ' + e.message)); }
 
 async function loadDeals(status){
     try {
         const deals = await fetchAPI(`/deals?status=${status}`);
         const el = document.getElementById(status === 'completed' ? 'completedDealsList' : 'declinedDealsList');
-        if(!deals || deals.length === 0) {
-            el.innerHTML = `<p style="opacity:0.6;text-align:center;padding:20px">Нет ${status === 'completed' ? 'совершённых' : 'отклонённых'} сделок</p>`;
-            return;
-        }
+        if(!deals || deals.length === 0) { el.innerHTML = `<p style="opacity:0.6;text-align:center;padding:20px">Нет ${status === 'completed' ? 'совершённых' : 'отклонённых'} сделок</p>`; return; }
         el.innerHTML = deals.map(deal => `
             <div style="padding:16px;background:rgba(255,255,255,0.04);border-radius:12px;margin:12px 0">
                 <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
@@ -923,137 +699,37 @@ async function loadDeals(status){
                     ${deal.status === 'declined' ? `<button class="btn btn-sm" onclick="openChatFromDeal(${deal.chat_id})">💬 Открыть переписку</button>` : ''}
                 </div>
                 <div id="deal-details-${deal.id}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1)">
-                    <div style="font-size:0.85rem;line-height:1.8">
-                        <b>💼 Сфера:</b> ${escapeHtml(deal.sphere)}<br>
-                        <b>📝 Запрос:</b> ${escapeHtml(deal.request)}<br>
-                        <b>💰 Бюджет:</b> ${escapeHtml(deal.budget)}<br>
-                        <b>📱 Контакт:</b> ${escapeHtml(deal.contact_method)} @${escapeHtml(deal.contact_nickname)}
-                    </div>
+                    <div style="font-size:0.85rem;line-height:1.8"><b>💼 Сфера:</b> ${escapeHtml(deal.sphere)}<br><b>📝 Запрос:</b> ${escapeHtml(deal.request)}<br><b>💰 Бюджет:</b> ${escapeHtml(deal.budget)}<br><b>📱 Контакт:</b> ${escapeHtml(deal.contact_method)} @${escapeHtml(deal.contact_nickname)}</div>
                 </div>
             </div>
         `).join('');
-    } catch(e) {
-        console.error('Load deals error:', e);
-        document.getElementById(status === 'completed' ? 'completedDealsList' : 'declinedDealsList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>';
-    }
+    } catch(e) { console.error('Load deals error:', e); document.getElementById(status === 'completed' ? 'completedDealsList' : 'declinedDealsList').innerHTML = '<p style="color:var(--danger)">Ошибка загрузки</p>'; }
 }
 
-function expandDeal(dealId){
-    const details = document.getElementById(`deal-details-${dealId}`);
-    details.style.display = details.style.display === 'none' ? 'block' : 'none';
-}
-
-async function deleteDeal(dealId){
-    if(!confirm('Удалить эту заявку?')) return;
-    try {
-        await fetchAPI(`/deals/${dealId}`, 'DELETE');
-        const activeTab = document.querySelector('#deals .tab.active').onclick.toString().match(/'(\w+)'/)?.[1];
-        loadDeals(activeTab);
-    } catch(e) { alert('❌ Ошибка удаления: ' + e.message); }
-}
-
+function expandDeal(dealId){ const details = document.getElementById(`deal-details-${dealId}`); details.style.display = details.style.display === 'none' ? 'block' : 'none'; }
+async function deleteDeal(dealId){ if(!confirm('Удалить эту заявку?')) return; try { await fetchAPI(`/deals/${dealId}`, 'DELETE'); const activeTab = document.querySelector('#deals .tab.active').onclick.toString().match(/'(\w+)'/)?.[1]; loadDeals(activeTab); } catch(e) { alert('❌ Ошибка удаления: ' + e.message); } }
 function openChatFromDeal(chatId){ openChat(chatId, 'Клиент'); showSection('chats'); }
+async function setClientName(name){ if(!activeChatId || !name) return; try { await fetchAPI(`/chat/${activeChatId}/set_client_name`, 'POST', {name}); document.getElementById('chatTitle').textContent = name; loadChats(); } catch(e) { console.error('Set client name error:', e); } }
+async function handleFirstMessage(){ if(!activeChatId || isAdmin) return; const chat = await fetchAPI(`/chat/${activeChatId}`); if(chat && chat.visitor_name) return; const name = prompt('👋 Привет! Как к вам обращаться?', ''); if(name && name.trim()) setClientName(name.trim()); }
 
-async function setClientName(name){
-    if(!activeChatId || !name) return;
-    try {
-        await fetchAPI(`/chat/${activeChatId}/set_client_name`, 'POST', {name});
-        document.getElementById('chatTitle').textContent = name;
-        loadChats();
-    } catch(e) { console.error('Set client name error:', e); }
-}
-
-async function handleFirstMessage(){
-    if(!activeChatId || isAdmin) return;
-    const chat = await fetchAPI(`/chat/${activeChatId}`);
-    if(chat && chat.visitor_name) return;
-    const name = prompt('👋 Привет! Как к вам обращаться?', '');
-    if(name && name.trim()) setClientName(name.trim());
-}
-
-async function loadUsers(){
-    const u=await fetchAPI('/admin/users');
-    if(!u)return;
-    document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join('');
-    document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':''}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join('');
-}
-
+async function loadUsers(){ const u=await fetchAPI('/admin/users'); if(!u)return; document.getElementById('targetUser').innerHTML='<option>Выберите</option>'+u.map(x=>`<option value="${x.id}">${x.username}</option>`).join(''); document.getElementById('userTable').innerHTML=u.map(x=>`<tr><td>${x.username}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><span class="status ${x.is_active?'status-active':'status-pending'}">${x.is_active?'🟢':''}</span></td><td><button class="btn ${x.is_active?'btn-red':'btn-green'}" onclick="toggleUser(${x.id})">${x.is_active?'Откл':'Вкл'}</button></td></tr>`).join(''); }
 function toggleUser(id){fetchAPI('/admin/toggle_user','POST',{user_id:id}).then(loadUsers).catch(e=>alert('❌ '+e.message));}
-
-function sendAdminMsg(){
-    const u=document.getElementById('targetUser').value;
-    const t=document.getElementById('adminMsg').value.trim();
-    if(!u||!t)return alert('❌ Выберите пользователя и введите текст');
-    fetchAPI('/admin/send_to_user','POST',{user_id:parseInt(u),text:t}).then(result=>{
-        if(result&&result.ok){alert('✅ Сообщение отправлено!');document.getElementById('adminMsg').value='';loadChats();}
-        else{alert('❌ Ошибка: '+(result?result.error:'Неизвестная'));}
-    }).catch(error=>{console.error('Error:',error);alert('❌ Ошибка отправки: '+error.message);});
-}
+function sendAdminMsg(){ const u=document.getElementById('targetUser').value; const t=document.getElementById('adminMsg').value.trim(); if(!u||!t)return alert('❌ Выберите пользователя и введите текст'); fetchAPI('/admin/send_to_user','POST',{user_id:parseInt(u),text:t}).then(result=>{ if(result&&result.ok){alert('✅ Сообщение отправлено!');document.getElementById('adminMsg').value='';loadChats();} else{alert('❌ Ошибка: '+(result?result.error:'Неизвестная'));} }).catch(error=>{console.error('Error:',error);alert('❌ Ошибка отправки: '+error.message);}); }
 
 async function loadProfile(){document.getElementById('profileUsername').value=localStorage.getItem('username')||'Загрузка...';}
-
-function changePassword(){
-    const p=document.getElementById('newPassword').value;
-    if(p.length<4)return alert('❌ Мин. 4 символа');
-    fetchAPI('/change_password','POST',{password:p}).then(()=>{
-        alert('✅ Готово');
-        document.getElementById('newPassword').value='';
-    }).catch(e=>alert('❌ '+e.message));
-}
-
-function saveProfileTG(){
-    const c = document.getElementById('profileTgChatId').value.trim();
-    const t = document.getElementById('profileTgToken').value.trim();
-    if(!c || !t) return alert('❌ Заполните Chat ID и Токен');
-    
-    fetchAPI('/telegram/save_chat_id', 'POST', {chat_id: c})
-        .then(()=> {
-            return fetchAPI('/telegram/setup', 'POST', {token: t, active: true});
-        })
-        .then(()=> {
-            alert('✅ Telegram подключён! Теперь вы будете получать уведомления.');
-            loadProfile();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('❌ Ошибка сохранения: ' + error.message);
-        });
-}
-
-async function loadAdminSettings() {
-    try {
-        const settings = await fetchAPI('/admin/get_settings');
-        document.getElementById('showClientChatsToggle').checked = settings.show_client_chats !== false;
-        document.getElementById('adminSettings').style.display = 'block';
-    } catch(e) {
-        console.error('Load admin settings error:', e);
-    }
-}
-
-async function toggleShowClientChats() {
-    const value = document.getElementById('showClientChatsToggle').checked;
-    try {
-        await fetchAPI('/admin/update_settings', 'POST', { show_client_chats: value });
-        loadChats();
-        alert('✅ Настройка сохранена!');
-    } catch(e) { 
-        alert('❌ Ошибка сохранения настройки: ' + e.message); 
-    }
-}
+function changePassword(){ const p=document.getElementById('newPassword').value; if(p.length<4)return alert('❌ Мин. 4 символа'); fetchAPI('/change_password','POST',{password:p}).then(()=>{ alert('✅ Готово'); document.getElementById('newPassword').value=''; }).catch(e=>alert('❌ '+e.message)); }
+function saveProfileTG(){ const c = document.getElementById('profileTgChatId').value.trim(); const t = document.getElementById('profileTgToken').value.trim(); if(!c || !t) return alert('❌ Заполните Chat ID и Токен'); fetchAPI('/telegram/save_chat_id', 'POST', {chat_id: c}).then(()=> { return fetchAPI('/telegram/setup', 'POST', {token: t, active: true}); }).then(()=> { alert('✅ Telegram подключён! Теперь вы будете получать уведомления.'); loadProfile(); }).catch(error => { console.error('Error:', error); alert('❌ Ошибка сохранения: ' + error.message); }); }
+async function loadAdminSettings() { try { const settings = await fetchAPI('/admin/get_settings'); document.getElementById('showClientChatsToggle').checked = settings.show_client_chats !== false; document.getElementById('adminSettings').style.display = 'block'; } catch(e) { console.error('Load admin settings error:', e); } }
+async function toggleShowClientChats() { const value = document.getElementById('showClientChatsToggle').checked; try { await fetchAPI('/admin/update_settings', 'POST', { show_client_chats: value }); loadChats(); alert('✅ Настройка сохранена!'); } catch(e) { alert('❌ Ошибка сохранения настройки: ' + e.message); } }
 
 function logout(){localStorage.clear();window.location.href='/index.html';}
 document.getElementById('msgInput').onkeypress=e=>{if(e.key==='Enter')sendMessage();};
 
 async function requestDealForm() {
-    if (!activeChatId) {
-        alert('❌ Выберите чат');
-        return;
-    }
-    
+    if (!activeChatId) { alert('❌ Выберите чат'); return; }
     try {
         await fetchAPI(`/chat/${activeChatId}/request_form`, 'POST', {});
         alert('✅ Форма заявки отправлена клиенту!');
-        
         const chatMessages = document.getElementById('chatMessages');
         const sysMsg = document.createElement('div');
         sysMsg.className = 'msg msg-admin';
@@ -1061,14 +737,10 @@ async function requestDealForm() {
         sysMsg.innerHTML = '📋 Клиенту отправлена форма заявки';
         chatMessages.appendChild(sysMsg);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        
-    } catch (e) {
-        alert('❌ Ошибка: ' + e.message);
-    }
+    } catch (e) { alert('❌ Ошибка: ' + e.message); }
 }
 
 loadProfile();showSection('chats');
 </script>
 </body>
 </html>
-
