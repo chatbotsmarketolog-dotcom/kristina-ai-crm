@@ -1,4 +1,4 @@
-// КРИСТИНА.AI CRM Widget v3.0 (ПОЛНАЯ ВЕРСИЯ)
+// КРИСТИНА.AI CRM Widget v3.0
 (function() {
     'use strict';
     
@@ -9,14 +9,13 @@
 
     let chatId = localStorage.getItem('kristina_chat_id') || null;
     let messages = [], formRequested = false, userName = localStorage.getItem('kristina_user_name') || '';
-    let selectedFiles = [], isOpen = false, typingTimer = null;
+    let selectedFiles = [], isOpen = false;
 
     const styles = `
         <style>
             @keyframes kFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-            
             #kristinaWidgetBtn {
-                position: fixed !important; bottom: 20px !important; right: 20px !important;
+                position: fixed !important; bottom: 24px !important; right: 24px !important;
                 background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
                 color: white !important; padding: 14px 20px !important; border-radius: 50px !important;
                 box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4) !important; cursor: pointer !important;
@@ -28,9 +27,9 @@
             #kristinaWidgetBtn::before { content: '💬' !important; font-size: 18px !important; }
             
             #kristinaChatWindow {
-                position: fixed !important; bottom: 80px !important; right: 20px !important;
-                width: 380px !important; max-width: calc(100vw - 40px) !important; height: 560px !important;
-                max-height: calc(100vh - 100px) !important; background: #1e293b !important;
+                position: fixed !important; bottom: 84px !important; right: 24px !important;
+                width: 380px !important; max-width: calc(100vw - 48px) !important; height: 560px !important;
+                max-height: calc(100vh - 108px) !important; background: #1e293b !important;
                 border-radius: 16px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
                 z-index: 2147483647 !important; display: none !important; flex-direction: column !important;
                 overflow: hidden !important; border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -55,7 +54,7 @@
             #kristinaChatMessages {
                 flex: 1 !important; overflow-y: auto !important; padding: 16px !important;
                 display: flex !important; flex-direction: column !important; gap: 12px !important;
-                background: #1e293b !important;
+                background: #1e293b !important; scroll-behavior: smooth !important;
             }
             #kristinaChatMessages::-webkit-scrollbar { width: 6px !important; }
             #kristinaChatMessages::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2) !important; border-radius: 3px !important; }
@@ -63,7 +62,7 @@
             .k-msg {
                 max-width: 85% !important; padding: 12px 16px !important; border-radius: 16px !important;
                 font-size: 14px !important; line-height: 1.4 !important; animation: kFadeIn 0.2s ease !important;
-                word-wrap: break-word !important;
+                word-wrap: break-word !important; position: relative !important;
             }
             .k-msg-user {
                 background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
@@ -127,11 +126,11 @@
                 flex-shrink: 0 !important; font-size: 14px !important;
             }
             #kristinaSendBtn:hover { transform: scale(1.05) !important; }
+            #kristinaSendBtn:disabled { opacity: 0.5 !important; cursor: not-allowed !important; transform: none !important; }
             
-            /* Формы */
             .k-form {
-                position: fixed !important; bottom: 80px !important; right: 20px !important;
-                width: 380px !important; max-width: calc(100vw - 40px) !important;
+                position: fixed !important; bottom: 84px !important; right: 24px !important;
+                width: 380px !important; max-width: calc(100vw - 48px) !important;
                 background: #1e293b !important; border-radius: 16px !important;
                 box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; z-index: 2147483647 !important;
                 display: none !important; flex-direction: column !important; overflow: hidden !important;
@@ -172,17 +171,6 @@
             .k-btn-cancel { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
             .k-btn-submit { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; color: white !important; }
             
-            /* AI кнопки */
-            .k-ai-btn {
-                margin: 4px 4px 4px 0 !important; padding: 6px 12px !important; font-size: 12px !important;
-                border: none !important; border-radius: 8px !important; cursor: pointer !important;
-                font-weight: 500 !important; transition: transform 0.2s !important;
-            }
-            .k-ai-btn:hover { transform: scale(1.05) !important; }
-            .k-ai-btn-yes { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; color: white !important; }
-            .k-ai-btn-no { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
-            
-            /* Мобильная адаптация */
             @media (max-width: 480px) {
                 #kristinaWidgetBtn { bottom: 16px !important; right: 16px !important; padding: 12px 18px !important; font-size: 13px !important; }
                 #kristinaChatWindow, .k-form {
@@ -214,7 +202,7 @@
             <div id="kristinaChatInputWrapper">
                 <div id="kristinaAttachedFiles"></div>
                 <div id="kristinaChatInputRow">
-                    <input type="file" id="kristinaFileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov" style="display:none">
+                    <input type="file" id="kristinaFileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov">
                     <button id="kristinaFileBtn" title="Прикрепить файл">📎</button>
                     <input type="text" id="kristinaChatInput" placeholder="Введите сообщение...">
                     <button id="kristinaSendBtn">Отправить</button>
@@ -317,7 +305,7 @@
             if (['нет','подумаю','позже','не сейчас','отмена','не хочу','не интересно'].some(k => t.includes(k))) {
                 try {
                     await api('/api/widget/deals', 'POST', {
-                        chat_id, client_name: userName || 'Аноним', sphere: 'Не указано',
+                        chat_id: chatId, client_name: userName || 'Аноним', sphere: 'Не указано',
                         request: `Клиент: "${text}"`, budget: '0', contact_method: 'Отказ',
                         contact_nickname: '-', status: 'declined', decline_reason: `Клиент: "${text}"`
                     });
@@ -343,8 +331,8 @@
         function parseAI(text) {
             if (!text.includes('[ДА ПОДАТЬ]') || !text.includes('[ОТМЕНА]')) return text;
             return text
-                .replace('[ДА ПОДАТЬ]', '<button class="k-ai-btn k-ai-btn-yes" onclick="window.kHandleDeal(true)">✅ Да, подать</button>')
-                .replace('[ОТМЕНА]', '<button class="k-ai-btn k-ai-btn-no" onclick="window.kHandleDeal(false)">❌ Отмена</button>');
+                .replace('[ДА ПОДАТЬ]', '<button class="k-btn k-btn-submit" style="margin:4px 4px 4px 0;padding:6px 12px;font-size:12px" onclick="window.kHandleDeal(true)">✅ Да, подать</button>')
+                .replace('[ОТМЕНА]', '<button class="k-btn k-btn-cancel" style="margin:4px 0;padding:6px 12px;font-size:12px" onclick="window.kHandleDeal(false)">❌ Отмена</button>');
         }
 
         window.kHandleDeal = async function(ok) {
@@ -356,11 +344,11 @@
                     if (userName && document.getElementById('dealClientName')) document.getElementById('dealClientName').value = userName;
                 } else {
                     await api('/api/widget/deals', 'POST', {
-                        chat_id, client_name: userName || 'Аноним', sphere: 'Не указано',
+                        chat_id: chatId, client_name: userName || 'Аноним', sphere: 'Не указано',
                         request: 'Отказ через AI', budget: '0', contact_method: 'Отказ',
                         contact_nickname: '-', status: 'declined', decline_reason: 'Кнопка [ОТМЕНА]'
                     });
-                    await api('/api/widget/send', 'POST', { chat_id, text: '❌ Заявка отменена.' });
+                    await api('/api/widget/send', 'POST', { chat_id: chatId, text: '❌ Заявка отменена.' });
                     renderMessages();
                 }
             } catch(e) { alert('❌ Ошибка: ' + e.message); }
@@ -395,7 +383,7 @@
                     selectedFiles.forEach(f => fd.append('files', f));
                     await api('/api/widget/send_with_files', 'POST', fd, true);
                 } else {
-                    await api('/api/widget/send', 'POST', { chat_id, text });
+                    await api('/api/widget/send', 'POST', { chat_id: chatId, text: text });
                 }
                 els.input.value = ''; selectedFiles = []; els.attached.innerHTML = '';
                 renderMessages();
@@ -404,30 +392,33 @@
         }
         els.send.onclick = send;
         els.input.onkeypress = e => { if (e.key === 'Enter') send(); };
-        
-        els.input.oninput = () => {
-            if (chatId) {
-                if (typingTimer) clearTimeout(typingTimer);
-                api('/api/widget/typing', 'POST', { chat_id: chatId }).catch(()=>{});
-                typingTimer = setTimeout(() => { typingTimer = null; }, 2000);
-            }
-        };
 
         async function initChat() {
             try {
-                if (!chatId) {
-                    const c = await api('/api/widget/chats', 'POST', {});
-                    chatId = c.id; localStorage.setItem('kristina_chat_id', chatId);
-                } else {
+                console.log('🔄 Initializing chat...');
+                
+                if (chatId) {
                     const chats = await api('/api/widget/chats');
-                    if (!chats.find(c => c.id == chatId)) {
-                        const c = await api('/api/widget/chats', 'POST', {});
-                        chatId = c.id; localStorage.setItem('kristina_chat_id', chatId);
+                    const existingChat = chats.find(c => c.id == chatId);
+                    if (!existingChat) {
+                        chatId = null;
+                        localStorage.removeItem('kristina_chat_id');
                     }
                 }
+                
+                if (!chatId) {
+                    const c = await api('/api/widget/chats', 'POST', {});
+                    chatId = c.id;
+                    localStorage.setItem('kristina_chat_id', chatId);
+                    console.log('✅ Created new chat:', chatId);
+                }
+                
                 renderMessages();
                 if (!userName) showNameForm();
-            } catch(e) { alert('❌ Ошибка: ' + e.message); }
+            } catch(e) { 
+                console.error('❌ Init chat error:', e); 
+                alert('❌ Ошибка подключения: ' + e.message);
+            }
         }
 
         function showNameForm() {
