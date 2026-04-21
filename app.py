@@ -2,7 +2,7 @@ import os, json, uuid, hashlib, datetime, secrets, requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text, func
+from sqlalchemy import text
 from openai import OpenAI
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -31,7 +31,7 @@ def validate_contact_method(method):
     if method_lower not in allowed: return False, f"❌ '{method}' не в списке разрешённых."
     return True, None
 
-# === МОДЕЛИ БАЗЫ ДАННЫХ ===
+# === МОДЕЛИ БАЗЫ ДАННЫХ (БЕЗ unread_count) ===
 class User(db.Model):
     __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
@@ -64,15 +64,12 @@ class Chat(db.Model):
     form_requested = db.Column(db.Boolean, default=False)
     status = db.Column(db.String(20), default='waiting')
     is_archived = db.Column(db.Boolean, default=False)
-    is_typing = db.Column(db.Boolean, default=False)
-    typing_updated = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    unread_count = db.Column(db.Integer, default=0)  # ✅ СЧЁТЧИК НЕПРОЧИТАННЫХ
 
 class Message(db.Model):
     __tablename__ = 'message'
     id = db.Column(db.Integer, primary_key=True)
-    chat_id = db.Column(db.Integer, db.ForeignKey('chat.id', ondelete='CASCADE'))  # ✅ CASCADE DELETE
+    chat_id = db.Column(db.Integer, db.ForeignKey('chat.id', ondelete='CASCADE'))
     sender = db.Column(db.String(20))
     text = db.Column(db.Text)
     file_url = db.Column(db.String(500))
@@ -118,7 +115,7 @@ class AIWebsite(db.Model):
 class Deal(db.Model):
     __tablename__ = 'deal'
     id = db.Column(db.Integer, primary_key=True)
-    chat_id = db.Column(db.Integer, db.ForeignKey('chat.id', ondelete='CASCADE'))  # ✅ CASCADE DELETE
+    chat_id = db.Column(db.Integer, db.ForeignKey('chat.id', ondelete='CASCADE'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     client_name = db.Column(db.String(100))
     sphere = db.Column(db.String(200))
@@ -153,40 +150,6 @@ def admin_required(f):
         return f(*args, **kwargs)
     wrapper.__name__ = f.__name__
     return wrapper
-
-def add_missing_columns():
-    with app.app_context():
-        try:
-            db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(100)'))
-            db.session.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS show_client_chats BOOLEAN DEFAULT TRUE'))
-            db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE website ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_web BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS is_active_telegram BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS created_at TIMESTAMP'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS forbidden TEXT'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS humanity_level INTEGER DEFAULT 3'))
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS is_typing BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS typing_updated TIMESTAMP'))
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS unread_count INTEGER DEFAULT 0'))
-            db.session.execute(text('ALTER TABLE message ADD COLUMN IF NOT EXISTS file_url VARCHAR(500)'))
-            db.session.execute(text('ALTER TABLE message ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE'))
-            try:
-                db.session.execute(text('ALTER TABLE chat ADD COLUMN user_id INTEGER'))
-                db.session.execute(text('CREATE TABLE IF NOT EXISTS aiwebsite (id SERIAL PRIMARY KEY, agent_id INTEGER REFERENCES aimanager(id), website_id INTEGER REFERENCES website(id), is_active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP DEFAULT NOW())'))
-                db.session.execute(text('''CREATE TABLE IF NOT EXISTS deal (id SERIAL PRIMARY KEY, chat_id INTEGER REFERENCES chat(id) ON DELETE CASCADE, user_id INTEGER REFERENCES "user"(id), client_name VARCHAR(100), sphere VARCHAR(200), request TEXT, budget VARCHAR(100), contact_method VARCHAR(50), contact_nickname VARCHAR(100), status VARCHAR(20) DEFAULT 'pending', decline_reason VARCHAR(200), created_at TIMESTAMP DEFAULT NOW())'''))
-                db.session.commit()
-                print("✅ Все миграции выполнены")
-            except Exception as e:
-                db.session.rollback()
-                print(f"ℹ️ Некоторые таблицы уже существуют: {e}")
-            db.session.commit()
-        except Exception as e:
-            print(f"Migration error: {e}")
-            db.session.rollback()
 
 # === АВТОРИЗАЦИЯ ===
 @app.route('/api/login', methods=['POST'])
@@ -301,7 +264,7 @@ def delete_site(site_id):
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-# === ЧАТЫ И СООБЩЕНИЯ (CRM) ===
+# === ЧАТЫ И СООБЩЕНИЯ (CRM) - УБРАНО unread_count ===
 @app.route('/api/chats', methods=['GET'])
 @token_required
 def get_chats():
@@ -316,7 +279,6 @@ def get_chats():
         chats = query.order_by(Chat.created_at.desc()).all()
         result = []
         for c in chats:
-            # ✅ ИСПРАВЛЕНО: показываем логин пользователя для админа
             display_name = c.visitor_name
             if u.is_admin and c.user_id:
                 user = User.query.get(c.user_id)
@@ -328,17 +290,13 @@ def get_chats():
             if deal:
                 if deal.status == 'completed': deal_status = '✅ Сделка'
                 elif deal.status == 'declined': deal_status = '❌ Отказ'
-            is_typing = False
-            if c.is_typing and c.typing_updated:
-                if (datetime.datetime.utcnow() - c.typing_updated).total_seconds() < 3: is_typing = True
+            
             result.append({
                 "id": c.id, 
                 "site": display_name or ("💬 Администратор" if not u.is_admin else "Клиент"), 
                 "status": c.status, 
                 "time": c.created_at.isoformat(), 
-                "deal_status": deal_status, 
-                "is_typing": is_typing,
-                "unread_count": c.unread_count
+                "deal_status": deal_status
             })
         return jsonify(result)
     except Exception as e: 
@@ -381,8 +339,6 @@ def delete_chat(chat_id):
         chat = Chat.query.get(chat_id)
         if not chat: return jsonify({"error": "Чат не найден"}), 404
         if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
-        
-        # ✅ УДАЛЯЕМ СВЯЗАННЫЕ ЗАПИСИ ПЕРЕД УДАЛЕНИЕМ ЧАТА
         Deal.query.filter_by(chat_id=chat_id).delete()
         Message.query.filter_by(chat_id=chat_id).delete()
         db.session.delete(chat)
@@ -399,12 +355,8 @@ def get_messages(chat_id):
         chat = Chat.query.get(chat_id)
         if not chat: return jsonify({"error": "Чат не найден"}), 404
         if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
-        
-        # ✅ СБРАСЫВАЕМ СЧЁТЧИК НЕПРОЧИТАННЫХ
-        chat.unread_count = 0
         Message.query.filter_by(chat_id=chat_id).update({Message.is_read: True}) 
         db.session.commit()
-        
         msgs = Message.query.filter_by(chat_id=chat_id).order_by(Message.timestamp).all()
         return jsonify({
             "messages": [{"id": m.id, "sender":m.sender, "text":m.text, "file_url":m.file_url, "is_read":m.is_read, "time":m.timestamp.isoformat()} for m in msgs], 
@@ -424,33 +376,15 @@ def send_message():
         chat = Chat.query.get(chat_id)
         if not chat: return jsonify({"error": "Чат не найден"}), 404
         if not request.current_user.is_admin and chat.user_id != request.current_user.id: return jsonify({"error": "Доступ запрещен"}), 403
-        
         msg = Message(chat_id=chat_id, sender=sender, text=text, file_url=file_url, is_read=False)
-        db.session.add(msg)
-        
-        # ✅ УВЕЛИЧИВАЕМ СЧЁТЧИК НЕПРОЧИТАННЫХ
-        if sender == 'user':
-            chat.unread_count = (chat.unread_count or 0) + 1
-        
-        db.session.commit()
-        
+        db.session.add(msg); db.session.commit()
         if sender == 'admin' and chat.user_id:
             user = User.query.get(chat.user_id)
             if user and user.telegram_chat_id: send_telegram_notification(user.telegram_chat_id, f"💬 <b>Новое сообщение!</b>\n\n{text[:100]}")
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-@app.route('/api/typing', methods=['POST'])
-@token_required
-def update_typing():
-    try:
-        chat = Chat.query.get(request.json.get('chat_id'))
-        if chat:
-            chat.is_typing = True; chat.typing_updated = datetime.datetime.utcnow(); db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-# === AI АГЕНТЫ ===
+# === AI АГЕНТЫ И TELEGRAM БОТЫ ===
 @app.route('/api/ai/agents', methods=['GET'])
 @token_required
 def get_user_agents():
@@ -494,16 +428,6 @@ def toggle_agent(agent_id):
         return jsonify({"ok": True, "is_active": agent.is_active_web})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-@app.route('/api/ai/agents/<int:agent_id>/toggle_telegram', methods=['POST'])
-@token_required
-def toggle_agent_telegram(agent_id):
-    try:
-        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
-        if not agent: return jsonify({"error": "Агент не найден"}), 404
-        agent.is_active_telegram = not agent.is_active_telegram; db.session.commit()
-        return jsonify({"ok": True, "is_active": agent.is_active_telegram})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
 @app.route('/api/ai/agents/<int:agent_id>/delete', methods=['DELETE'])
 @token_required
 def delete_agent(agent_id):
@@ -527,28 +451,6 @@ def link_agent_to_website(agent_id):
         if existing: return jsonify({"error": "Агент уже привязан к сайту"}), 400
         link = AIWebsite(agent_id=agent_id, website_id=website_id); db.session.add(link); db.session.commit()
         return jsonify({"ok": True})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route('/api/ai/agents/<int:agent_id>/unlink_website', methods=['POST'])
-@token_required
-def unlink_agent_from_website(agent_id):
-    try:
-        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
-        if not agent: return jsonify({"error": "Агент не найден"}), 404
-        AIWebsite.query.filter_by(agent_id=agent_id).delete(); db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route('/api/ai/agents/<int:agent_id>/linked_website', methods=['GET'])
-@token_required
-def get_linked_website(agent_id):
-    try:
-        agent = AIManager.query.filter_by(id=agent_id, user_id=request.current_user.id).first()
-        if not agent: return jsonify({"error": "Агент не найден"}), 404
-        link = AIWebsite.query.filter_by(agent_id=agent_id).first()
-        if not link: return jsonify({"website": None})
-        website = Website.query.get(link.website_id)
-        return jsonify({"website": {"id": website.id, "url": website.url, "status": website.status} if website else None})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/ai/get', methods=['GET'])
@@ -619,16 +521,6 @@ def get_deals():
         return jsonify([{"id": d.id, "client_name": d.client_name, "sphere": d.sphere, "request": d.request, "budget": d.budget, "contact_method": d.contact_method, "contact_nickname": d.contact_nickname, "status": d.status, "decline_reason": d.decline_reason, "chat_id": d.chat_id, "created_at": d.created_at.isoformat()} for d in deals])
     except Exception as e: return jsonify([]), 500
 
-@app.route('/api/deals/<int:deal_id>', methods=['PUT'])
-@token_required
-def update_deal(deal_id):
-    try:
-        deal = Deal.query.get(deal_id)
-        if not deal or deal.user_id != request.current_user.id: return jsonify({"error": "Сделка не найдена"}), 404
-        d = request.json; deal.status = d.get('status', deal.status); deal.decline_reason = d.get('decline_reason', deal.decline_reason)
-        db.session.commit(); return jsonify({"ok": True})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
 @app.route('/api/deals/<int:deal_id>', methods=['DELETE'])
 @token_required
 def delete_deal(deal_id):
@@ -659,14 +551,6 @@ def save_user_chat_id():
         return jsonify({"ok": True, "message": "Chat ID сохранён"})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-@app.route('/api/admin/save_chat_id', methods=['POST'])
-@admin_required
-def save_chat_id():
-    try:
-        request.current_user.telegram_chat_id = request.json.get('chat_id'); db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
 @app.route('/api/admin/get_settings', methods=['GET'])
 @admin_required
 def get_admin_settings():
@@ -679,7 +563,7 @@ def get_admin_settings():
 def update_admin_settings():
     try:
         data = request.json
-        if 'show_client_chats' in data:
+        if 'show_client_chats' in 
             request.current_user.show_client_chats = data['show_client_chats']
             db.session.commit()
         return jsonify({"ok": True})
@@ -748,40 +632,6 @@ def restore_site():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
-
-# === ЭНДПОИНТЫ МИГРАЦИИ ===
-@app.route('/api/admin/migrate_ai_columns', methods=['POST'])
-@admin_required
-def migrate_ai_columns():
-    try:
-        with app.app_context():
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS forbidden TEXT'))
-            db.session.execute(text('ALTER TABLE aimanager ADD COLUMN IF NOT EXISTS humanity_level INTEGER DEFAULT 3'))
-            db.session.commit()
-        return jsonify({"ok": True, "message": "Колонки добавлены"})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route('/api/admin/migrate_deals_table', methods=['POST'])
-@admin_required
-def migrate_deals_table():
-    try:
-        with app.app_context():
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(100)'))
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
-            db.session.execute(text('''CREATE TABLE IF NOT EXISTS deal (id SERIAL PRIMARY KEY, chat_id INTEGER REFERENCES chat(id) ON DELETE CASCADE, user_id INTEGER REFERENCES "user"(id), client_name VARCHAR(100), sphere VARCHAR(200), request TEXT, budget VARCHAR(100), contact_method VARCHAR(50), contact_nickname VARCHAR(100), status VARCHAR(20) DEFAULT 'pending', decline_reason VARCHAR(200), created_at TIMESTAMP DEFAULT NOW())'''))
-            db.session.commit()
-        return jsonify({"ok": True, "message": "Миграция завершена"})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
-@app.route('/api/admin/migrate_form_requested', methods=['POST'])
-@admin_required
-def migrate_form_requested():
-    try:
-        with app.app_context():
-            db.session.execute(text('ALTER TABLE chat ADD COLUMN IF NOT EXISTS form_requested BOOLEAN DEFAULT FALSE'))
-            db.session.commit()
-        return jsonify({"ok": True, "message": "Колонка form_requested добавлена"})
-    except Exception as e: return jsonify({"error": str(e)}), 500
 
 # === ВИДЖЕТ (ПУБЛИЧНЫЕ ЭНДПОИНТЫ) ===
 @app.route('/api/widget/chats', methods=['GET'])
@@ -864,19 +714,6 @@ def widget_send_with_files():
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-@app.route('/api/widget/typing', methods=['POST', 'OPTIONS'])
-def widget_typing():
-    try:
-        if request.method == 'OPTIONS': return '', 204
-        api_key = request.headers.get('X-API-Key'); chat_id = request.json.get('chat_id')
-        chat = Chat.query.get(chat_id)
-        if not chat: return jsonify({"error": "Chat not found"}), 404
-        website = Website.query.filter_by(api_key=api_key, status='active', is_deleted=False).first()
-        if not website or chat.website_id != website.id: return jsonify({"error": "Invalid API key"}), 401
-        chat.is_typing = True; chat.typing_updated = datetime.datetime.utcnow(); db.session.commit()
-        return jsonify({"ok": True})
-    except Exception as e: return jsonify({"error": str(e)}), 500
-
 @app.route('/api/widget/chat/<int:chat_id>/set_client_name', methods=['POST'])
 def widget_set_client_name(chat_id):
     try:
@@ -933,7 +770,6 @@ def widget_capture_late_contact():
 # === ЗАПУСК ===
 with app.app_context():
     db.create_all()
-    add_missing_columns()
     admin = User.query.filter_by(username='Kristina').first()
     if not admin: admin = User(username='Kristina', is_admin=True); db.session.add(admin)
     admin.is_active = True; admin.password_hash = hash_pwd('zaqqaz'); db.session.commit()
