@@ -1,26 +1,22 @@
-// КРИСТИНА.AI CRM Widget v2.0
+// КРИСТИНА.AI CRM Widget v3.0 (ПОЛНАЯ ВЕРСИЯ)
 (function() {
     'use strict';
     
-    // Конфигурация
     const API_URL = window.KRISTINA_API_URL || 'https://kristina-crm-api.onrender.com';
     const API_KEY = window.KRISTINA_API_KEY;
     
     if (!API_KEY) { console.error('❌ KRISTINA_API_KEY не указан!'); return; }
 
-    // Состояние
     let chatId = localStorage.getItem('kristina_chat_id') || null;
     let messages = [], formRequested = false, userName = localStorage.getItem('kristina_user_name') || '';
     let selectedFiles = [], isOpen = false, typingTimer = null;
 
-    // Современные стили
     const styles = `
         <style>
             @keyframes kFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-            @keyframes kPulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
             
             #kristinaWidgetBtn {
-                position: fixed !important; bottom: 24px !important; right: 24px !important;
+                position: fixed !important; bottom: 20px !important; right: 20px !important;
                 background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
                 color: white !important; padding: 14px 20px !important; border-radius: 50px !important;
                 box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4) !important; cursor: pointer !important;
@@ -32,9 +28,9 @@
             #kristinaWidgetBtn::before { content: '💬' !important; font-size: 18px !important; }
             
             #kristinaChatWindow {
-                position: fixed !important; bottom: 84px !important; right: 24px !important;
-                width: 380px !important; max-width: calc(100vw - 48px) !important; height: 560px !important;
-                max-height: calc(100vh - 108px) !important; background: #1e293b !important;
+                position: fixed !important; bottom: 80px !important; right: 20px !important;
+                width: 380px !important; max-width: calc(100vw - 40px) !important; height: 560px !important;
+                max-height: calc(100vh - 100px) !important; background: #1e293b !important;
                 border-radius: 16px !important; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
                 z-index: 2147483647 !important; display: none !important; flex-direction: column !important;
                 overflow: hidden !important; border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -59,7 +55,7 @@
             #kristinaChatMessages {
                 flex: 1 !important; overflow-y: auto !important; padding: 16px !important;
                 display: flex !important; flex-direction: column !important; gap: 12px !important;
-                background: #1e293b !important; scroll-behavior: smooth !important;
+                background: #1e293b !important;
             }
             #kristinaChatMessages::-webkit-scrollbar { width: 6px !important; }
             #kristinaChatMessages::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2) !important; border-radius: 3px !important; }
@@ -67,7 +63,7 @@
             .k-msg {
                 max-width: 85% !important; padding: 12px 16px !important; border-radius: 16px !important;
                 font-size: 14px !important; line-height: 1.4 !important; animation: kFadeIn 0.2s ease !important;
-                word-wrap: break-word !important; position: relative !important;
+                word-wrap: break-word !important;
             }
             .k-msg-user {
                 background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
@@ -131,12 +127,11 @@
                 flex-shrink: 0 !important; font-size: 14px !important;
             }
             #kristinaSendBtn:hover { transform: scale(1.05) !important; }
-            #kristinaSendBtn:disabled { opacity: 0.5 !important; cursor: not-allowed !important; transform: none !important; }
             
             /* Формы */
             .k-form {
-                position: fixed !important; bottom: 84px !important; right: 24px !important;
-                width: 380px !important; max-width: calc(100vw - 48px) !important;
+                position: fixed !important; bottom: 80px !important; right: 20px !important;
+                width: 380px !important; max-width: calc(100vw - 40px) !important;
                 background: #1e293b !important; border-radius: 16px !important;
                 box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important; z-index: 2147483647 !important;
                 display: none !important; flex-direction: column !important; overflow: hidden !important;
@@ -207,7 +202,6 @@
         </style>
     `;
 
-    // HTML виджета
     const widgetHTML = `
         <button id="kristinaWidgetBtn">Онлайн менеджер</button>
         
@@ -220,7 +214,7 @@
             <div id="kristinaChatInputWrapper">
                 <div id="kristinaAttachedFiles"></div>
                 <div id="kristinaChatInputRow">
-                    <input type="file" id="kristinaFileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov">
+                    <input type="file" id="kristinaFileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov" style="display:none">
                     <button id="kristinaFileBtn" title="Прикрепить файл">📎</button>
                     <input type="text" id="kristinaChatInput" placeholder="Введите сообщение...">
                     <button id="kristinaSendBtn">Отправить</button>
@@ -280,11 +274,9 @@
     `;
 
     try {
-        // Добавляем стили и HTML
         document.head.insertAdjacentHTML('beforeend', styles);
         document.body.insertAdjacentHTML('beforeend', widgetHTML);
 
-        // Элементы
         const els = {
             btn: document.getElementById('kristinaWidgetBtn'),
             win: document.getElementById('kristinaChatWindow'),
@@ -311,7 +303,6 @@
 
         if (!els.btn || !els.win) { console.error('❌ Widget init failed'); return; }
 
-        // API запросы
         async function api(url, method = 'GET', body = null, formData = false) {
             const opts = { method, headers: { 'X-API-Key': API_KEY } };
             if (!formData) opts.headers['Content-Type'] = 'application/json';
@@ -321,10 +312,8 @@
             return res.status === 204 ? null : res.json();
         }
 
-        // Триггеры клиента
         async function checkTriggers(text) {
             const t = text.toLowerCase();
-            // Отказ → сделка в "Отклонённые"
             if (['нет','подумаю','позже','не сейчас','отмена','не хочу','не интересно'].some(k => t.includes(k))) {
                 try {
                     await api('/api/widget/deals', 'POST', {
@@ -335,7 +324,6 @@
                 } catch(e) {}
                 return;
             }
-            // Позже → форма подарка
             if (['подумаю','напишите позднее','позже','не сейчас'].some(k => t.includes(k))) {
                 setTimeout(() => {
                     [els.nameForm, els.win, els.dealForm].forEach(el => el?.classList.remove('active'));
@@ -343,7 +331,6 @@
                 }, 300);
                 return;
             }
-            // Согласие → форма заявки
             if (['да','хочу','интересно','заполню','готова','давайте','пришлите','где заполнить'].some(k => t.includes(k))) {
                 setTimeout(() => {
                     els.nameForm?.classList.remove('active');
@@ -353,7 +340,6 @@
             }
         }
 
-        // Парсер AI-кнопок
         function parseAI(text) {
             if (!text.includes('[ДА ПОДАТЬ]') || !text.includes('[ОТМЕНА]')) return text;
             return text
@@ -361,7 +347,6 @@
                 .replace('[ОТМЕНА]', '<button class="k-ai-btn k-ai-btn-no" onclick="window.kHandleDeal(false)">❌ Отмена</button>');
         }
 
-        // Обработка AI-кнопок
         window.kHandleDeal = async function(ok) {
             if (!chatId) return;
             try {
@@ -381,7 +366,6 @@
             } catch(e) { alert('❌ Ошибка: ' + e.message); }
         };
 
-        // Открыть/закрыть чат
         els.btn.onclick = () => {
             isOpen = !isOpen;
             if (isOpen) { els.win.classList.add('active'); els.btn.style.display = 'none'; if (!chatId) initChat(); }
@@ -390,7 +374,6 @@
         els.close.onclick = () => { isOpen = false; els.win.classList.remove('active'); els.btn.style.display = 'flex'; };
         els.fileBtn.onclick = () => els.fileInput.click();
 
-        // Файлы
         els.fileInput.onchange = e => {
             [...e.target.files].forEach(f => {
                 if (!['application/pdf','image/jpeg','image/png','image/gif','image/webp','video/mp4','video/quicktime'].includes(f.type)) { alert('❌ Неверный формат'); return; }
@@ -402,7 +385,6 @@
         };
         window.kRemoveFile = i => { selectedFiles.splice(i,1); els.attached.innerHTML = selectedFiles.map((f,j) => `<div class="k-file-tag">📎 ${f.name}<span class="k-remove" onclick="window.kRemoveFile(${j})">×</span></div>`).join(''); };
 
-        // Отправка
         async function send() {
             const text = els.input.value.trim();
             if (!text && !selectedFiles.length) return;
@@ -423,7 +405,6 @@
         els.send.onclick = send;
         els.input.onkeypress = e => { if (e.key === 'Enter') send(); };
         
-        // Индикатор "печатает"
         els.input.oninput = () => {
             if (chatId) {
                 if (typingTimer) clearTimeout(typingTimer);
@@ -432,7 +413,6 @@
             }
         };
 
-        // Инициализация
         async function initChat() {
             try {
                 if (!chatId) {
@@ -469,7 +449,6 @@
         }
         if (els.nameInput) els.nameInput.onkeypress = e => { if (e.key === 'Enter') els.nameSubmit?.click(); };
 
-        // Загрузка сообщений
         async function renderMessages() {
             if (!chatId) return;
             try {
@@ -496,7 +475,6 @@
                 }).join('');
                 els.msgs.scrollTop = els.msgs.scrollHeight;
                 
-                // Показать форму если запрошена
                 if (formRequested && !els.dealForm.classList.contains('active') && !els.win.classList.contains('active') && (!els.nameForm || !els.nameForm.classList.contains('active'))) {
                     els.nameForm?.classList.remove('active'); els.dealForm?.classList.add('active');
                 }
@@ -504,7 +482,6 @@
         }
         setInterval(renderMessages, 3000);
 
-        // Формы
         function showDealForm() {
             els.win.classList.remove('active'); els.dealForm?.classList.add('active');
             if (userName && document.getElementById('dealClientName')) document.getElementById('dealClientName').value = userName;
@@ -534,7 +511,6 @@
             };
         }
 
-        // Форма подарка
         if (els.lateCancel) els.lateCancel.onclick = () => { els.lateForm?.classList.remove('active'); els.win?.classList.add('active'); };
         if (els.lateSubmit) {
             els.lateSubmit.onclick = async () => {
@@ -550,9 +526,8 @@
             };
         }
 
-        // Запуск
         initChat();
-        console.log('✅ Widget v2.0 loaded');
+        console.log('✅ Widget v3.0 loaded');
         
     } catch(e) { console.error('❌ Widget error:', e); }
 })();
