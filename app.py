@@ -563,7 +563,7 @@ def get_admin_settings():
 def update_admin_settings():
     try:
         data = request.json
-        if 'show_client_chats' in   # ✅ ИСПРАВЛЕНО: добавлено ""
+        if 'show_client_chats' in   # ✅ ПРАВИЛЬНО: добавлено ""
             request.current_user.show_client_chats = data['show_client_chats']
             db.session.commit()
         return jsonify({"ok": True})
