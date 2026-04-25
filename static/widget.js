@@ -1,4 +1,4 @@
-// КРИСТИНА.AI CRM Widget v3.0
+// КРИСТИНА.AI CRM Widget v3.1
 (function() {
     'use strict';
     
@@ -171,6 +171,7 @@
             .k-btn-cancel { background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; }
             .k-btn-submit { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; color: white !important; }
             
+            /* ✅ ИСПРАВЛЕНО: АДАПТИВНОСТЬ ПОД МОБИЛЬНЫЕ */
             @media (max-width: 480px) {
                 #kristinaWidgetBtn { bottom: 16px !important; right: 16px !important; padding: 12px 18px !important; font-size: 13px !important; }
                 #kristinaChatWindow, .k-form {
@@ -184,8 +185,8 @@
                 #kristinaChatInputWrapper { padding: 10px 14px !important; }
                 #kristinaChatInputRow { flex-wrap: wrap !important; }
                 #kristinaFileBtn { width: 36px !important; height: 36px !important; order: 1 !important; }
-                #kristinaChatInput { flex: 1 1 calc(100% - 90px) !important; order: 2 !important; }
-                #kristinaSendBtn { order: 3 !important; padding: 10px 18px !important; }
+                #kristinaChatInput { flex: 1 1 calc(100% - 90px) !important; order: 2 !important; min-width: 0 !important; }
+                #kristinaSendBtn { order: 3 !important; padding: 10px 18px !important; font-size: 13px !important; }
             }
         </style>
     `;
@@ -302,6 +303,7 @@
 
         async function checkTriggers(text) {
             const t = text.toLowerCase();
+            // ✅ ИСПРАВЛЕНО: кнопка "Отмена" → сделка в "Отклонённые"
             if (['нет','подумаю','позже','не сейчас','отмена','не хочу','не интересно'].some(k => t.includes(k))) {
                 try {
                     await api('/api/widget/deals', 'POST', {
@@ -309,7 +311,8 @@
                         request: `Клиент: "${text}"`, budget: '0', contact_method: 'Отказ',
                         contact_nickname: '-', status: 'declined', decline_reason: `Клиент: "${text}"`
                     });
-                } catch(e) {}
+                    console.log('✅ Сделка отправлена в "Отклонённые"');
+                } catch(e) { console.error('Ошибка создания отклонённой сделки:', e); }
                 return;
             }
             if (['подумаю','напишите позднее','позже','не сейчас'].some(k => t.includes(k))) {
@@ -343,6 +346,7 @@
                     els.dealForm?.classList.add('active');
                     if (userName && document.getElementById('dealClientName')) document.getElementById('dealClientName').value = userName;
                 } else {
+                    // ✅ ИСПРАВЛЕНО: кнопка "Отмена" → сделка в "Отклонённые"
                     await api('/api/widget/deals', 'POST', {
                         chat_id: chatId, client_name: userName || 'Аноним', sphere: 'Не указано',
                         request: 'Отказ через AI', budget: '0', contact_method: 'Отказ',
@@ -518,7 +522,7 @@
         }
 
         initChat();
-        console.log('✅ Widget v3.0 loaded');
+        console.log('✅ Widget v3.1 loaded');
         
     } catch(e) { console.error('❌ Widget error:', e); }
 })();
