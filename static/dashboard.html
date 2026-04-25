@@ -17,8 +17,8 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .container{padding:16px;flex:1;overflow-y:auto}
 .section{display:none}.section.active{display:block}
 
-/* ✅ ИСПРАВЛЕНО: Чат СПРАВА (1fr слева, 350px справа) */
-.chat-container{display:grid;grid-template-columns:1fr 350px;gap:16px;height:calc(100vh - 100px)}
+/* ✅ ИСПРАВЛЕНО: Чат СПРАВА, шире (450px) */
+.chat-container{display:grid;grid-template-columns:320px 450px;gap:16px;height:calc(100vh - 100px)}
 .chat-list{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;order:1}
 .chat-list-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between}
 .chat-items{flex:1;overflow-y:auto}
@@ -30,11 +30,15 @@ body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-d
 .chat-window{background:var(--panel);border-radius:12px;display:flex;flex-direction:column;height:100%;order:2}
 .chat-header{padding:14px;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;display:flex;justify-content:space-between;align-items:center}
 .chat-header-left{display:flex;align-items:center;gap:10px}
-.chat-back-btn{background:none;border:none;color:var(--text);font-size:1.2rem;cursor:pointer;padding:4px 8px;border-radius:6px;display:none}
-.chat-back-btn:hover{background:rgba(255,255,255,0.1)}
+/* ✅ ИСПРАВЛЕНО: Кнопка "Назад" */
+.chat-back-btn{background:rgba(255,255,255,0.1);border:none;color:var(--text);font-size:1.2rem;cursor:pointer;padding:4px 10px;border-radius:6px;transition:background 0.2s}
+.chat-back-btn:hover{background:rgba(255,255,255,0.2)}
+@media(max-width:1024px){
+    .chat-container{grid-template-columns:300px 1fr!important}
+}
 @media(max-width:768px){
     .chat-container{grid-template-columns:1fr!important;height:calc(100vh - 60px)!important}
-    .chat-back-btn{display:block}
+    .chat-back-btn{display:block!important}
     .header{padding:10px}.header h2{font-size:0.9rem;width:100%;order:1;margin-bottom:10px}
     .nav{width:100%;order:2;justify-content:space-between}.nav .btn{flex:1;margin:2px;padding:8px;font-size:0.8rem}
     .card{padding:12px;margin-bottom:12px}
@@ -114,7 +118,8 @@ table{width:100%;border-collapse:collapse}th,td{padding:12px;text-align:left;bor
       <div class="chat-window hidden" id="chatWindowPanel">
         <div class="chat-header">
           <div class="chat-header-left">
-            <button class="chat-back-btn" onclick="closeChat()">←</button>
+            <!-- ✅ ИСПРАВЛЕНО: Кнопка "Назад" -->
+            <button class="chat-back-btn" onclick="closeChat()" title="Вернуться к списку">← Назад</button>
             <span id="chatTitle">Выберите диалог</span>
           </div>
           <div style="display:flex;gap:8px">
@@ -275,6 +280,7 @@ const API = location.origin + '/api';
 const API_URL = location.origin;
 const token = localStorage.getItem('token');
 const isAdmin = localStorage.getItem('isAdmin') === 'true';
+const currentUsername = localStorage.getItem('username') || 'Admin';
 let activeChatId = null, pollInterval = null, editingAgentId = null, lastMessagesHash = '';
 
 if (!token) window.location.href = '/index.html';
@@ -370,6 +376,7 @@ async function loadArchivedChats() {
 function showChatList(){document.getElementById('chatListPanel').classList.remove('hidden');document.getElementById('chatWindowPanel').classList.add('hidden');}
 function showChatWindow(){document.getElementById('chatListPanel').classList.add('hidden');document.getElementById('chatWindowPanel').classList.remove('hidden');}
 
+// ✅ ИСПРАВЛЕНО: Кнопка "Назад"
 function closeChat(){
     activeChatId = null;
     if(pollInterval) clearInterval(pollInterval);
@@ -407,7 +414,12 @@ async function loadMessages(){
             document.getElementById('chatMessages').innerHTML = m.map(x => {
                 const isFromAdmin = x.sender === 'admin';
                 // ✅ ИСПРАВЛЕНО: показываем правильное имя
-                const senderName = isFromAdmin ? 'Админ' : (isAdmin ? chatTitle : 'Клиент');
+                let senderName;
+                if (isFromAdmin) {
+                    senderName = isAdmin ? currentUsername : 'Админ';
+                } else {
+                    senderName = isAdmin ? chatTitle : 'Клиент';
+                }
                 const msgClass = isFromAdmin ? 'msg-admin' : 'msg-user';
                 let content = x.text || '';
                 
