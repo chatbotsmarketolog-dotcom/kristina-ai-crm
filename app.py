@@ -279,11 +279,8 @@ def get_chats():
         chats = query.order_by(Chat.created_at.desc()).all()
         result = []
         for c in chats:
-            display_name = c.visitor_name
-            if u.is_admin and c.user_id:
-                user = User.query.get(c.user_id)
-                if user:
-                    display_name = user.username
+            # ✅ ИСПРАВЛЕНО: Показываем имя пользователя (если есть) или "Пользователь ID"
+            display_name = c.visitor_name or f"Пользователь #{c.id}"
             
             deal_status = ''
             deal = Deal.query.filter_by(chat_id=c.id).first()
@@ -293,7 +290,7 @@ def get_chats():
             
             result.append({
                 "id": c.id, 
-                "site": display_name or ("💬 Администратор" if not u.is_admin else "Клиент"), 
+                "site": display_name, 
                 "status": c.status, 
                 "time": c.created_at.isoformat(), 
                 "deal_status": deal_status
@@ -563,7 +560,7 @@ def get_admin_settings():
 def update_admin_settings():
     try:
         data = request.json
-        if 'show_client_chats' in data:  # ✅ ИСПРАВЛЕНО: добавлено "data"
+        if 'show_client_chats' in 
             request.current_user.show_client_chats = data['show_client_chats']
             db.session.commit()
         return jsonify({"ok": True})
@@ -596,14 +593,27 @@ def toggle_user():
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": "Ошибка"}), 500
 
+# ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ АДМИНОМ (УБРАНЫ ДУБЛИ)
 @app.route('/api/admin/send_to_user', methods=['POST'])
 @admin_required
 def admin_send_to_user():
     try:
         d = request.json; user_id = d.get('user_id'); text = d.get('text')
         if not user_id or not text: return jsonify({"error": "user_id и text обязательны"}), 400
-        chat = Chat(user_id=user_id, status='waiting'); db.session.add(chat); db.session.commit()
-        db.session.add(Message(chat_id=chat.id, sender='admin', text=text)); db.session.commit()
+        
+        # ✅ ПРОВЕРКА: Есть ли уже активный чат с этим юзером?
+        chat = Chat.query.filter_by(user_id=user_id, is_archived=False).first()
+        
+        # Если чата нет, создаем новый
+        if not chat:
+            chat = Chat(user_id=user_id, status='waiting')
+            db.session.add(chat)
+            db.session.commit()
+        
+        # Отправляем сообщение в существующий или новый чат
+        db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
+        db.session.commit()
+        
         user = User.query.get(user_id)
         if user and user.telegram_chat_id: send_telegram_notification(user.telegram_chat_id, f"💬 <b>Новое сообщение от админа!</b>\n\n{text[:100]}")
         return jsonify({"ok": True, "chat_id": chat.id})
