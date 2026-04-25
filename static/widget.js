@@ -1,4 +1,4 @@
-// КРИСТИНА.AI CRM Widget v3.1
+// КРИСТИНА.AI CRM Widget v3.2
 (function() {
     'use strict';
     
@@ -470,6 +470,7 @@
                 }).join('');
                 els.msgs.scrollTop = els.msgs.scrollHeight;
                 
+                // ✅ ИСПРАВЛЕНО: Автопоявление анкеты
                 if (formRequested && !els.dealForm.classList.contains('active') && !els.win.classList.contains('active') && (!els.nameForm || !els.nameForm.classList.contains('active'))) {
                     els.nameForm?.classList.remove('active'); els.dealForm?.classList.add('active');
                 }
@@ -522,7 +523,7 @@
         }
 
         initChat();
-        console.log('✅ Widget v3.1 loaded');
+        console.log('✅ Widget v3.2 loaded');
         
     } catch(e) { console.error('❌ Widget error:', e); }
 })();
