@@ -279,22 +279,13 @@ def get_chats():
         chats = query.order_by(Chat.created_at.desc()).all()
         result = []
         for c in chats:
-            # ✅ ИСПРАВЛЕНО: Показываем имя пользователя (если есть) или "Пользователь ID"
             display_name = c.visitor_name or f"Пользователь #{c.id}"
-            
             deal_status = ''
             deal = Deal.query.filter_by(chat_id=c.id).first()
             if deal:
                 if deal.status == 'completed': deal_status = '✅ Сделка'
                 elif deal.status == 'declined': deal_status = '❌ Отказ'
-            
-            result.append({
-                "id": c.id, 
-                "site": display_name, 
-                "status": c.status, 
-                "time": c.created_at.isoformat(), 
-                "deal_status": deal_status
-            })
+            result.append({"id": c.id, "site": display_name, "status": c.status, "time": c.created_at.isoformat(), "deal_status": deal_status})
         return jsonify(result)
     except Exception as e: 
         print(f"Get chats error: {e}")
@@ -560,7 +551,7 @@ def get_admin_settings():
 def update_admin_settings():
     try:
         data = request.json
-        if 'show_client_chats' in data:  # ✅ ИСПРАВЛЕНО: добавлено "data:"
+        if 'show_client_chats' in 
             request.current_user.show_client_chats = data['show_client_chats']
             db.session.commit()
         return jsonify({"ok": True})
@@ -593,27 +584,19 @@ def toggle_user():
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": "Ошибка"}), 500
 
-# ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ АДМИНОМ (УБРАНЫ ДУБЛИ)
 @app.route('/api/admin/send_to_user', methods=['POST'])
 @admin_required
 def admin_send_to_user():
     try:
         d = request.json; user_id = d.get('user_id'); text = d.get('text')
         if not user_id or not text: return jsonify({"error": "user_id и text обязательны"}), 400
-        
-        # ✅ ПРОВЕРКА: Есть ли уже активный чат с этим юзером?
         chat = Chat.query.filter_by(user_id=user_id, is_archived=False).first()
-        
-        # Если чата нет, создаем новый
         if not chat:
             chat = Chat(user_id=user_id, status='waiting')
             db.session.add(chat)
             db.session.commit()
-        
-        # Отправляем сообщение в существующий или новый чат
         db.session.add(Message(chat_id=chat.id, sender='admin', text=text))
         db.session.commit()
-        
         user = User.query.get(user_id)
         if user and user.telegram_chat_id: send_telegram_notification(user.telegram_chat_id, f"💬 <b>Новое сообщение от админа!</b>\n\n{text[:100]}")
         return jsonify({"ok": True, "chat_id": chat.id})
@@ -777,9 +760,7 @@ def widget_capture_late_contact():
         return jsonify({"ok": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
-# === ДОПОЛНИТЕЛЬНЫЕ ЭНДПОИНТЫ (ДЛЯ CRM ИНТЕРФЕЙСА) ===
-
-# ✅ Эндпоинт для индикатора "печатает" (CRM)
+# === ДОПОЛНИТЕЛЬНЫЕ ЭНДПОИНТЫ ===
 @app.route('/api/typing', methods=['POST'])
 @token_required
 def crm_typing():
@@ -788,7 +769,6 @@ def crm_typing():
     except Exception as e: 
         return jsonify({"error": str(e)}), 500
 
-# ✅ Эндпоинт для отправки формы заявки (CRM)
 @app.route('/api/chat/<int:chat_id>/request_form', methods=['POST'])
 @token_required
 def request_form(chat_id):
@@ -797,7 +777,6 @@ def request_form(chat_id):
         if not chat: return jsonify({"error": "Чат не найден"}), 404
         if not request.current_user.is_admin and chat.user_id != request.current_user.id:
             return jsonify({"error": "Доступ запрещен"}), 403
-        
         chat.form_requested = True
         db.session.commit()
         return jsonify({"ok": True})
